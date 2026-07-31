@@ -27,8 +27,20 @@ function createDb(): Db {
   return drizzlePglite(client, { schema });
 }
 
-export const db: Db = globalForDb.db ?? createDb();
-globalForDb.db = db;
+function realDb(): Db {
+  if (!globalForDb.db) globalForDb.db = createDb();
+  return globalForDb.db;
+}
+
+// Lazy proxy: PGlite must not be opened at module-import time, or `next
+// build` workers would open the data directory alongside the dev server and
+// corrupt it. The instance is created on first actual use.
+export const db: Db = new Proxy({} as Db, {
+  get(_target, prop) {
+    const value = (realDb() as unknown as Record<PropertyKey, unknown>)[prop];
+    return typeof value === "function" ? value.bind(globalForDb.db) : value;
+  },
+});
 
 // Run migrations once per process (PGlite dev convenience; prod runs npm run db:migrate)
 export async function ensureMigrated(): Promise<void> {
@@ -42,7 +54,12 @@ export async function ensureMigrated(): Promise<void> {
         const { migrate } = await import("drizzle-orm/pglite/migrator");
         await migrate(db as PgliteDatabase<typeof schema>, { migrationsFolder });
       }
-    })();
+    })().catch((err) => {
+      // Don't cache a failed attempt (e.g. a transient PGlite lock during a
+      // dev-server restart) — let the next request retry.
+      globalForDb.migrated = undefined;
+      throw err;
+    });
   }
   return globalForDb.migrated;
 }
