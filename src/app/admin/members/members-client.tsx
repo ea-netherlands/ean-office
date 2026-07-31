@@ -1,0 +1,229 @@
+"use client";
+
+import { useState, useTransition, useActionState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  setMemberStatusAction,
+  setMemberRoleAction,
+  endTrialAction,
+  clearNoShowsAction,
+  deleteUserAction,
+  addMemberAction,
+  AdminActionState,
+} from "@/actions/admin";
+import { Badge, Card, btnPrimary, btnSecondary, btnDanger, inputCls } from "@/components/ui";
+import { formatDayLong } from "@/lib/dates";
+
+export type MemberRow = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  trialEndsAt: string | null;
+  trialEnded: boolean;
+  noShowCount: number;
+  noShowEmailed: boolean;
+  noShowOptOut: boolean;
+  hasProfile: boolean;
+  lastSeenAt: string | null;
+};
+
+export function MembersClient({ rows }: { rows: MemberRow[] }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [addState, addAction] = useActionState<AdminActionState, FormData>(
+    addMemberAction,
+    {}
+  );
+
+  const trialsToReview = rows.filter((r) => r.trialEnded);
+
+  function run(action: () => Promise<AdminActionState>) {
+    setError(null);
+    startTransition(async () => {
+      const res = await action();
+      if (res.error) setError(res.error);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="space-y-4">
+      {trialsToReview.length > 0 && (
+        <Card className="border-orange-300 bg-orange-50">
+          <h2 className="font-semibold mb-2">Trials to review</h2>
+          <p className="text-sm text-slate-600 mb-3">
+            These trials have ended — confirm them as regular members, extend,
+            or end. (Members see no difference; this is EAN&apos;s own tracking.)
+          </p>
+          <ul className="space-y-2">
+            {trialsToReview.map((r) => (
+              <li key={r.id} className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-sm font-medium">
+                  {r.name}{" "}
+                  <span className="text-slate-400 font-normal">
+                    trial ended {r.trialEndsAt && formatDayLong(r.trialEndsAt)}
+                  </span>
+                </span>
+                <span className="flex gap-1.5">
+                  <SmallBtn onClick={() => run(() => endTrialAction(r.id, "convert"))}>
+                    Confirm member
+                  </SmallBtn>
+                  <SmallBtn onClick={() => run(() => endTrialAction(r.id, "extend"))}>
+                    Extend 30d
+                  </SmallBtn>
+                  <SmallBtn danger onClick={() => run(() => endTrialAction(r.id, "end"))}>
+                    End
+                  </SmallBtn>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      {error && (
+        <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+          {error}
+        </p>
+      )}
+
+      <div className="flex justify-end">
+        <button className={btnSecondary} onClick={() => setShowAdd((v) => !v)}>
+          + Add member manually
+        </button>
+      </div>
+      {showAdd && (
+        <Card>
+          <p className="text-sm text-slate-500 mb-3">
+            For seeding the roster (e.g. from the old Airtable). They can log
+            in immediately with a magic link.
+          </p>
+          <form action={addAction} className="flex gap-2 flex-wrap">
+            <input name="name" placeholder="Name" required className={`${inputCls} flex-1 min-w-40`} />
+            <input name="email" type="email" placeholder="Email" required className={`${inputCls} flex-1 min-w-40`} />
+            <button type="submit" className={btnPrimary}>
+              Add
+            </button>
+          </form>
+          {addState.error && <p className="text-sm text-red-700 mt-2">{addState.error}</p>}
+          {addState.ok && <p className="text-sm text-teal-700 mt-2">Added.</p>}
+        </Card>
+      )}
+
+      <Card>
+        <ul className="divide-y divide-slate-100">
+          {rows.map((r) => (
+            <li key={r.id} className="py-2.5">
+              <button
+                className="w-full flex items-center justify-between gap-2 text-left cursor-pointer"
+                onClick={() => setExpanded(expanded === r.id ? null : r.id)}
+              >
+                <span className="text-sm">
+                  <span className="font-medium">{r.name}</span>{" "}
+                  <span className="text-slate-400">{r.email}</span>
+                </span>
+                <span className="flex gap-1.5 items-center flex-wrap justify-end">
+                  {r.role === "admin" && <Badge tone="indigo">admin</Badge>}
+                  <Badge
+                    tone={
+                      r.status === "active"
+                        ? "green"
+                        : r.status === "trial"
+                          ? "teal"
+                          : "stone"
+                    }
+                  >
+                    {r.status}
+                  </Badge>
+                  {r.noShowCount > 0 && (
+                    <Badge tone="red">
+                      {r.noShowCount} no-shows{r.noShowEmailed ? " · emailed" : ""}
+                      {r.noShowOptOut ? " · opted out" : ""}
+                    </Badge>
+                  )}
+                  {!r.hasProfile && <Badge tone="amber">no profile</Badge>}
+                </span>
+              </button>
+
+              {expanded === r.id && (
+                <div className="mt-3 flex gap-1.5 flex-wrap items-center">
+                  {r.lastSeenAt && (
+                    <span className="text-xs text-slate-400 mr-2">
+                      last seen {r.lastSeenAt}
+                    </span>
+                  )}
+                  {r.status !== "active" && (
+                    <SmallBtn onClick={() => run(() => setMemberStatusAction(r.id, "active"))}>
+                      Mark active
+                    </SmallBtn>
+                  )}
+                  {r.status !== "inactive" && (
+                    <SmallBtn onClick={() => run(() => setMemberStatusAction(r.id, "inactive"))}>
+                      Deactivate
+                    </SmallBtn>
+                  )}
+                  {r.role === "admin" ? (
+                    <SmallBtn onClick={() => run(() => setMemberRoleAction(r.id, "member"))}>
+                      Remove admin
+                    </SmallBtn>
+                  ) : (
+                    <SmallBtn onClick={() => run(() => setMemberRoleAction(r.id, "admin"))}>
+                      Make admin
+                    </SmallBtn>
+                  )}
+                  {r.noShowCount > 0 && (
+                    <SmallBtn onClick={() => run(() => clearNoShowsAction(r.id))}>
+                      Zero no-shows
+                    </SmallBtn>
+                  )}
+                  <SmallBtn
+                    danger
+                    onClick={() => {
+                      if (
+                        confirm(
+                          `Really delete ${r.name}? This wipes their bookings and check-ins permanently (GDPR delete).`
+                        )
+                      )
+                        run(() => deleteUserAction(r.id));
+                    }}
+                  >
+                    Delete (GDPR)
+                  </SmallBtn>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      </Card>
+      {pending && <p className="text-xs text-slate-400">Working…</p>}
+    </div>
+  );
+}
+
+function SmallBtn({
+  children,
+  onClick,
+  danger,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`text-xs rounded-lg px-2.5 py-1.5 border cursor-pointer ${
+        danger
+          ? "text-red-700 border-red-200 hover:bg-red-50"
+          : "text-slate-700 border-slate-200 hover:bg-slate-50"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
