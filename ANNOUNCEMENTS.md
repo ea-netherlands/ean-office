@@ -60,14 +60,32 @@ What's different for you:
 - Desks are numbered 1–8 now, and people can pick or swap a specific desk
   when they book. There's a floor plan in the app.
 
-One thing I'd really appreciate your help with: getting people into the habit
-of scanning the QR code when they arrive. I'll print stickers for the door,
-the lunch table and each desk. The check-in numbers are what we report to
-EAIF, and attendance can't be backfilled — every week without check-ins is a
-permanent gap in the next funding application.
+**A favour, if you're in the office this weekend?** There's a job that needs
+doing in the room and I can't do it remotely.
 
-Have a click around and tell me what's confusing or annoying — easier to fix
-now than later.
+Go to Admin → QR and hit print. You'll get:
+
+- two big "Working here today?" posters — one for the door, one for the lunch
+  table
+- one numbered label per desk (1 to 8), each with the check-in code on it
+- one for the lunch table
+
+Then cut them up and stick them on. **The desk numbers need to match the
+floor plan** in the booking page, because people can now reserve a specific
+desk: 1 is the one nearest the door, then 2 and 3 as a pair, 4 and 5 as the
+next pair, 6 at the far end, and 7 and 8 on the island by the kitchen. Open
+Book → tap any day and you'll see the plan.
+
+Worth scanning one with your phone once they're up, just to check it opens
+the check-in page.
+
+No stress if the weekend doesn't work — but the sooner they're up the better.
+Attendance can't be backfilled, and the check-in numbers are what we report
+to EAIF, so every week without them is a permanent gap in the next funding
+application.
+
+Have a click around too and tell me what's confusing or annoying — easier to
+fix now than later.
 
 ---
 
