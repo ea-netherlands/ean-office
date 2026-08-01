@@ -140,7 +140,18 @@ export default async function HomePage() {
                       {e.endsAt ? `–${e.endsAt}` : ""}
                     </p>
                   </div>
-                  <RsvpButton eventId={e.id} rsvped={myRsvps.has(e.id)} />
+                  {e.url ? (
+                    <a
+                      href={e.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs border border-slate-300 rounded-full px-3 py-1 hover:bg-slate-50 whitespace-nowrap"
+                    >
+                      RSVP on Luma
+                    </a>
+                  ) : (
+                    <RsvpButton eventId={e.id} rsvped={myRsvps.has(e.id)} />
+                  )}
                 </li>
               ))}
             </ul>

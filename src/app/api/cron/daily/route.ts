@@ -160,7 +160,15 @@ ${endingSoon.length > 0 ? `<li>Trials ending within two weeks: <strong>${endingS
     result.weeklyDigest = true;
   }
 
-  // 7. GDPR: purge check-in records past the retention window.
+  // 7. Mirror the Luma calendar so events don't need manual entry.
+  try {
+    const { syncLuma } = await import("@/lib/luma");
+    result.luma = await syncLuma();
+  } catch (err) {
+    result.luma = { ok: false, error: String(err) };
+  }
+
+  // 8. GDPR: purge check-in records past the retention window.
   const purgeBefore = addDays(today, -Math.round(cfg.checkin_retention_months * 30.44));
   const purged = await db
     .delete(checkins)

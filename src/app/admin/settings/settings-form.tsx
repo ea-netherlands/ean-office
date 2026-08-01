@@ -132,6 +132,14 @@ export function SettingsForm({ cfg }: { cfg: Settings }) {
           <label className={labelCls}>Wifi password</label>
           <input name="wifi_password" defaultValue={cfg.wifi_password} className={inputCls} />
         </div>
+        <div>
+          <label className={labelCls}>Luma calendar feed (ICS URL)</label>
+          <input name="luma_ics_url" defaultValue={cfg.luma_ics_url} className={inputCls} />
+          <p className="text-xs text-slate-400 mt-1">
+            Events sync from this feed daily. Leave empty to manage events by
+            hand.
+          </p>
+        </div>
       </Card>
 
       {state.error && <p className="text-sm text-red-700">{state.error}</p>}

@@ -21,6 +21,7 @@ export type Settings = {
   trial_months: number;
   office_address: string;
   wifi_password: string;
+  luma_ics_url: string; // public ICS feed of the EAN Luma calendar
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -42,6 +43,7 @@ export const DEFAULT_SETTINGS: Settings = {
   trial_months: 3,
   office_address: "EA Netherlands office, Amsterdam",
   wifi_password: "ask your host",
+  luma_ics_url: "https://api.lu.ma/ics/get?entity=calendar&id=cal-akaE66Y0BQlrCVY",
 };
 
 export async function getSettings(): Promise<Settings> {

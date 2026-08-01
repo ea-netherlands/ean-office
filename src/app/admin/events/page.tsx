@@ -29,6 +29,8 @@ export default async function EventsPage() {
       organiser: e.organiser,
       expectedAttendance: e.expectedAttendance,
       headcount: e.headcount,
+      source: e.source,
+      url: e.url,
       checkins: forEvent.filter((a) => a.source === "checkin").length,
       manual: forEvent.filter((a) => a.source === "manual").length,
       rsvps: forEvent.filter((a) => a.source === "rsvp").length,
@@ -40,8 +42,9 @@ export default async function EventsPage() {
     <Page wide>
       <H1>Events</H1>
       <Sub>
-        A counter, not a platform — Luma and Slack stay in charge of promotion.
-        Attendance comes from the check-in QR, or type a headcount afterwards.
+        A counter, not a platform — events sync from the Luma calendar daily
+        (promotion and RSVPs stay on Luma). Check the guessed type, and type a
+        headcount after each event. Attendance also comes from the check-in QR.
       </Sub>
       <EventsClient rows={rows} />
     </Page>

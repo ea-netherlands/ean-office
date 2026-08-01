@@ -290,6 +290,7 @@ export async function saveSettingsAction(
   await setSetting("flex_unavailable_window", String(formData.get("flex_unavailable_window") || "12:00–13:00"));
   await setSetting("office_address", String(formData.get("office_address") || ""));
   await setSetting("wifi_password", String(formData.get("wifi_password") || ""));
+  await setSetting("luma_ics_url", String(formData.get("luma_ics_url") || "").trim());
 
   revalidatePath("/admin/settings");
   return { ok: true };
@@ -340,4 +341,28 @@ export async function deleteEventAction(eventId: string): Promise<AdminActionSta
   await db.delete(events).where(eq(events.id, eventId));
   revalidatePath("/admin/events");
   return { ok: true };
+}
+
+export async function setEventTypeAction(
+  eventId: string,
+  type: string
+): Promise<AdminActionState> {
+  await requireAdmin();
+  await db
+    .update(events)
+    .set({ type: type as typeof events.$inferInsert.type })
+    .where(eq(events.id, eventId));
+  revalidatePath("/admin/events");
+  return { ok: true };
+}
+
+export async function syncLumaAction(): Promise<
+  AdminActionState & { created?: number; updated?: number; total?: number }
+> {
+  await requireAdmin();
+  const { syncLuma } = await import("@/lib/luma");
+  const res = await syncLuma();
+  revalidatePath("/admin/events");
+  if (!res.ok) return { error: res.error };
+  return { ok: true, created: res.created, updated: res.updated, total: res.total };
 }

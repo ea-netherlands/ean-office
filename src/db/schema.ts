@@ -234,6 +234,11 @@ export const events = pgTable("events", {
     .default("ean"),
   expectedAttendance: integer("expected_attendance"),
   headcount: integer("headcount"), // admin-entered fallback
+  source: text("source", { enum: ["manual", "luma"] })
+    .notNull()
+    .default("manual"),
+  externalId: text("external_id").unique(), // Luma UID for sync upserts
+  url: text("url"), // luma.com event page
   createdBy: text("created_by"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
