@@ -1,132 +1,152 @@
 # Going live — a walkthrough for James
 
-No prior deployment experience assumed. Total time: roughly an hour, most of
-it waiting for signups and DNS. Everything is on free tiers; the app costs
-€0/month to run.
+No prior deployment experience assumed. About an hour of actual work, most
+of the rest is waiting for DNS. Everything runs on free tiers; the app costs
+€0/month at this scale.
 
-You'll create three free accounts (GitHub, Vercel, Neon), connect them
-together, and point a subdomain at the result. Claude Code can drive most of
-the terminal parts — this doc is so you understand what's happening and can
-redo any step yourself.
+You'll create four free accounts, connect them, and point a subdomain at the
+result. Claude Code can run every terminal step for you — the accounts and
+the DNS record are the parts that need to be you.
 
 ---
 
 ## The mental model
 
-- **GitHub** holds the code (like Google Drive for code, with history).
-- **Vercel** runs the app. Every time the code on GitHub changes, Vercel
-  rebuilds and republishes it automatically. It also runs the daily 08:00 job.
-- **Neon** holds the database (who's a member, who booked what). It's
-  Postgres, the same thing the app uses on this laptop, just hosted.
-- **Resend** sends the emails (magic links, reminders, approvals).
-- **DNS** is one record that makes `office.effectiefaltruisme.nl` point at
-  Vercel.
+- **GitHub** holds the code (like Drive for code, with history).
+- **Vercel** runs the app and the daily 08:00 job. Every push to GitHub
+  redeploys automatically.
+- **Neon** holds the database — who's a member, who booked what.
+- **Resend** sends the email (magic links, reminders, approvals).
+- **DNS** — one record makes `office.effectiefaltruisme.nl` point at Vercel.
+
+## Before you start: a password manager
+
+Put every login below in EAN's shared password manager, and store the
+two-factor codes there too — not only on your phone. The whole reason this
+project exists is that a process died with one person's departure; don't
+recreate that with the accounts.
+
+Use `info@effectiefaltruisme.nl` (or a `tech@` alias) for **Vercel, Neon and
+Resend**. GitHub is the exception — accounts there are personal by design.
 
 ## Step 1 — GitHub (10 min)
 
-1. Create an account at github.com (or use EAN's if one exists).
-2. Create a new **private** repository called `ean-office`. Don't add a
-   README — the code already has one.
-3. Push the code up. From a terminal in the `ean-office` folder:
+1. You and Ricardo each create a personal account at github.com.
+2. Create a free **organisation** (e.g. `ea-netherlands`) with both of you as
+   owners, so the code outlives either of you.
+3. In the org, create a **private** repository called `ean-office`. Don't add
+   a README — the code has one.
+4. Push the code. In a terminal, from the `ean-office` folder:
 
 ```bash
-git remote add origin https://github.com/YOUR-USERNAME/ean-office.git
-git push -u origin main
+git remote add origin https://github.com/ea-netherlands/ean-office.git && git push -u origin main
 ```
-
-(It will ask you to log in the first time.)
 
 ## Step 2 — Neon, the database (10 min)
 
-1. Sign up at neon.tech (free tier — comfortably enough for this forever).
-2. Create a project, call it `ean-office`, pick region **Frankfurt (eu-central-1)**.
-3. It shows a **connection string** — a long address starting with
-   `postgresql://…`. Copy it somewhere; that's your `DATABASE_URL`.
-4. Create the tables by running the migrations once, from the `ean-office`
-   folder:
+1. Sign up at neon.tech with the info@ address (free tier is plenty forever
+   at this size).
+2. Create a project called `ean-office`, region **Frankfurt (eu-central-1)**.
+3. Copy the **connection string** it shows — a long address starting
+   `postgresql://`. That's your `DATABASE_URL`.
+4. Create the tables (paste your real connection string in place of the
+   placeholder):
 
 ```bash
-DATABASE_URL="paste-the-connection-string-here" npx tsx -e "import('./src/db/index.ts').then(m=>m.ensureMigrated()).then(()=>{console.log('migrated');process.exit(0)})"
+DATABASE_URL="postgresql://…" npm run db:migrate
 ```
 
-5. Do **not** run the seed script against this database — that's fake demo
-   data. The real roster gets added through the app (step 6).
+⚠️ Never run `npm run db:seed` against this database — that's fake demo data.
 
 ## Step 3 — Resend, the email (10 min)
 
-1. Sign up at resend.com (free tier: 100 emails/day — plenty).
-2. Add and verify the domain `effectiefaltruisme.nl` under **Domains**. It
-   gives you 2–3 DNS records to add wherever your DNS is managed (same place
-   as step 5 — likely your domain registrar or Cloudflare). This proves you
-   own the domain so emails don't land in spam.
+1. Sign up at resend.com with the info@ address (free tier: 100 emails/day,
+   comfortably enough).
+2. **Domains → Add** `effectiefaltruisme.nl`. It gives you 2–3 DNS records to
+   add wherever the domain's DNS lives — this is what keeps the office emails
+   out of spam. Same place you'll add the record in step 5.
 3. Create an **API key** and copy it.
 
 ## Step 4 — Vercel, the hosting (15 min)
 
-1. Sign up at vercel.com **with your GitHub account** (that's the connection
-   that makes deploys automatic).
-2. **Add New → Project**, import the `ean-office` repository. Before hitting
-   Deploy, open **Environment Variables** and add:
+1. Sign up at vercel.com **with email** (info@), not "Continue with GitHub" —
+   that would tie the account to one person's GitHub. Connect GitHub
+   afterwards when it asks.
+2. **Add New → Project → Import** the `ean-office` repo.
+3. Before clicking Deploy, open **Environment Variables** and add:
 
 | Name | Value |
 |---|---|
 | `DATABASE_URL` | the Neon connection string |
 | `RESEND_API_KEY` | the Resend key |
-| `APP_SECRET` | a long random string — run `openssl rand -base64 32` in a terminal to make one |
+| `APP_SECRET` | a long random string — `openssl rand -base64 32` |
 | `APP_URL` | `https://office.effectiefaltruisme.nl` |
 | `EMAIL_FROM` | `EA Netherlands Office <office@effectiefaltruisme.nl>` |
-| `CRON_SECRET` | another random string (same `openssl` command) |
+| `CRON_SECRET` | another `openssl rand -base64 32` |
 
-3. Hit **Deploy**. Two minutes later you get a working URL like
-   `ean-office-xxxx.vercel.app`. The daily job is registered automatically
-   (it's in `vercel.json`).
+4. **Deploy.** Two minutes later you have a working URL like
+   `ean-office-xxxx.vercel.app`. The daily job registers itself from
+   `vercel.json`; Vercel passes `CRON_SECRET` automatically.
 
 ## Step 5 — the subdomain (5 min + DNS wait)
 
-1. In the Vercel project: **Settings → Domains → Add** →
+1. Vercel project → **Settings → Domains → Add** →
    `office.effectiefaltruisme.nl`.
-2. Vercel shows you a **CNAME record**. Add it wherever
-   effectiefaltruisme.nl's DNS lives (ask whoever set up the website —
-   likely Cloudflare or the registrar): name `office`, value
+2. Vercel shows a **CNAME record**. Add it where effectiefaltruisme.nl's DNS
+   is managed (ask whoever set up the website): name `office`, value
    `cname.vercel-dns.com`.
-3. Wait for it to go green in Vercel (minutes to a few hours).
+3. Wait for Vercel to show it as valid — minutes, occasionally a few hours.
 
-## Step 6 — first login and setup (15 min)
+## Step 6 — first login and setup (20 min)
 
-1. Open `https://office.effectiefaltruisme.nl`. The database is empty, so
-   there's no admin yet. Add yourself by running this once from your laptop:
+The database is empty, so there's no admin yet. Bootstrap yourself once:
 
 ```bash
-DATABASE_URL="the-neon-connection-string" npx tsx -e "
-import('./src/db/index.ts').then(async (m) => {
-  const { newId } = await import('./src/lib/ids.ts');
-  await m.ensureMigrated();
-  await m.db.insert(m.users).values({ id: newId('usr'), name: 'James Herbert', email: 'james@effectiefaltruisme.nl', role: 'admin', status: 'active', approvedAt: new Date() });
-  console.log('admin created'); process.exit(0);
-});"
+DATABASE_URL="postgresql://…" npm run admin:add -- "James Herbert" james@effectiefaltruisme.nl
 ```
 
-2. Log in on the site with that email — the magic link now arrives as a real
-   email.
-3. From **Admin → Members**, add Ricardo and Merlijn (then promote them to
-   admin), and add the existing members from the Airtable export.
-4. **Admin → Settings**: check desk count, coverage days, wifi password,
-   office address. The Luma feed is pre-filled.
-5. **Admin → Events → Sync from Luma**, then walk the list once setting the
-   right type on past events (this is what makes the historical
-   events-per-month numbers in Reports correct).
-6. **Admin → QR**: print the stickers. Door, lunch table, desks.
+Then, on the live site:
 
-## Step 7 — flip the website (5 min)
+1. **Log in** at `/login` with that address — the magic link now arrives as a
+   real email. (If it doesn't, check Resend's dashboard for the domain
+   verification status.)
+2. **Admin → Members** — add Ricardo and Merlijn, then promote both to admin.
+   The app warns until there are three. Add existing members from the
+   Airtable export here too ("Add member manually").
+3. **Admin → Settings** — check desk count, coverage days (Mon–Thu), arrival
+   slots, office address, and the wifi password. Consider changing the wifi
+   password itself: the old one sat on a public Notion URL.
+4. **Admin → Info page** — read it through; it's pre-filled from the Notion
+   content. The Notion page can then be archived.
+5. **Admin → Events → Sync from Luma** — pulls your calendar in. Walk the
+   past events once and set the right type on each (talk, social, themed
+   coworking day…), since that's what the events-per-month figures in
+   Reports are built from.
+6. **Admin → QR** — print the stickers. One by the door, one on the lunch
+   table, small ones on the desks.
+7. **Admin → Reports** — should look sane and mostly empty. Real numbers
+   start accumulating from day one of check-ins.
 
-Hand `WEBSITE-EDITS.md` to whoever manages Sanity: the two CTA swaps, the
-"already a member" link, the one-working-day copy. Export the Airtable base
-to CSV, then cancel the subscription.
+## Step 7 — switch the website and tell people (15 min)
+
+1. Hand `WEBSITE-EDITS.md` to whoever manages Sanity: the two CTA swaps, the
+   "already a member" link, and the one-working-day wording.
+2. Export the Airtable base to CSV (every table), then cancel the
+   subscription — but check the anonymous feedback form first, it's also on
+   Airtable and is linked from the info page.
+3. Announce it to members. Worth mentioning: booking moved off the Google
+   Sheet, desks are now numbered so you can pick or move seats (or just book
+   and get one assigned), the QR code by the door is how attendance gets
+   counted, and profiles are optional.
 
 ## Afterwards
 
-- **Code changes**: any change pushed to GitHub redeploys automatically.
-- **Something looks broken**: Vercel dashboard → the project → **Logs**.
-- **Checking the cron ran**: Vercel → Settings → Cron Jobs shows the last runs.
-- **Backups**: Neon keeps point-in-time restore on the free tier. The
-  reports CSV export is also a de-facto data backup — download one monthly.
+- **Code changes** — push to GitHub, Vercel redeploys itself.
+- **Something looks broken** — Vercel dashboard → project → **Logs**.
+- **Did the cron run?** — Vercel → Settings → Cron Jobs shows recent runs.
+  You can also open `/admin/emails` to see everything the app has sent.
+- **Backups** — Neon has point-in-time restore on the free tier. Downloading
+  the reports CSV monthly is a decent second copy.
+- **First month to watch** — the check-in rate on `/admin/reports`. Below
+  ~70% is a problem to fix in the room (a nudge at lunch, a bigger sticker),
+  not in the code.
