@@ -45,6 +45,36 @@ export async function saveProfileAction(
   return { ok: true };
 }
 
+/**
+ * The member-facing community profile — separate from the M&E answers,
+ * which are never shown to anyone. Opt-in via profileVisible.
+ */
+export async function saveCommunityProfileAction(
+  _prev: ProfileState,
+  formData: FormData
+): Promise<ProfileState> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Not logged in." };
+
+  const visible = formData.get("profileVisible") === "on";
+  const publicCauseAreas = formData.getAll("publicCauseAreas").map(String);
+  await db
+    .update(users)
+    .set({
+      profileVisible: visible,
+      bio: String(formData.get("bio") || "").slice(0, 500) || null,
+      expertise: String(formData.get("expertise") || "").slice(0, 300) || null,
+      publicCauseAreas: publicCauseAreas.length > 0 ? publicCauseAreas : null,
+      publicLink: String(formData.get("publicLink") || "").slice(0, 300) || null,
+    })
+    .where(eq(users.id, user.id));
+
+  revalidatePath("/me");
+  revalidatePath("/book");
+  revalidatePath("/");
+  return { ok: true };
+}
+
 export async function updatePrefsAction(
   _prev: ProfileState,
   formData: FormData

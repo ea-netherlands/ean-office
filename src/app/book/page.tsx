@@ -70,7 +70,13 @@ export default async function BookPage({
       flexLeft: cap.flexLeft,
       full: cap.full,
       waitlistCount: cap.waitlistCount,
-      people: cap.people.map((p) => p.name),
+      people: cap.people.map((p) => ({
+        id: p.id,
+        name: p.name,
+        seatType: p.seatType,
+        isYou: p.id === user.id,
+        profile: p.profile,
+      })),
       mine: my
         ? {
             bookingId: my.id,

@@ -17,6 +17,21 @@ import { appUrl } from "./auth";
 
 export type Booking = typeof bookings.$inferSelect;
 
+export type PersonProfile = {
+  bio: string | null;
+  expertise: string | null;
+  causeAreas: string[] | null;
+  link: string | null;
+};
+
+export type DayPerson = {
+  id: string;
+  name: string;
+  seatType: string;
+  // Present only when the member opted in to a visible community profile.
+  profile: PersonProfile | null;
+};
+
 export type DayCapacity = {
   date: string;
   desksBooked: number;
@@ -27,7 +42,7 @@ export type DayCapacity = {
   full: boolean;
   waitlistCount: number;
   closed: boolean; // weekend or holiday
-  people: { id: string; name: string; seatType: string }[];
+  people: DayPerson[];
 };
 
 export async function capacityForRange(
@@ -44,6 +59,11 @@ export async function capacityForRange(
       source: bookings.source,
       userId: bookings.userId,
       userName: users.name,
+      profileVisible: users.profileVisible,
+      bio: users.bio,
+      expertise: users.expertise,
+      publicCauseAreas: users.publicCauseAreas,
+      publicLink: users.publicLink,
     })
     .from(bookings)
     .innerJoin(users, eq(users.id, bookings.userId))
@@ -83,7 +103,19 @@ export async function capacityForRange(
     } else {
       day.flexBooked++;
     }
-    day.people.push({ id: r.userId, name: r.userName, seatType: r.seatType });
+    day.people.push({
+      id: r.userId,
+      name: r.userName,
+      seatType: r.seatType,
+      profile: r.profileVisible
+        ? {
+            bio: r.bio,
+            expertise: r.expertise,
+            causeAreas: r.publicCauseAreas,
+            link: r.publicLink,
+          }
+        : null,
+    });
   }
   for (const day of map.values()) {
     day.desksLeft = Math.max(0, cfg.desk_count - day.desksBooked);

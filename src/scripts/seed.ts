@@ -167,6 +167,30 @@ async function main() {
       guidelinesAcceptedAt: approvedAt,
       approvedAt,
       approvedBy: pick(adminIds),
+      ...(chance(0.6)
+        ? {
+            profileVisible: true,
+            bio: pick([
+              "Researching AI governance and what the EU AI Act means for frontier labs.",
+              "Building a global health charity — currently piloting in Malawi.",
+              "Working on alternative protein policy in the Netherlands.",
+              "Independent researcher on farmed animal welfare metrics.",
+              "Figuring out my career switch into biosecurity — happy to chat!",
+              "Community building for the Dutch EA network.",
+              "Earning to give; software engineer by day.",
+            ]),
+            expertise: pick([
+              "grant applications, EU policy",
+              "statistics, cost-effectiveness analysis",
+              "operations, event organising",
+              "machine learning, technical AI safety",
+              "fundraising, charity entrepreneurship",
+              "career planning, coaching",
+            ]),
+            publicCauseAreas: [weightedCause()].filter((c) => c !== "Other"),
+            publicLink: "https://linkedin.com/in/example",
+          }
+        : {}),
       ...(hasProfile
         ? {
             causeArea: weightedCause(),

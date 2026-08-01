@@ -13,6 +13,7 @@ import {
   BlockState,
 } from "@/actions/booking";
 import { ProfileForm } from "@/components/profile-form";
+import { PeopleList, PersonChipData } from "@/components/people";
 import { Avatar, btnPrimary, btnSecondary, btnDanger, inputCls, Icon } from "@/components/ui";
 import { formatDayLong, WEEKDAY_NAMES } from "@/lib/dates";
 
@@ -25,7 +26,7 @@ export type DayInfo = {
   flexLeft: number;
   full: boolean;
   waitlistCount: number;
-  people: string[];
+  people: PersonChipData[];
   mine: {
     bookingId: string;
     status: "booked" | "waitlisted";
@@ -242,8 +243,8 @@ function DayCell({
           {d.themedEvent && <Icon name="target-arrow" className="text-[10px] text-teal-700" />}
           {d.people.length > 0 && (
             <span className="flex -space-x-1 mt-auto">
-              {d.people.slice(0, 3).map((name, i) => (
-                <Avatar key={i} name={name} small />
+              {d.people.slice(0, 3).map((p) => (
+                <Avatar key={p.id} name={p.name} small />
               ))}
               {d.people.length > 3 && (
                 <span className="text-[9px] self-center pl-1.5">
@@ -289,16 +290,8 @@ function DayPanel({
       </p>
 
       {day.people.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-3">
-          {day.people.map((name, i) => (
-            <span
-              key={i}
-              className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-full pl-1 pr-2.5 py-0.5 text-xs"
-            >
-              <Avatar name={name} small />
-              {name}
-            </span>
-          ))}
+        <div className="mt-3">
+          <PeopleList people={day.people} />
         </div>
       )}
 

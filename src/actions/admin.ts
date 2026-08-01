@@ -356,6 +356,18 @@ export async function setEventTypeAction(
   return { ok: true };
 }
 
+export async function saveInfoPageAction(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  await requireAdmin();
+  await setSetting("info_public_md", String(formData.get("info_public_md") || ""));
+  await setSetting("info_members_md", String(formData.get("info_members_md") || ""));
+  revalidatePath("/info");
+  revalidatePath("/admin/info");
+  return { ok: true };
+}
+
 export async function syncLumaAction(): Promise<
   AdminActionState & { created?: number; updated?: number; total?: number }
 > {

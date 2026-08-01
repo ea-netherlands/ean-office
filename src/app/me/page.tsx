@@ -53,6 +53,13 @@ export default async function MePage() {
           user={{
             name: user.name,
             noshowEmailOptOut: user.noshowEmailOptOut,
+            community: {
+              profileVisible: user.profileVisible,
+              bio: user.bio ?? user.about, // prefill from intake, editable before publishing
+              expertise: user.expertise,
+              publicCauseAreas: user.publicCauseAreas,
+              publicLink: user.publicLink ?? user.profileUrl,
+            },
             profile: {
               causeArea: user.causeArea,
               roleCategory: user.roleCategory,

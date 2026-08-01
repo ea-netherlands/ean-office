@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { Nav } from "@/components/nav";
-import { Page, H1, Sub, Card, Avatar, Badge, btnPrimary, btnSecondary } from "@/components/ui";
+import { Page, H1, Sub, Card, Badge, btnPrimary, btnSecondary } from "@/components/ui";
+import { PeopleList } from "@/components/people";
 import { capacityForDay } from "@/lib/booking";
 import { db, checkins, events, eventAttendance, ensureMigrated } from "@/db";
 import { and, eq, gte, lte, asc } from "drizzle-orm";
@@ -103,20 +104,15 @@ export default async function HomePage() {
                 Nobody yet — be the first to book.
               </p>
             ) : (
-              <div className="flex flex-wrap gap-2">
-                {cap.people.map((p, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-full pl-1 pr-3 py-1 text-sm"
-                  >
-                    <Avatar name={p.name} small />
-                    {p.id === user.id ? "You" : p.name}
-                    {p.seatType === "flex" && (
-                      <span className="text-xs text-slate-400">table</span>
-                    )}
-                  </span>
-                ))}
-              </div>
+              <PeopleList
+                people={cap.people.map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                  seatType: p.seatType,
+                  isYou: p.id === user.id,
+                  profile: p.profile,
+                }))}
+              />
             )}
           </Card>
         )}

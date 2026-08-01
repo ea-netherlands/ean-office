@@ -51,6 +51,15 @@ export const users = pgTable(
     profileUpdatedAt: timestamp("profile_updated_at", { withTimezone: true }),
     profileSkipCount: integer("profile_skip_count").notNull().default(0),
 
+    // Community profile — what other members may see. Deliberately separate
+    // from the M&E answers above, which are aggregate-reporting-only by
+    // promise. Opt-in, member-authored, never includes funding or gender.
+    profileVisible: boolean("profile_visible").notNull().default(false),
+    bio: text("bio"), // "what I'm working on"
+    expertise: text("expertise"), // "ask me about"
+    publicCauseAreas: text("public_cause_areas").array(),
+    publicLink: text("public_link"),
+
     // no-show ladder state
     noshowEmailOptOut: boolean("noshow_email_opt_out").notNull().default(false),
     lastNoshowEmailAt: timestamp("last_noshow_email_at", {
