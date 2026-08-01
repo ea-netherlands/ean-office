@@ -113,7 +113,12 @@ export function JoinForm({
           <input type="checkbox" name="guidelines" required className="mt-0.5" />
           <span>
             I&apos;ve read the{" "}
-            <a href="/info" target="_blank" className="text-teal-700 underline">
+            <a
+              href="https://effectiefaltruisme.nl/en/legal/code-of-conduct"
+              target="_blank"
+              rel="noreferrer"
+              className="text-teal-700 underline"
+            >
               office guidelines
             </a>{" "}
             *
