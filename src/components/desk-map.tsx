@@ -1,12 +1,19 @@
 "use client";
 
-// The office floor plan, from James's sketch: kitchen along the top wall
-// with desks 7–8 beside it, the main island in the middle (1, then 2/4
-// facing 3/5, then 6), the lunch table bottom-left, and the lounge behind a
-// divider on the right. Every desk renders the same size. Tap a free desk
-// to take it.
+// The office floor plan, from James's sketch. A unit grid keeps every desk
+// the same footprint: desks 2/3/4/5 and 7/8 lie two units wide by one deep,
+// desks 1 and 6 are the same desks rotated 90° — one unit wide, spanning
+// both rows of the island. Kitchen and lunch table stack against the left
+// wall with nothing between them; the desk cluster starts after them, with
+// 7 and 8 lined up above 2 and 4. Lounge sits behind the divider, right.
+//
+// Tracks: kitchen/lunch · gap · desk 1 · desks 7,2,3 · desks 8,4,5 · desk 6.
+// A full desk is 2 units across, so the rotated ones (1, 6) are 1 unit.
 
 export type DeskOccupant = { name: string; isYou: boolean };
+
+const GRID_COLS = "2.5fr 0.35fr 1fr 2fr 2fr 1fr";
+const GRID_ROWS = "2.25rem 1rem 2.25rem 2.25rem";
 
 export function DeskMap({
   deskCount,
@@ -23,59 +30,74 @@ export function DeskMap({
   flexUsed?: number;
   flexTotal?: number;
 }) {
-  const desk = (n: number) => (
-    <Desk key={n} n={n} occupant={occupants.get(n)} onPick={onPick} disabled={disabled} />
+  const desk = (n: number, style: React.CSSProperties) => (
+    <div style={style} key={n}>
+      <Desk n={n} occupant={occupants.get(n)} onPick={onPick} disabled={disabled} />
+    </div>
   );
 
   // The drawn layout fits the real 8-desk room; other counts get a plain grid.
   if (deskCount !== 8) {
     return (
       <div className="grid grid-cols-4 gap-1.5">
-        {Array.from({ length: deskCount }, (_, i) => desk(i + 1))}
+        {Array.from({ length: deskCount }, (_, i) => (
+          <div key={i + 1} className="h-10">
+            <Desk n={i + 1} occupant={occupants.get(i + 1)} onPick={onPick} disabled={disabled} />
+          </div>
+        ))}
       </div>
     );
   }
 
   return (
-    <div className="relative select-none border border-slate-300 rounded-xl p-2.5 pr-14 bg-white">
+    <div className="relative select-none border border-slate-300 rounded-xl p-2.5 pr-12 bg-white">
       {/* lounge, behind the divider on the right */}
-      <div className="absolute top-2 bottom-2 right-0 w-12 border-l border-dashed border-slate-300 flex items-center justify-center">
+      <div className="absolute top-2 bottom-2 right-0 w-11 border-l border-dashed border-slate-300 flex items-center justify-center">
         <span className="text-[10px] text-slate-400 -rotate-90 whitespace-nowrap">
           lounge
         </span>
       </div>
-      {/* door on the left wall */}
-      <div className="absolute -left-1 top-1/2 -translate-y-1/2 bg-white px-0.5 text-slate-400 text-[10px] leading-none text-center">
-        <span className="text-base leading-none">⇦</span>
+      {/* door, left wall */}
+      <div className="absolute -left-0.5 top-1/2 -translate-y-1/2 bg-white px-0.5 text-slate-400 text-[9px] leading-none text-center">
+        <span className="text-sm leading-none">⇦</span>
         <br />
         door
       </div>
 
-      {/* top wall: kitchen + desks 7, 8 */}
-      <div className="grid grid-cols-4 gap-1.5 mb-4">
-        <div className="col-span-2 h-10 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-[10px] text-slate-400">
+      <div
+        className="grid gap-1.5"
+        style={{ gridTemplateColumns: GRID_COLS, gridTemplateRows: GRID_ROWS }}
+      >
+        {/* left wall: kitchen above the lunch table, nothing between them */}
+        <div
+          style={{ gridColumn: "1 / 2", gridRow: "1" }}
+          className="rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-[10px] text-slate-400"
+        >
           kitchen
         </div>
-        {desk(7)}
-        {desk(8)}
-      </div>
+        <div
+          style={{ gridColumn: "1 / 2", gridRow: "3 / 5" }}
+          className="rounded-lg border border-slate-200 bg-slate-50 flex flex-col items-center justify-center text-[10px] text-slate-400 text-center leading-tight px-1"
+        >
+          <span>lunch table</span>
+          {typeof flexUsed === "number" && typeof flexTotal === "number" && (
+            <span>
+              {flexUsed}/{flexTotal} taken
+            </span>
+          )}
+        </div>
 
-      {/* the island: 1 | 2/4 over 3/5 | 6 — all desks the same size */}
-      <div className="grid grid-cols-4 grid-rows-2 gap-1.5 mb-4 px-3">
-        <div className="row-span-2 flex items-center">{desk(1)}</div>
-        {desk(2)}
-        {desk(4)}
-        <div className="row-span-2 flex items-center">{desk(6)}</div>
-        {desk(3)}
-        {desk(5)}
-      </div>
+        {/* top wall: 7 and 8, lined up above 2 and 4 */}
+        {desk(7, { gridColumn: "4 / 5", gridRow: "1" })}
+        {desk(8, { gridColumn: "5 / 6", gridRow: "1" })}
 
-      {/* lunch table, bottom-left */}
-      <div className="w-1/2 h-10 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-[10px] text-slate-400">
-        lunch table
-        {typeof flexUsed === "number" && typeof flexTotal === "number"
-          ? ` · ${flexUsed}/${flexTotal} spots taken`
-          : ""}
+        {/* the island: 1 and 6 rotated on the ends, 2/4 over 3/5 between */}
+        {desk(1, { gridColumn: "3 / 4", gridRow: "3 / 5" })}
+        {desk(2, { gridColumn: "4 / 5", gridRow: "3" })}
+        {desk(4, { gridColumn: "5 / 6", gridRow: "3" })}
+        {desk(3, { gridColumn: "4 / 5", gridRow: "4" })}
+        {desk(5, { gridColumn: "5 / 6", gridRow: "4" })}
+        {desk(6, { gridColumn: "6 / 7", gridRow: "3 / 5" })}
       </div>
     </div>
   );
@@ -114,7 +136,7 @@ function Desk({
             : `Desk ${n} — ${occupant.name}`
           : `Desk ${n} — free`
       }
-      className={`w-full h-10 rounded-lg border text-xs font-medium flex flex-col items-center justify-center gap-0 leading-tight transition-colors ${
+      className={`w-full h-full rounded-lg border text-xs font-medium flex flex-col items-center justify-center gap-0 leading-tight transition-colors ${
         occupant?.isYou
           ? "bg-teal-600 border-teal-700 text-white"
           : occupant
