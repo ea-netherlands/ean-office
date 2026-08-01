@@ -10,11 +10,13 @@ export function TodayActions({
   booked,
   checkedIn,
   seatType,
+  deskNumber,
   full,
 }: {
   booked: boolean;
   checkedIn: boolean;
   seatType?: string;
+  deskNumber?: number;
   full: boolean;
 }) {
   const [pending, startTransition] = useTransition();
@@ -37,7 +39,11 @@ export function TodayActions({
       {booked ? (
         <p className="text-lg font-semibold">
           You&apos;re booked today
-          {seatType === "flex" ? " (lunch table)" : ""}
+          {seatType === "flex"
+            ? " (lunch table)"
+            : deskNumber
+              ? ` — desk ${deskNumber}`
+              : ""}
         </p>
       ) : (
         <p className="text-lg font-semibold">

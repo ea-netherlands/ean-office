@@ -7,6 +7,7 @@ export type PersonChipData = {
   id: string;
   name: string;
   seatType?: string;
+  deskNumber?: number | null;
   isYou?: boolean;
   profile: {
     bio: string | null;
@@ -43,9 +44,11 @@ export function PeopleList({ people }: { people: PersonChipData[] }) {
             >
               <Avatar name={p.name} small />
               {p.isYou ? "You" : p.name}
-              {p.seatType === "flex" && (
+              {p.seatType === "flex" ? (
                 <span className="text-slate-400">table</span>
-              )}
+              ) : p.deskNumber ? (
+                <span className="text-slate-400">d{p.deskNumber}</span>
+              ) : null}
               {clickable && <span className="text-teal-600">›</span>}
             </button>
           );

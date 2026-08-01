@@ -54,7 +54,11 @@ export default async function AdminTodayPage() {
                   <div className="flex-1">
                     <p className="text-sm font-medium">
                       {r.u.name}{" "}
-                      {r.b.seatType === "flex" && <Badge tone="amber">lunch table</Badge>}
+                      {r.b.seatType === "flex" ? (
+                        <Badge tone="amber">lunch table</Badge>
+                      ) : r.b.deskNumber ? (
+                        <Badge tone="teal">desk {r.b.deskNumber}</Badge>
+                      ) : null}
                       {r.b.source === "walkin" && <Badge tone="indigo">walk-in</Badge>}
                       {r.b.source === "block" && <Badge>repeating</Badge>}
                     </p>

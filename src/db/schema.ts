@@ -158,6 +158,8 @@ export const bookings = pgTable(
     seatType: text("seat_type", { enum: ["desk", "flex"] })
       .notNull()
       .default("desk"),
+    deskNumber: integer("desk_number"), // 1..desk_count, desks only
+
     status: text("status", { enum: ["booked", "cancelled", "waitlisted"] })
       .notNull()
       .default("booked"),
@@ -175,6 +177,9 @@ export const bookings = pgTable(
     uniqueIndex("bookings_user_date_booked")
       .on(t.userId, t.date)
       .where(sql`${t.status} = 'booked'`),
+    uniqueIndex("bookings_date_desk_booked")
+      .on(t.date, t.deskNumber)
+      .where(sql`${t.status} = 'booked' AND ${t.deskNumber} IS NOT NULL`),
     index("bookings_date_idx").on(t.date),
   ]
 );

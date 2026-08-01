@@ -85,6 +85,7 @@ export default async function HomePage() {
               booked={!!myBooking}
               checkedIn={!!myCheckin}
               seatType={myBooking?.seatType}
+              deskNumber={myBooking?.deskNumber ?? undefined}
               full={cap.full}
             />
           )}
@@ -109,6 +110,7 @@ export default async function HomePage() {
                   id: p.id,
                   name: p.name,
                   seatType: p.seatType,
+                  deskNumber: p.deskNumber,
                   isYou: p.id === user.id,
                   profile: p.profile,
                 }))}

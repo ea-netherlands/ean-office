@@ -1,0 +1,2 @@
+ALTER TABLE "bookings" ADD COLUMN "desk_number" integer;--> statement-breakpoint
+CREATE UNIQUE INDEX "bookings_date_desk_booked" ON "bookings" USING btree ("date","desk_number") WHERE "bookings"."status" = 'booked' AND "bookings"."desk_number" IS NOT NULL;

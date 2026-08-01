@@ -28,6 +28,7 @@ export type DayPerson = {
   id: string;
   name: string;
   seatType: string;
+  deskNumber: number | null;
   // Present only when the member opted in to a visible community profile.
   profile: PersonProfile | null;
 };
@@ -59,6 +60,7 @@ export async function capacityForRange(
       source: bookings.source,
       userId: bookings.userId,
       userName: users.name,
+      deskNumber: bookings.deskNumber,
       profileVisible: users.profileVisible,
       bio: users.bio,
       expertise: users.expertise,
@@ -107,6 +109,7 @@ export async function capacityForRange(
       id: r.userId,
       name: r.userName,
       seatType: r.seatType,
+      deskNumber: r.deskNumber,
       profile: r.profileVisible
         ? {
             bio: r.bio,
@@ -132,6 +135,42 @@ export async function capacityForDay(date: string): Promise<DayCapacity> {
 
 // ---------- booking ----------
 
+/** Desk numbers already reserved on a given day. */
+export async function takenDeskNumbers(date: string): Promise<Set<number>> {
+  const rows = await db
+    .select({ n: bookings.deskNumber })
+    .from(bookings)
+    .where(
+      and(
+        eq(bookings.date, date),
+        eq(bookings.status, "booked"),
+        eq(bookings.seatType, "desk")
+      )
+    );
+  return new Set(rows.map((r) => r.n).filter((n): n is number => n !== null));
+}
+
+async function assignDeskNumber(
+  date: string,
+  deskCount: number,
+  requested?: number
+): Promise<{ ok: true; n: number | null } | { ok: false; error: string }> {
+  const taken = await takenDeskNumbers(date);
+  if (requested) {
+    if (requested < 1 || requested > deskCount) {
+      return { ok: false, error: `There is no desk ${requested}.` };
+    }
+    if (taken.has(requested)) {
+      return { ok: false, error: `Desk ${requested} is already taken that day.` };
+    }
+    return { ok: true, n: requested };
+  }
+  for (let n = 1; n <= deskCount; n++) {
+    if (!taken.has(n)) return { ok: true, n };
+  }
+  return { ok: true, n: null }; // shouldn't happen while desksLeft > 0
+}
+
 export type BookResult =
   | { ok: true; booking: Booking; seatType: "desk" | "flex" }
   | { ok: true; waitlisted: true; booking: Booking }
@@ -145,6 +184,7 @@ export async function bookDay(
     allowWaitlist?: boolean;
     sendConfirmation?: boolean;
     seriesId?: string;
+    deskNumber?: number; // request a specific desk
   } = {}
 ): Promise<BookResult> {
   const cfg = await getSettings();
@@ -191,7 +231,18 @@ export async function bookDay(
   const cap = await capacityForDay(date);
   let seatType: "desk" | "flex" | null = null;
   if (cap.desksLeft > 0) seatType = "desk";
-  else if (cap.flexLeft > 0) seatType = "flex";
+  else if (cap.flexLeft > 0 && !opts.deskNumber) seatType = "flex";
+
+  if (opts.deskNumber && cap.desksLeft === 0) {
+    return { ok: false, error: "All desks are taken that day." };
+  }
+
+  let deskNumber: number | null = null;
+  if (seatType === "desk") {
+    const assigned = await assignDeskNumber(date, cfg.desk_count, opts.deskNumber);
+    if (!assigned.ok) return { ok: false, error: assigned.error };
+    deskNumber = assigned.n;
+  }
 
   if (!seatType) {
     if (!opts.allowWaitlist) return { ok: false, error: "That day is full." };
@@ -216,6 +267,7 @@ export async function bookDay(
       userId,
       date,
       seatType,
+      deskNumber,
       status: "booked",
       source,
       seriesId: opts.seriesId ?? null,
@@ -250,10 +302,35 @@ async function sendBookingConfirmation(
     subject: `Booked: ${formatDayLong(booking.date)}`,
     kind: "booking_confirmed",
     html: `<p>Hi ${name},</p>
-<p>You're booked for <strong>${formatDayLong(booking.date)}</strong> (${booking.seatType === "desk" ? "desk" : "lunch-table spot"}).</p>
+<p>You're booked for <strong>${formatDayLong(booking.date)}</strong> (${booking.seatType === "desk" ? `desk ${booking.deskNumber ?? ""}`.trim() : "lunch-table spot"}).</p>
 ${flexNote}
 <p>Plans changed? ${link(cancelUrl(booking), "Cancel in one tap")} — no login needed, and it frees the desk for someone else.</p>`,
   });
+}
+
+/** Move an existing desk booking to a different (free) desk. */
+export async function switchDesk(
+  bookingId: string,
+  userId: string,
+  deskNumber: number
+): Promise<{ ok: boolean; error?: string }> {
+  const cfg = await getSettings();
+  const [booking] = await db
+    .select()
+    .from(bookings)
+    .where(eq(bookings.id, bookingId));
+  if (!booking || booking.userId !== userId) return { ok: false, error: "Booking not found." };
+  if (booking.status !== "booked" || booking.seatType !== "desk") {
+    return { ok: false, error: "Only booked desks can be moved." };
+  }
+  if (booking.date < todayAms()) return { ok: false, error: "That day has passed." };
+  const assigned = await assignDeskNumber(booking.date, cfg.desk_count, deskNumber);
+  if (!assigned.ok) return { ok: false, error: assigned.error };
+  await db
+    .update(bookings)
+    .set({ deskNumber: assigned.n })
+    .where(eq(bookings.id, bookingId));
+  return { ok: true };
 }
 
 // ---------- cancellation + waitlist promotion ----------
@@ -297,9 +374,15 @@ export async function promoteWaitlist(date: string): Promise<void> {
     .limit(1);
   if (!next) return;
 
+  let deskNumber: number | null = null;
+  if (seatType === "desk") {
+    const cfg = await getSettings();
+    const assigned = await assignDeskNumber(date, cfg.desk_count);
+    if (assigned.ok) deskNumber = assigned.n;
+  }
   const [promoted] = await db
     .update(bookings)
-    .set({ status: "booked", seatType })
+    .set({ status: "booked", seatType, deskNumber })
     .where(eq(bookings.id, next.id))
     .returning();
 
@@ -506,6 +589,12 @@ export async function checkInUser(
     const cap = await capacityForDay(date);
     const seatType = cap.desksLeft > 0 ? "desk" : cap.flexLeft > 0 ? "flex" : "desk";
     overCapacity = cap.full;
+    let deskNumber: number | null = null;
+    if (seatType === "desk" && cap.desksLeft > 0) {
+      const cfg = await getSettings();
+      const assigned = await assignDeskNumber(date, cfg.desk_count);
+      if (assigned.ok) deskNumber = assigned.n;
+    }
     const [wb] = await db
       .insert(bookings)
       .values({
@@ -513,6 +602,7 @@ export async function checkInUser(
         userId,
         date,
         seatType,
+        deskNumber,
         status: "booked",
         source: "walkin",
       })

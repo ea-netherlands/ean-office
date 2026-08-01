@@ -262,6 +262,7 @@ async function main() {
         date: d,
         seriesId: s.seriesId,
         seatType: "desk",
+        deskNumber: cancelled ? null : desksUsed + 1,
         status: cancelled ? "cancelled" : "booked",
         source: "block",
         noShow: false, // set by the no-show pass below
@@ -303,6 +304,7 @@ async function main() {
         userId: m.id,
         date: d,
         seatType,
+        deskNumber: !cancelled && seatType === "desk" ? desksUsed + 1 : null,
         status: cancelled ? "cancelled" : "booked",
         source: isWalkin ? "walkin" : "self",
         noShow: false,

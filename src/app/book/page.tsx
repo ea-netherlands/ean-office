@@ -74,6 +74,7 @@ export default async function BookPage({
         id: p.id,
         name: p.name,
         seatType: p.seatType,
+        deskNumber: p.deskNumber,
         isYou: p.id === user.id,
         profile: p.profile,
       })),
@@ -112,6 +113,7 @@ export default async function BookPage({
           flexWindow={cfg.flex_unavailable_window}
           horizonWeeks={cfg.block_horizon_weeks}
           hasProfile={!!user.causeArea}
+          deskCount={cfg.desk_count}
         />
       </Page>
     </>

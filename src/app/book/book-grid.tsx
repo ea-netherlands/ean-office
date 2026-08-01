@@ -10,8 +10,10 @@ import {
   cancelSeriesAction,
   blockPreviewAction,
   blockCreateAction,
+  switchDeskAction,
   BlockState,
 } from "@/actions/booking";
+import { DeskMap, DeskOccupant } from "@/components/desk-map";
 import { ProfileForm } from "@/components/profile-form";
 import { PeopleList, PersonChipData } from "@/components/people";
 import { Avatar, btnPrimary, btnSecondary, btnDanger, inputCls, Icon } from "@/components/ui";
@@ -47,22 +49,23 @@ export function BookGrid(props: {
   flexWindow: string;
   horizonWeeks: number;
   hasProfile: boolean;
+  deskCount: number;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<string | null>(null);
   const [showBlock, setShowBlock] = useState(false);
-  const [profileFor, setProfileFor] = useState<string | null>(null);
+  const [profileFor, setProfileFor] = useState<{ date: string; deskNumber?: number } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const day = props.days.find((d) => d.date === selected) ?? null;
 
-  function book(date: string, skipProfile = false) {
+  function book(date: string, skipProfile = false, deskNumber?: number) {
     setMessage(null);
     startTransition(async () => {
-      const res = await bookDateAction(date, { skipProfile });
+      const res = await bookDateAction(date, { skipProfile, deskNumber });
       if (res.needsProfile) {
-        setProfileFor(date);
+        setProfileFor({ date, deskNumber });
         return;
       }
       setProfileFor(null);
@@ -71,9 +74,25 @@ export function BookGrid(props: {
         setMessage(
           `Booked a lunch-table spot for ${formatDayLong(date)}. Reminder: the table is used for lunch ${props.flexWindow}, so you'll need to pack up for that hour.`
         );
-      else setMessage(`Booked — see you ${formatDayLong(date)}!`);
+      else
+        setMessage(
+          `Booked desk ${res.deskNumber ?? ""} — see you ${formatDayLong(date)}!`.replace("  ", " ")
+        );
       router.refresh();
     });
+  }
+
+  function pickDesk(d: DayInfo, n: number) {
+    if (d.mine?.status === "booked" && d.mine.seatType === "desk") {
+      // already booked that day — move desks instead
+      startTransition(async () => {
+        const res = await switchDeskAction(d.mine!.bookingId, n);
+        setMessage(res.error ?? `Moved to desk ${n} on ${formatDayLong(d.date)}.`);
+        router.refresh();
+      });
+    } else if (!d.mine) {
+      book(d.date, false, n);
+    }
   }
 
   // Pad the first week so weekday columns line up.
@@ -138,6 +157,8 @@ export function BookGrid(props: {
           day={day}
           flexWindow={props.flexWindow}
           pending={pending}
+          deskCount={props.deskCount}
+          onPickDesk={(n) => pickDesk(day, n)}
           onBook={() => book(day.date)}
           onWaitlist={() =>
             startTransition(async () => {
@@ -177,12 +198,12 @@ export function BookGrid(props: {
               onDone={() => {
                 const d = profileFor;
                 setProfileFor(null);
-                book(d);
+                book(d.date, false, d.deskNumber);
               }}
               onSkip={() => {
                 const d = profileFor;
                 setProfileFor(null);
-                book(d, true);
+                book(d.date, true, d.deskNumber);
               }}
             />
           </div>
@@ -263,6 +284,8 @@ function DayPanel({
   day,
   flexWindow,
   pending,
+  deskCount,
+  onPickDesk,
   onBook,
   onWaitlist,
   onCancel,
@@ -270,11 +293,22 @@ function DayPanel({
   day: DayInfo;
   flexWindow: string;
   pending: boolean;
+  deskCount: number;
+  onPickDesk: (n: number) => void;
   onBook: () => void;
   onWaitlist: () => void;
   onCancel: (all: boolean) => void;
 }) {
   const deskFullFlexAvailable = day.desksLeft === 0 && day.flexLeft > 0;
+  const occupants = new Map<number, DeskOccupant>();
+  for (const p of day.people) {
+    if (p.deskNumber) {
+      occupants.set(p.deskNumber, { name: p.name, isYou: !!p.isYou });
+    }
+  }
+  const canPick =
+    !pending &&
+    (!day.mine || (day.mine.status === "booked" && day.mine.seatType === "desk"));
   return (
     <div className="mt-4 bg-white border border-slate-200 rounded-xl p-4">
       <h3 className="font-semibold">{formatDayLong(day.date)}</h3>
@@ -288,6 +322,22 @@ function DayPanel({
             ? `Desks full — ${day.flexLeft} lunch-table spot${day.flexLeft === 1 ? "" : "s"} left`
             : `${day.desksLeft} desk${day.desksLeft === 1 ? "" : "s"} and ${day.flexLeft} lunch-table spot${day.flexLeft === 1 ? "" : "s"} left`}
       </p>
+
+      <div className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-3">
+        <p className="text-xs text-slate-500 mb-2">
+          {day.mine?.status === "booked" && day.mine.seatType === "desk"
+            ? "Tap a free desk to move."
+            : day.mine
+              ? "The room today:"
+              : "Tap a free desk to book it — or use the button below for any desk."}
+        </p>
+        <DeskMap
+          deskCount={deskCount}
+          occupants={occupants}
+          onPick={onPickDesk}
+          disabled={!canPick}
+        />
+      </div>
 
       {day.people.length > 0 && (
         <div className="mt-3">

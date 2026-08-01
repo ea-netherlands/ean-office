@@ -92,17 +92,17 @@ In the HNK building — network **HNK Public** (a pop-up asks for your name and 
 
 ## Meeting places & phone booths
 
-For a quick online meeting, any spot in the common area on the ground floor works. For quiet, there are 5 phone booths in the building: one on floor −1, two on the 1st floor, and two on the 2nd floor (stairs or elevator; please only roam the first floor).
+For a quick online meeting, any spot in the common area on the ground floor works. For quiet, there are **5 phone booths on the same floor as the office**.
 
 Meeting rooms can be booked at a discount through our HNK app — ask a host in advance and they'll book it and pass the bill on. About €17.50/hour ex BTW for the 6-person room, €30/hour ex BTW for the larger rooms (16–20 people).
 
 ## Food and drinks
 
-Snacks, tea and coffee are free in our office; there's a fridge and a microwave, and appropriate bins for waste. The building restaurant (ground floor) is open 9:00–17:00 Mon–Fri. Nearby: Ramon's coffee kiosk (2 min walk, vegan sandwiches), Vooges for fancier lunches (4 min, some vegan options), Café Westerdok for drinks (2 min).
+Snacks, tea and coffee are free in our office; there's a fridge and a microwave, and appropriate bins for waste. The building restaurant (ground floor) is open 9:00–17:00 Mon–Fri. Nearby: Ramon's coffee kiosk (2 min walk, vegan sandwiches), Vooges for fancier lunches (4 min, some vegan options), and Niemandsland for coffee and drinks (4 min). Ordering in? Our favourite is the Lebanese sajeria — really nice wraps with plenty of vegan options.
 
 ## Facilities in the building
 
-Free to use, all on floor −1: gym, game room, and a shower.
+There's a full gym on floor −1 (plus a shower) — access is limited to people who donate to cover its rent. Interested? Ask someone from the EAN team.
 
 ## Package delivery
 

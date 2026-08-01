@@ -10,6 +10,7 @@ import {
   cancelSeries,
   createBlockBooking,
   previewBlockBooking,
+  switchDesk,
   BlockPreview,
 } from "@/lib/booking";
 import { getSettings } from "@/lib/settings";
@@ -21,6 +22,7 @@ export type BookActionState = {
   seatType?: "desk" | "flex";
   needsProfile?: boolean;
   date?: string;
+  deskNumber?: number;
 };
 
 /**
@@ -37,7 +39,7 @@ async function profileGate(userId: string): Promise<"ok" | "required" | "askable
 
 export async function bookDateAction(
   date: string,
-  opts: { skipProfile?: boolean } = {}
+  opts: { skipProfile?: boolean; deskNumber?: number } = {}
 ): Promise<BookActionState> {
   const user = await getCurrentUser();
   if (!isActiveMember(user)) return { error: "You need to be logged in as a member." };
@@ -56,12 +58,29 @@ export async function bookDateAction(
     return { needsProfile: true, date, error: "Please complete your profile first — it takes 30 seconds." };
   }
 
-  const res = await bookDay(user!.id, date);
+  const res = await bookDay(user!.id, date, { deskNumber: opts.deskNumber });
   revalidatePath("/book");
   revalidatePath("/");
   if (!res.ok) return { error: res.error };
   if ("waitlisted" in res) return { ok: true, waitlisted: true, date };
-  return { ok: true, seatType: res.seatType, date };
+  return {
+    ok: true,
+    seatType: res.seatType,
+    date,
+    deskNumber: "booking" in res ? res.booking.deskNumber ?? undefined : undefined,
+  };
+}
+
+export async function switchDeskAction(
+  bookingId: string,
+  deskNumber: number
+): Promise<{ ok: boolean; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Not logged in." };
+  const res = await switchDesk(bookingId, user.id, deskNumber);
+  revalidatePath("/book");
+  revalidatePath("/");
+  return res;
 }
 
 export async function joinWaitlistAction(date: string): Promise<BookActionState> {
