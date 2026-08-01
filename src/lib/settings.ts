@@ -45,7 +45,8 @@ export const DEFAULT_SETTINGS: Settings = {
   trial_months: 3,
   office_address:
     "HNK Houthavens, Van Diemenstraat 92, 1013 CN Amsterdam (ground floor — ask for 'Effectief Altruïsme Nederland', or walk towards the elevators, turn right through the connecting doors, first office on the right with the EA logos)",
-  wifi_password: "EA7654321!",
+  // Real value is set in the database via /admin/settings — never in source.
+  wifi_password: "ask a host",
   luma_ics_url: "https://api.lu.ma/ics/get?entity=calendar&id=cal-akaE66Y0BQlrCVY",
   info_public_md: `## Where
 

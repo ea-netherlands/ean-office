@@ -1,8 +1,8 @@
 /**
  * Create the first admin (or promote an existing member).
  *
- *   npm run admin:add -- "James Herbert" james@effectiefaltruisme.nl
- *   DATABASE_URL="postgres://…" npm run admin:add -- "Name" email@example.org
+ *   npm run admin:add -- "Full Name" name@example.org
+ *   DATABASE_URL="postgres://…" npm run admin:add -- "Full Name" name@example.org
  *
  * Only needed to bootstrap the very first admin on a fresh database —
  * after that, admins add each other from /admin/members.

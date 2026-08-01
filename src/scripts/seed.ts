@@ -102,10 +102,11 @@ async function main() {
 
   // ---------- admins ----------
   console.log("Admins…");
+  // Fictional demo accounts — real admins are created with `npm run admin:add`.
   const admins = [
-    { name: "James Herbert", email: "james@effectiefaltruisme.nl" },
-    { name: "Ricardo Mendes", email: "ricardo@effectiefaltruisme.nl" },
-    { name: "Merlijn de Groot", email: "merlijn@effectiefaltruisme.nl" },
+    { name: "Sanne Bakker", email: "sanne.bakker@example.org" },
+    { name: "Daan Visser", email: "daan.visser@example.org" },
+    { name: "Merel Jansen", email: "merel.jansen@example.org" },
   ];
   const adminIds: string[] = [];
   for (const a of admins) {
@@ -461,6 +462,7 @@ async function main() {
   console.log(
     `Done: ${everyone.length} members+admins, ${bookingCount} bookings, ${checkinCount} check-ins, ${eventCount} events.`
   );
+  console.log(`Log in at /login as ${admins[0].email} (admin) to look around.`);
   process.exit(0);
 }
 

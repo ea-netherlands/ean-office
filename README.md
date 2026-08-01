@@ -13,10 +13,10 @@ npm run db:seed     # migrate + load realistic demo data (stop the dev server fi
 npm run dev         # http://localhost:3000
 ```
 
-Log in as `james@effectiefaltruisme.nl` — with no email provider configured,
-the magic link is shown on screen after you submit the login form (dev only).
-Seeded admins: James, Ricardo, Merlijn. All demo emails land in
-`/admin/emails` instead of being delivered.
+The seed prints a demo admin address to log in with — with no email provider
+configured, the magic link is shown on screen after you submit the login
+form (dev only). All demo email lands in `/admin/emails` instead of being
+delivered. Create real admins with `npm run admin:add -- "Name" email`.
 
 ## How it works
 
