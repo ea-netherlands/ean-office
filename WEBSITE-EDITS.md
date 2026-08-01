@@ -18,6 +18,12 @@ Button label can stay exactly as it is.
 (every table). Existing members can be added to the app's roster from
 `/admin/members` → "Add member manually".
 
+⚠️ The **anonymous feedback form** (`airtable.com/shrPaWBNeHIB7ewvt`, linked
+from the old Notion page and now from the app's /info page) also runs on
+Airtable. Check whether it survives on the free plan before cancelling — if
+not, recreate it (e.g. a Google Form) and update the link at Admin → Info
+page.
+
 ## 2. Add a member entry point (recommended)
 
 The page currently has no way for existing members to reach the booking
