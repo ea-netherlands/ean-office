@@ -336,6 +336,10 @@ function DayPanel({
           occupants={occupants}
           onPick={onPickDesk}
           disabled={!canPick}
+          flexUsed={day.people.filter((p) => p.seatType === "flex").length}
+          flexTotal={
+            day.people.filter((p) => p.seatType === "flex").length + day.flexLeft
+          }
         />
       </div>
 
