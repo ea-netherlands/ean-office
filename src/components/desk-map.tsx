@@ -19,16 +19,20 @@ export function DeskMap({
   deskCount,
   occupants, // deskNumber -> occupant
   onPick,
+  onPickFlex,
   disabled,
-  flexUsed,
-  flexTotal,
+  flexOccupants = [],
+  flexLeft = 0,
+  flexWindow,
 }: {
   deskCount: number;
   occupants: Map<number, DeskOccupant>;
   onPick?: (n: number) => void;
+  onPickFlex?: () => void;
   disabled?: boolean;
-  flexUsed?: number;
-  flexTotal?: number;
+  flexOccupants?: DeskOccupant[];
+  flexLeft?: number;
+  flexWindow?: string;
 }) {
   const desk = (n: number, style: React.CSSProperties) => (
     <div style={style} key={n}>
@@ -75,16 +79,14 @@ export function DeskMap({
         >
           kitchen
         </div>
-        <div
-          style={{ gridColumn: "1 / 2", gridRow: "3 / 5" }}
-          className="rounded-lg border border-slate-200 bg-slate-50 flex flex-col items-center justify-center text-[10px] text-slate-400 text-center leading-tight px-1"
-        >
-          <span>lunch table</span>
-          {typeof flexUsed === "number" && typeof flexTotal === "number" && (
-            <span>
-              {flexUsed}/{flexTotal} taken
-            </span>
-          )}
+        <div style={{ gridColumn: "1 / 2", gridRow: "3 / 5" }}>
+          <LunchTable
+            occupants={flexOccupants}
+            left={flexLeft}
+            onPick={onPickFlex}
+            disabled={disabled}
+            window={flexWindow}
+          />
         </div>
 
         {/* top wall: 7 and 8, lined up above 2 and 4 */}
@@ -103,6 +105,71 @@ export function DeskMap({
   );
 }
 
+function initialsOf(name: string): string {
+  return name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+/** The lunch table — a seat like any other, just shared and shaped differently. */
+function LunchTable({
+  occupants,
+  left,
+  onPick,
+  disabled,
+  window: flexWindow,
+}: {
+  occupants: DeskOccupant[];
+  left: number;
+  onPick?: () => void;
+  disabled?: boolean;
+  window?: string;
+}) {
+  const mine = occupants.some((o) => o.isYou);
+  const clickable = !mine && left > 0 && !!onPick && !disabled;
+  return (
+    <button
+      type="button"
+      disabled={!clickable}
+      onClick={() => onPick?.()}
+      title={
+        mine
+          ? "Lunch table — you"
+          : left > 0
+            ? `Lunch table — ${left} spot${left === 1 ? "" : "s"} free${
+                flexWindow ? ` (packed up for lunch ${flexWindow})` : ""
+              }`
+            : "Lunch table — full"
+      }
+      className={`w-full h-full rounded-lg border text-[10px] flex flex-col items-center justify-center leading-tight px-1 text-center transition-colors ${
+        mine
+          ? "bg-teal-600 border-teal-700 text-white"
+          : clickable
+            ? "bg-white border-teal-300 text-teal-800 hover:bg-teal-50 cursor-pointer"
+            : "bg-slate-50 border-slate-200 text-slate-400 cursor-default"
+      }`}
+    >
+      <span className="font-medium">lunch table</span>
+      <span className={mine ? "text-teal-100" : ""}>
+        {mine ? "you" : left > 0 ? `${left} free` : "full"}
+      </span>
+      {occupants.length > 0 && (
+        <span
+          className={`mt-0.5 text-[9px] ${mine ? "text-teal-100" : "text-slate-400"}`}
+        >
+          {occupants
+            .filter((o) => !o.isYou)
+            .map((o) => initialsOf(o.name))
+            .join(" ")}
+        </span>
+      )}
+    </button>
+  );
+}
+
 function Desk({
   n,
   occupant,
@@ -116,14 +183,7 @@ function Desk({
 }) {
   const free = !occupant;
   const clickable = free && !!onPick && !disabled;
-  const initials = occupant
-    ? occupant.name
-        .split(/\s+/)
-        .map((w) => w[0])
-        .slice(0, 2)
-        .join("")
-        .toUpperCase()
-    : null;
+  const initials = occupant ? initialsOf(occupant.name) : null;
   return (
     <button
       type="button"

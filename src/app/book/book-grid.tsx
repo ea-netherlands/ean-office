@@ -10,9 +10,10 @@ import {
   cancelSeriesAction,
   blockPreviewAction,
   blockCreateAction,
-  switchDeskAction,
+  switchSeatAction,
   BlockState,
 } from "@/actions/booking";
+import type { SeatTarget } from "@/lib/booking";
 import { DeskMap, DeskOccupant } from "@/components/desk-map";
 import { ProfileForm } from "@/components/profile-form";
 import { PeopleList, PersonChipData } from "@/components/people";
@@ -54,18 +55,27 @@ export function BookGrid(props: {
   const router = useRouter();
   const [selected, setSelected] = useState<string | null>(null);
   const [showBlock, setShowBlock] = useState(false);
-  const [profileFor, setProfileFor] = useState<{ date: string; deskNumber?: number } | null>(null);
+  const [profileFor, setProfileFor] = useState<{ date: string; seat?: SeatTarget } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const day = props.days.find((d) => d.date === selected) ?? null;
 
-  function book(date: string, skipProfile = false, deskNumber?: number) {
+  function book(
+    date: string,
+    skipProfile = false,
+    seat?: SeatTarget
+  ) {
+    const deskNumber = seat?.type === "desk" ? seat.deskNumber : undefined;
     setMessage(null);
     startTransition(async () => {
-      const res = await bookDateAction(date, { skipProfile, deskNumber });
+      const res = await bookDateAction(date, {
+        skipProfile,
+        deskNumber,
+        seatType: seat?.type,
+      });
       if (res.needsProfile) {
-        setProfileFor({ date, deskNumber });
+        setProfileFor({ date, seat });
         return;
       }
       setProfileFor(null);
@@ -82,16 +92,23 @@ export function BookGrid(props: {
     });
   }
 
-  function pickDesk(d: DayInfo, n: number) {
-    if (d.mine?.status === "booked" && d.mine.seatType === "desk") {
-      // already booked that day — move desks instead
+  function pickSeat(d: DayInfo, seat: SeatTarget) {
+    const label = seat.type === "desk" ? `desk ${seat.deskNumber}` : "the lunch table";
+    if (d.mine?.status === "booked") {
+      // already booked that day — move seats instead
       startTransition(async () => {
-        const res = await switchDeskAction(d.mine!.bookingId, n);
-        setMessage(res.error ?? `Moved to desk ${n} on ${formatDayLong(d.date)}.`);
+        const res = await switchSeatAction(d.mine!.bookingId, seat);
+        const moved = `Moved to ${label} on ${formatDayLong(d.date)}.`;
+        setMessage(
+          res.error ??
+            (seat.type === "flex"
+              ? `${moved} The table is used for lunch ${props.flexWindow}, so you'll need to pack up for that hour.`
+              : moved)
+        );
         router.refresh();
       });
     } else if (!d.mine) {
-      book(d.date, false, n);
+      book(d.date, false, seat);
     }
   }
 
@@ -158,7 +175,7 @@ export function BookGrid(props: {
           flexWindow={props.flexWindow}
           pending={pending}
           deskCount={props.deskCount}
-          onPickDesk={(n) => pickDesk(day, n)}
+          onPickSeat={(seat) => pickSeat(day, seat)}
           onBook={() => book(day.date)}
           onWaitlist={() =>
             startTransition(async () => {
@@ -198,12 +215,12 @@ export function BookGrid(props: {
               onDone={() => {
                 const d = profileFor;
                 setProfileFor(null);
-                book(d.date, false, d.deskNumber);
+                book(d.date, false, d.seat);
               }}
               onSkip={() => {
                 const d = profileFor;
                 setProfileFor(null);
-                book(d.date, true, d.deskNumber);
+                book(d.date, true, d.seat);
               }}
             />
           </div>
@@ -285,7 +302,7 @@ function DayPanel({
   flexWindow,
   pending,
   deskCount,
-  onPickDesk,
+  onPickSeat,
   onBook,
   onWaitlist,
   onCancel,
@@ -294,7 +311,7 @@ function DayPanel({
   flexWindow: string;
   pending: boolean;
   deskCount: number;
-  onPickDesk: (n: number) => void;
+  onPickSeat: (seat: SeatTarget) => void;
   onBook: () => void;
   onWaitlist: () => void;
   onCancel: (all: boolean) => void;
@@ -306,9 +323,10 @@ function DayPanel({
       occupants.set(p.deskNumber, { name: p.name, isYou: !!p.isYou });
     }
   }
-  const canPick =
-    !pending &&
-    (!day.mine || (day.mine.status === "booked" && day.mine.seatType === "desk"));
+  const flexOccupants: DeskOccupant[] = day.people
+    .filter((p) => p.seatType === "flex")
+    .map((p) => ({ name: p.name, isYou: !!p.isYou }));
+  const canPick = !pending && (!day.mine || day.mine.status === "booked");
   return (
     <div className="mt-4 bg-white border border-slate-200 rounded-xl p-4">
       <h3 className="font-semibold">{formatDayLong(day.date)}</h3>
@@ -325,21 +343,21 @@ function DayPanel({
 
       <div className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-3">
         <p className="text-xs text-slate-500 mb-2">
-          {day.mine?.status === "booked" && day.mine.seatType === "desk"
-            ? "Tap a free desk to move."
+          {day.mine?.status === "booked"
+            ? "Tap a free desk or the lunch table to move."
             : day.mine
               ? "The room today:"
-              : "Tap a free desk to book it — or use the button below for any desk."}
+              : "Tap a free desk or the lunch table to take it — or use the button below for any seat."}
         </p>
         <DeskMap
           deskCount={deskCount}
           occupants={occupants}
-          onPick={onPickDesk}
+          onPick={(n) => onPickSeat({ type: "desk", deskNumber: n })}
+          onPickFlex={() => onPickSeat({ type: "flex" })}
           disabled={!canPick}
-          flexUsed={day.people.filter((p) => p.seatType === "flex").length}
-          flexTotal={
-            day.people.filter((p) => p.seatType === "flex").length + day.flexLeft
-          }
+          flexOccupants={flexOccupants}
+          flexLeft={day.flexLeft}
+          flexWindow={flexWindow}
         />
       </div>
 

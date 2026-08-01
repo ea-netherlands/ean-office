@@ -10,7 +10,8 @@ import {
   cancelSeries,
   createBlockBooking,
   previewBlockBooking,
-  switchDesk,
+  switchSeat,
+  SeatTarget,
   BlockPreview,
 } from "@/lib/booking";
 import { getSettings } from "@/lib/settings";
@@ -39,7 +40,11 @@ async function profileGate(userId: string): Promise<"ok" | "required" | "askable
 
 export async function bookDateAction(
   date: string,
-  opts: { skipProfile?: boolean; deskNumber?: number } = {}
+  opts: {
+    skipProfile?: boolean;
+    deskNumber?: number;
+    seatType?: "desk" | "flex";
+  } = {}
 ): Promise<BookActionState> {
   const user = await getCurrentUser();
   if (!isActiveMember(user)) return { error: "You need to be logged in as a member." };
@@ -58,7 +63,10 @@ export async function bookDateAction(
     return { needsProfile: true, date, error: "Please complete your profile first — it takes 30 seconds." };
   }
 
-  const res = await bookDay(user!.id, date, { deskNumber: opts.deskNumber });
+  const res = await bookDay(user!.id, date, {
+    deskNumber: opts.deskNumber,
+    seatType: opts.seatType,
+  });
   revalidatePath("/book");
   revalidatePath("/");
   if (!res.ok) return { error: res.error };
@@ -71,13 +79,13 @@ export async function bookDateAction(
   };
 }
 
-export async function switchDeskAction(
+export async function switchSeatAction(
   bookingId: string,
-  deskNumber: number
+  target: SeatTarget
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Not logged in." };
-  const res = await switchDesk(bookingId, user.id, deskNumber);
+  const res = await switchSeat(bookingId, user.id, target);
   revalidatePath("/book");
   revalidatePath("/");
   return res;

@@ -185,6 +185,7 @@ export async function bookDay(
     sendConfirmation?: boolean;
     seriesId?: string;
     deskNumber?: number; // request a specific desk
+    seatType?: "desk" | "flex"; // request a seat kind (flex = lunch table)
   } = {}
 ): Promise<BookResult> {
   const cfg = await getSettings();
@@ -229,12 +230,18 @@ export async function bookDay(
   }
 
   const cap = await capacityForDay(date);
+  const wantsFlex = opts.seatType === "flex";
   let seatType: "desk" | "flex" | null = null;
-  if (cap.desksLeft > 0) seatType = "desk";
+  if (wantsFlex) {
+    if (cap.flexLeft > 0) seatType = "flex";
+  } else if (cap.desksLeft > 0) seatType = "desk";
   else if (cap.flexLeft > 0 && !opts.deskNumber) seatType = "flex";
 
   if (opts.deskNumber && cap.desksLeft === 0) {
     return { ok: false, error: "All desks are taken that day." };
+  }
+  if (wantsFlex && !seatType && !opts.allowWaitlist) {
+    return { ok: false, error: "The lunch table is full that day." };
   }
 
   let deskNumber: number | null = null;
@@ -308,11 +315,15 @@ ${flexNote}
   });
 }
 
-/** Move an existing desk booking to a different (free) desk. */
-export async function switchDesk(
+export type SeatTarget =
+  | { type: "desk"; deskNumber: number }
+  | { type: "flex" };
+
+/** Move an existing booking to another free seat — desk or lunch table. */
+export async function switchSeat(
   bookingId: string,
   userId: string,
-  deskNumber: number
+  target: SeatTarget
 ): Promise<{ ok: boolean; error?: string }> {
   const cfg = await getSettings();
   const [booking] = await db
@@ -320,16 +331,34 @@ export async function switchDesk(
     .from(bookings)
     .where(eq(bookings.id, bookingId));
   if (!booking || booking.userId !== userId) return { ok: false, error: "Booking not found." };
-  if (booking.status !== "booked" || booking.seatType !== "desk") {
-    return { ok: false, error: "Only booked desks can be moved." };
+  if (booking.status !== "booked") {
+    return { ok: false, error: "Only confirmed bookings can be moved." };
   }
   if (booking.date < todayAms()) return { ok: false, error: "That day has passed." };
-  const assigned = await assignDeskNumber(booking.date, cfg.desk_count, deskNumber);
-  if (!assigned.ok) return { ok: false, error: assigned.error };
-  await db
-    .update(bookings)
-    .set({ deskNumber: assigned.n })
-    .where(eq(bookings.id, bookingId));
+
+  if (target.type === "flex") {
+    if (booking.seatType === "flex") return { ok: true }; // already there
+    const cap = await capacityForDay(booking.date);
+    if (cap.flexLeft <= 0) return { ok: false, error: "The lunch table is full that day." };
+    await db
+      .update(bookings)
+      .set({ seatType: "flex", deskNumber: null })
+      .where(eq(bookings.id, bookingId));
+  } else {
+    const assigned = await assignDeskNumber(
+      booking.date,
+      cfg.desk_count,
+      target.deskNumber
+    );
+    if (!assigned.ok) return { ok: false, error: assigned.error };
+    await db
+      .update(bookings)
+      .set({ seatType: "desk", deskNumber: assigned.n })
+      .where(eq(bookings.id, bookingId));
+  }
+
+  // Moving off a desk or off the table can free a seat for the waitlist.
+  await promoteWaitlist(booking.date);
   return { ok: true };
 }
 
