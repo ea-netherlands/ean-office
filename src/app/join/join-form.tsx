@@ -65,19 +65,19 @@ export function JoinForm({
           </select>
         </div>
         <div>
-          <label className={labelCls}>
-            LinkedIn, personal site, or EA Forum profile *
-          </label>
+          <label className={labelCls}>A link that tells us who you are *</label>
           <input
             name="profileUrl"
             type="text"
             inputMode="url"
             required
-            placeholder="linkedin.com/in/yourname"
             className={inputCls}
           />
           <p className="text-xs text-slate-400 mt-1">
-            Anything that gives us a sense of who you are.
+            LinkedIn, a personal site, your EA Forum or LessWrong profile —
+            whatever gives us a sense of your work. If you don&apos;t have any
+            of those, link to a PDF of your CV (Google Drive, Dropbox, and so
+            on — just check the link is viewable by anyone).
           </p>
         </div>
         <div>

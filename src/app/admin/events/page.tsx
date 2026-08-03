@@ -2,7 +2,7 @@ import { db, events, eventAttendance, users } from "@/db";
 import { desc, inArray } from "drizzle-orm";
 import { Page, H1, Sub } from "@/components/ui";
 import { EventsClient, EventRow } from "./events-client";
-import { todayAms } from "@/lib/dates";
+import { todayAms, amsDate } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -17,10 +17,9 @@ export default async function EventsPage() {
       : [];
 
   const proposerNames = new Map(
-    (await db.select({ id: users.id, name: users.name }).from(users)).map((u) => [
-      u.id,
-      u.name,
-    ])
+    (
+      await db.select({ id: users.id, name: users.name, email: users.email }).from(users)
+    ).map((u) => [u.id, { name: u.name, email: u.email }])
   );
 
   const rows: EventRow[] = all.map((e) => {
@@ -40,7 +39,9 @@ export default async function EventsPage() {
       url: e.url,
       status: e.status,
       proposalNote: e.proposalNote,
-      proposedBy: e.createdBy ? proposerNames.get(e.createdBy) ?? null : null,
+      proposedBy: e.createdBy ? proposerNames.get(e.createdBy)?.name ?? null : null,
+      proposedByEmail: e.createdBy ? proposerNames.get(e.createdBy)?.email ?? null : null,
+      questionAskedAt: e.questionAskedAt ? amsDate(e.questionAskedAt) : null,
       checkins: forEvent.filter((a) => a.source === "checkin").length,
       manual: forEvent.filter((a) => a.source === "manual").length,
       rsvps: forEvent.filter((a) => a.source === "rsvp").length,

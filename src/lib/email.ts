@@ -14,6 +14,8 @@ export async function sendEmail(opts: {
   kind: string;
   /** Optional calendar invite, shown by mail clients as an acceptable event. */
   icsAttachment?: { filename: string; content: string };
+  /** Send replies to a human rather than the shared office address. */
+  replyTo?: string;
 }): Promise<void> {
   await ensureMigrated();
   let delivered = false;
@@ -26,6 +28,7 @@ export async function sendEmail(opts: {
         to: opts.to,
         subject: opts.subject,
         html: wrap(opts.html),
+        ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
         ...(opts.icsAttachment
           ? {
               attachments: [

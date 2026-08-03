@@ -272,7 +272,9 @@ function CommunityProfileCard({
             </div>
           </div>
           <div>
-            <label className={labelCls}>Link (LinkedIn, site, EA Forum)</label>
+            <label className={labelCls}>
+              Link (LinkedIn, site, EA Forum, LessWrong)
+            </label>
             <input
               name="publicLink"
               type="text"
@@ -280,7 +282,6 @@ function CommunityProfileCard({
               maxLength={300}
               defaultValue={community.publicLink ?? ""}
               className={inputCls}
-              placeholder="linkedin.com/in/yourname"
             />
           </div>
           {state.ok && <p className="text-sm text-teal-700">Saved.</p>}

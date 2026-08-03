@@ -42,7 +42,7 @@ export async function submitJoinRequest(
   if (!profileUrl) return { error: "Please add a link — LinkedIn, a personal site, or an EA Forum profile." };
   const normalisedUrl = normaliseUrl(profileUrl);
   if (!normalisedUrl) {
-    return { error: "That link doesn't look right — something like linkedin.com/in/yourname works." };
+    return { error: "That link doesn't look right — check it's a full web address." };
   }
   if (!about) return { error: "Please tell us a little about what you're working on." };
   if (!expectedFrequency) return { error: "Please pick how often you expect to come." };

@@ -1,0 +1,1 @@
+ALTER TABLE "events" ADD COLUMN "question_asked_at" timestamp with time zone;

@@ -257,6 +257,7 @@ export const events = pgTable("events", {
     .notNull()
     .default("confirmed"),
   proposalNote: text("proposal_note"),
+  questionAskedAt: timestamp("question_asked_at", { withTimezone: true }),
   externalId: text("external_id").unique(), // Luma UID for sync upserts
   url: text("url"), // luma.com event page
   createdBy: text("created_by"),

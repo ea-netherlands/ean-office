@@ -8,6 +8,7 @@ import {
   deleteEventAction,
   setEventTypeAction,
   decideEventAction,
+  askEventQuestionAction,
   syncLumaAction,
   AdminActionState,
 } from "@/actions/admin";
@@ -35,6 +36,8 @@ export type EventRow = {
   status: string;
   proposalNote: string | null;
   proposedBy: string | null;
+  proposedByEmail: string | null;
+  questionAskedAt: string | null;
 };
 
 const EVENT_TYPES = [
@@ -196,36 +199,94 @@ function SyncButton() {
 function ProposalItem({ e }: { e: EventRow }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [asking, setAsking] = useState(false);
+  const [question, setQuestion] = useState("");
+  const [note, setNote] = useState<string | null>(null);
+
   function decide(decision: "confirmed" | "declined") {
     startTransition(async () => {
       await decideEventAction(e.id, decision);
       router.refresh();
     });
   }
+
   return (
     <li className="py-3">
       <p className="text-sm font-medium">
         {e.title} <Badge tone="teal">proposed</Badge>
+        {e.questionAskedAt && <Badge>waiting on them</Badge>}
       </p>
       <p className="text-xs text-slate-500 mt-0.5">
         {formatDay(e.date)}
-        {e.startsAt ? ` · ${e.startsAt}${e.endsAt ? `–${e.endsAt}` : ""}` : ""}
-        {e.proposedBy ? ` · by ${e.proposedBy}` : ""}
-        {e.expectedAttendance ? ` · expects ~${e.expectedAttendance}` : ""}
+        {e.startsAt ? ` \u00b7 ${e.startsAt}${e.endsAt ? `\u2013${e.endsAt}` : ""}` : ""}
+        {e.expectedAttendance ? ` \u00b7 expects ~${e.expectedAttendance}` : ""}
       </p>
+      {e.proposedBy && (
+        <p className="text-xs text-slate-500">
+          by {e.proposedBy}
+          {e.proposedByEmail && (
+            <>
+              {" \u00b7 "}
+              <a href={`mailto:${e.proposedByEmail}`} className="text-teal-700 underline">
+                {e.proposedByEmail}
+              </a>
+            </>
+          )}
+          {e.questionAskedAt && ` \u00b7 asked ${e.questionAskedAt}`}
+        </p>
+      )}
       {e.proposalNote && (
         <p className="text-sm text-slate-700 mt-2 whitespace-pre-line">
           {e.proposalNote}
         </p>
       )}
-      <div className="mt-3 flex gap-2">
-        <button className={btnPrimary} disabled={pending} onClick={() => decide("confirmed")}>
-          {pending ? "Working…" : "Confirm"}
-        </button>
-        <button className={btnSecondary} disabled={pending} onClick={() => decide("declined")}>
-          Decline
-        </button>
-      </div>
+
+      {asking ? (
+        <div className="mt-3 space-y-2">
+          <textarea
+            className={inputCls}
+            rows={3}
+            placeholder="What would you like to ask them? Replies come straight to your inbox, not the shared one."
+            value={question}
+            onChange={(ev) => setQuestion(ev.target.value)}
+          />
+          <div className="flex gap-2">
+            <button
+              className={btnPrimary}
+              disabled={pending || !question.trim()}
+              onClick={() =>
+                startTransition(async () => {
+                  const res = await askEventQuestionAction(e.id, question);
+                  setNote(res.error ?? `Sent to ${e.proposedBy}.`);
+                  if (!res.error) {
+                    setAsking(false);
+                    setQuestion("");
+                  }
+                  router.refresh();
+                })
+              }
+            >
+              {pending ? "Sending\u2026" : "Send"}
+            </button>
+            <button className={btnSecondary} onClick={() => setAsking(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-3 flex gap-2 flex-wrap">
+          <button className={btnPrimary} disabled={pending} onClick={() => decide("confirmed")}>
+            {pending ? "Working\u2026" : "Confirm"}
+          </button>
+          <button className={btnSecondary} onClick={() => setAsking(true)}>
+            Ask a question
+          </button>
+          <button className={btnSecondary} disabled={pending} onClick={() => decide("declined")}>
+            Decline
+          </button>
+        </div>
+      )}
+      {note && <p className="text-xs text-slate-500 mt-2">{note}</p>}
     </li>
   );
 }

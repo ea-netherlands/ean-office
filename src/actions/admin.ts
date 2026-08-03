@@ -408,6 +408,43 @@ export async function decideEventAction(
   return { ok: true };
 }
 
+/**
+ * Reach out to whoever proposed an event. Replies go straight to the admin
+ * who asked, not the shared office inbox, so it becomes a normal conversation.
+ */
+export async function askEventQuestionAction(
+  eventId: string,
+  question: string
+): Promise<AdminActionState> {
+  const admin = await requireAdmin();
+  if (!question.trim()) return { error: "Write something first." };
+  const [event] = await db.select().from(events).where(eq(events.id, eventId));
+  if (!event) return { error: "Event not found." };
+  if (!event.createdBy) return { error: "No proposer on record for this one." };
+  const [proposer] = await db.select().from(users).where(eq(users.id, event.createdBy));
+  if (!proposer) return { error: "Proposer not found." };
+
+  await db
+    .update(events)
+    .set({ questionAskedAt: new Date() })
+    .where(eq(events.id, eventId));
+
+  await sendEmail({
+    to: proposer.email,
+    replyTo: admin.email,
+    subject: `About your event: ${event.title}`,
+    kind: "event_question",
+    html: `<p>Hi ${proposer.name},</p>
+<p>Thanks for proposing <strong>${event.title}</strong> on ${formatDayLong(event.date)} — ${admin.name} here, I'd like to talk it through a bit:</p>
+<blockquote style="border-left:3px solid #16879c;padding-left:12px;color:#333;">${question.replace(/</g, "&lt;").replace(/\n/g, "<br>")}</blockquote>
+<p>Just hit reply — this goes straight to me.</p>
+<p>${admin.name}</p>`,
+  });
+
+  revalidatePath("/admin/events");
+  return { ok: true };
+}
+
 export async function setEventTypeAction(
   eventId: string,
   type: string
