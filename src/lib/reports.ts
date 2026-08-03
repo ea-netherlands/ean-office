@@ -2,6 +2,7 @@ import { db, bookings, checkins, users, events, eventAttendance } from "@/db";
 import { and, eq, gte, lte, inArray } from "drizzle-orm";
 import { getSettings } from "./settings";
 import { addDays, isWorkingDay, todayAms } from "./dates";
+import { genderReportLabel } from "./profile-options";
 
 // Every figure here is one EAN has reported to EAIF or set as a target.
 // Occupancy is always a percentage of desks (8), never of total seats.
@@ -135,7 +136,13 @@ export async function getReport(from: string, to: string): Promise<Report> {
   const eventRows = await db
     .select()
     .from(events)
-    .where(and(gte(events.date, from), lte(events.date, to)));
+    .where(
+      and(
+        gte(events.date, from),
+        lte(events.date, to),
+        eq(events.status, "confirmed")
+      )
+    );
   const attendanceRows =
     eventRows.length > 0
       ? await db
@@ -269,7 +276,7 @@ export async function getReport(from: string, to: string): Promise<Report> {
               : null
     ),
     experience: breakdown((u) => u.experienceLevel),
-    gender: breakdown((u) => u.gender),
+    gender: breakdown((u) => genderReportLabel(u.gender)),
     pctXRisk: share((u) => u.causeArea === "Existential Risk Reduction"),
     pctEaFunded: share(
       (u) => u.eaFunding === "direct" || u.eaFunding === "employer"

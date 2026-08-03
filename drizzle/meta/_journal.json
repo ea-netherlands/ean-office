@@ -29,6 +29,13 @@
       "when": 1785586148276,
       "tag": "0003_purple_the_order",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785769641731,
+      "tag": "0004_bitter_fat_cobra",
+      "breakpoints": true
     }
   ]
 }

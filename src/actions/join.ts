@@ -7,6 +7,7 @@ import { sendEmail, link } from "@/lib/email";
 import { appUrl } from "@/lib/auth";
 import { formatDayLong } from "@/lib/dates";
 import { normaliseUrl } from "@/lib/url";
+import { resolveGender } from "@/lib/profile-options";
 
 export type JoinState = { ok?: boolean; error?: string };
 
@@ -34,7 +35,7 @@ export async function submitJoinRequest(
   const experienceLevel = String(formData.get("experienceLevel") || "");
   const eaFunding = String(formData.get("eaFunding") || "");
   const funders = formData.getAll("funders").map(String);
-  const gender = String(formData.get("gender") || "");
+  const gender = resolveGender(formData);
 
   if (!name || !email.includes("@")) return { error: "Name and a valid email are required." };
   if (!descriptor) return { error: "Please pick what best describes you." };

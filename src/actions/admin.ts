@@ -19,6 +19,7 @@ import { sendEmail, link } from "@/lib/email";
 import { addDays, formatDayLong, todayAms } from "@/lib/dates";
 import { getSettings, setSetting, Settings } from "@/lib/settings";
 import { clearAllNoShows } from "@/lib/noshow";
+import { buildIcs } from "@/lib/ics";
 import { bookDay } from "@/lib/booking";
 
 async function requireAdmin() {
@@ -72,14 +73,44 @@ export async function approveRequestAction(requestId: string): Promise<AdminActi
     kind: "request_approved",
     html: `<p>Hi ${user.name},</p>
 <p>Great news — you're welcome at the office on <strong>${formatDayLong(req.requestedDate)}</strong>. Come at <strong>${req.requestedArrival}</strong> and someone will be there to show you around.</p>
-<p>Practical bits (address, door, lunch): ${link(`${appUrl()}/info`, "office info page")}.<br>
-Wifi password: <strong>${cfg.wifi_password}</strong></p>
+<p>Practical bits — address, getting in, lunch, wifi: ${link(`${appUrl()}/info`, "office info page")}. The wifi password is on posters up in the office.</p>
 <p>After your visit you can book desks any time at ${link(`${appUrl()}/book`, "the booking page")} — just log in with this email address.</p>
 <p>See you soon!<br>The EA Netherlands team</p>`,
   });
 
+  // Calendar invite for the host, so welcoming someone is in their day rather
+  // than only in the app. Sent to the admin who approved plus the visitor.
+  const invite = buildIcs({
+    uid: `visit-${req.id}@office.effectiefaltruisme.nl`,
+    title: `Welcome ${user.name} to the office`,
+    description: `${user.name}'s first visit. They arrive at ${req.requestedArrival}.\n\n${user.about ?? ""}\n\nProfile: ${user.profileUrl ?? "—"}\nWho's in that day: ${appUrl()}/book`,
+    location: cfg.office_address,
+    date: req.requestedDate,
+    startTime: req.requestedArrival,
+    durationMinutes: 60,
+    organiserEmail: adminEmailFrom(),
+    attendeeEmails: [admin.email],
+  });
+  await sendEmail({
+    to: admin.email,
+    subject: `Hosting ${user.name} — ${formatDayLong(req.requestedDate)} at ${req.requestedArrival}`,
+    kind: "host_calendar_invite",
+    html: `<p>You approved <strong>${user.name}</strong>'s first visit, so here's a calendar invite for the welcome.</p>
+<p><strong>${formatDayLong(req.requestedDate)} at ${req.requestedArrival}</strong> — accept the attached invite and it'll be in your calendar.</p>
+<p>${user.about ? `What they're working on: ${user.about}<br>` : ""}${user.profileUrl ? link(user.profileUrl, "Their profile") : ""}</p>
+<p>${link(`${appUrl()}/admin/today`, "Who else is in that day")}</p>`,
+    icsAttachment: { filename: "office-visit.ics", content: invite },
+  });
+
   revalidatePath("/admin/requests");
   return { ok: true };
+}
+
+/** Bare address for the iCalendar ORGANIZER field. */
+function adminEmailFrom(): string {
+  const from = process.env.EMAIL_FROM || "office@effectiefaltruisme.nl";
+  const match = from.match(/<([^>]+)>/);
+  return match ? match[1] : from;
 }
 
 export async function declineRequestAction(
@@ -289,7 +320,6 @@ export async function saveSettingsAction(
   if (slots.length > 0) await setSetting("arrival_slots", slots);
   await setSetting("flex_unavailable_window", String(formData.get("flex_unavailable_window") || "12:00–13:00"));
   await setSetting("office_address", String(formData.get("office_address") || ""));
-  await setSetting("wifi_password", String(formData.get("wifi_password") || ""));
   await setSetting("luma_ics_url", String(formData.get("luma_ics_url") || "").trim());
 
   revalidatePath("/admin/settings");
@@ -340,6 +370,41 @@ export async function deleteEventAction(eventId: string): Promise<AdminActionSta
   await requireAdmin();
   await db.delete(events).where(eq(events.id, eventId));
   revalidatePath("/admin/events");
+  return { ok: true };
+}
+
+export async function decideEventAction(
+  eventId: string,
+  decision: "confirmed" | "declined"
+): Promise<AdminActionState> {
+  await requireAdmin();
+  const [event] = await db.select().from(events).where(eq(events.id, eventId));
+  if (!event) return { error: "Event not found." };
+  await db.update(events).set({ status: decision }).where(eq(events.id, eventId));
+
+  if (event.createdBy) {
+    const [proposer] = await db.select().from(users).where(eq(users.id, event.createdBy));
+    if (proposer) {
+      await sendEmail({
+        to: proposer.email,
+        subject:
+          decision === "confirmed"
+            ? `Your event is confirmed: ${event.title}`
+            : `About your event proposal: ${event.title}`,
+        kind: decision === "confirmed" ? "event_confirmed" : "event_declined",
+        html:
+          decision === "confirmed"
+            ? `<p>Hi ${proposer.name},</p>
+<p>Your event <strong>${event.title}</strong> on ${formatDayLong(event.date)} is confirmed — it's on the office calendar now.</p>
+<p>Before the day, run through the ${link("https://tinyurl.com/checklist-office-events", "event checklist")}. Two things people forget: the alarm is active from 22:00, and the connecting doors close at 18:00.</p>
+<p>Thanks for organising it!</p>`
+            : `<p>Hi ${proposer.name},</p>
+<p>Thanks for proposing <strong>${event.title}</strong>. We can't host it on ${formatDayLong(event.date)} — one of the team will follow up to explain and see if another date works.</p>`,
+      });
+    }
+  }
+  revalidatePath("/admin/events");
+  revalidatePath("/");
   return { ok: true };
 }
 

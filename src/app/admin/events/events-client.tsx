@@ -7,6 +7,7 @@ import {
   setHeadcountAction,
   deleteEventAction,
   setEventTypeAction,
+  decideEventAction,
   syncLumaAction,
   AdminActionState,
 } from "@/actions/admin";
@@ -31,6 +32,9 @@ export type EventRow = {
   manual: number;
   rsvps: number;
   past: boolean;
+  status: string;
+  proposalNote: string | null;
+  proposedBy: string | null;
 };
 
 const EVENT_TYPES = [
@@ -57,6 +61,9 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
     },
     {}
   );
+
+  const proposals = rows.filter((r) => r.status === "proposed");
+  const confirmed = rows.filter((r) => r.status !== "proposed");
 
   return (
     <div className="space-y-4">
@@ -128,12 +135,27 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
         </Card>
       )}
 
+      {proposals.length > 0 && (
+        <Card className="border-teal-300 bg-teal-50/50">
+          <h2 className="font-semibold mb-1">Member proposals</h2>
+          <p className="text-sm text-slate-600 mb-3">
+            Not visible to anyone else and not counted in reports until you
+            confirm them.
+          </p>
+          <ul className="divide-y divide-teal-200/60">
+            {proposals.map((e) => (
+              <ProposalItem key={e.id} e={e} />
+            ))}
+          </ul>
+        </Card>
+      )}
+
       <Card>
-        {rows.length === 0 ? (
+        {confirmed.length === 0 ? (
           <p className="text-sm text-slate-500">No events yet.</p>
         ) : (
           <ul className="divide-y divide-slate-100">
-            {rows.map((e) => (
+            {confirmed.map((e) => (
               <EventItem key={e.id} e={e} />
             ))}
           </ul>
@@ -168,6 +190,43 @@ function SyncButton() {
       </button>
       {result && <span className="text-sm text-slate-500">{result}</span>}
     </>
+  );
+}
+
+function ProposalItem({ e }: { e: EventRow }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  function decide(decision: "confirmed" | "declined") {
+    startTransition(async () => {
+      await decideEventAction(e.id, decision);
+      router.refresh();
+    });
+  }
+  return (
+    <li className="py-3">
+      <p className="text-sm font-medium">
+        {e.title} <Badge tone="teal">proposed</Badge>
+      </p>
+      <p className="text-xs text-slate-500 mt-0.5">
+        {formatDay(e.date)}
+        {e.startsAt ? ` · ${e.startsAt}${e.endsAt ? `–${e.endsAt}` : ""}` : ""}
+        {e.proposedBy ? ` · by ${e.proposedBy}` : ""}
+        {e.expectedAttendance ? ` · expects ~${e.expectedAttendance}` : ""}
+      </p>
+      {e.proposalNote && (
+        <p className="text-sm text-slate-700 mt-2 whitespace-pre-line">
+          {e.proposalNote}
+        </p>
+      )}
+      <div className="mt-3 flex gap-2">
+        <button className={btnPrimary} disabled={pending} onClick={() => decide("confirmed")}>
+          {pending ? "Working…" : "Confirm"}
+        </button>
+        <button className={btnSecondary} disabled={pending} onClick={() => decide("declined")}>
+          Decline
+        </button>
+      </div>
+    </li>
   );
 }
 

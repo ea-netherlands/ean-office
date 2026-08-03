@@ -129,10 +129,6 @@ export function SettingsForm({ cfg }: { cfg: Settings }) {
           <input name="office_address" defaultValue={cfg.office_address} className={inputCls} />
         </div>
         <div>
-          <label className={labelCls}>Wifi password</label>
-          <input name="wifi_password" defaultValue={cfg.wifi_password} className={inputCls} />
-        </div>
-        <div>
           <label className={labelCls}>Luma calendar feed (ICS URL)</label>
           <input name="luma_ics_url" defaultValue={cfg.luma_ics_url} className={inputCls} />
           <p className="text-xs text-slate-400 mt-1">

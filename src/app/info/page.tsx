@@ -9,7 +9,6 @@ export const dynamic = "force-dynamic";
 function renderInfoMd(md: string, cfg: Settings): string {
   const withVars = md
     .replaceAll("{{office_address}}", cfg.office_address)
-    .replaceAll("{{wifi_password}}", cfg.wifi_password)
     .replaceAll("{{flex_window}}", cfg.flex_unavailable_window);
   return marked.parse(withVars, { async: false });
 }

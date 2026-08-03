@@ -48,7 +48,13 @@ export default async function BookPage({
   const monthEvents = await db
     .select()
     .from(events)
-    .where(and(gte(events.date, first), lte(events.date, last)));
+    .where(
+      and(
+        gte(events.date, first),
+        lte(events.date, last),
+        eq(events.status, "confirmed")
+      )
+    );
   const themedByDate = new Map(
     monthEvents
       .filter((e) => e.type === "themed_coworking")

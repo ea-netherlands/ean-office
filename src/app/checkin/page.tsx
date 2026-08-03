@@ -45,7 +45,7 @@ export default async function CheckinPage() {
   const todaysEvents = await db
     .select()
     .from(events)
-    .where(eq(events.date, today));
+    .where(and(eq(events.date, today), eq(events.status, "confirmed")));
   const myEventCheckins = new Set(
     (
       await db

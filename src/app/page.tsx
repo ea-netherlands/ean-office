@@ -54,7 +54,13 @@ export default async function HomePage() {
   const upcomingEvents = await db
     .select()
     .from(events)
-    .where(and(gte(events.date, today), lte(events.date, addDays(today, 21))))
+    .where(
+      and(
+        gte(events.date, today),
+        lte(events.date, addDays(today, 21)),
+        eq(events.status, "confirmed")
+      )
+    )
     .orderBy(asc(events.date));
   const myRsvps = new Set(
     (
@@ -118,6 +124,16 @@ export default async function HomePage() {
             )}
           </Card>
         )}
+
+        <Card className="mb-4 flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-sm text-slate-600">
+            Got something you&apos;d like to run here? Reading groups, talks,
+            socials — the office is yours outside office hours.
+          </p>
+          <Link href="/events/propose" className={btnSecondary}>
+            Propose an event
+          </Link>
+        </Card>
 
         {upcomingEvents.length > 0 && (
           <Card>

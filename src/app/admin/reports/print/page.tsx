@@ -77,7 +77,7 @@ export default async function PrintReportPage({
           <Row key={e.label} k={`Experience: ${e.label}`} v={`${pct(e.peoplePct)} / ${pct(e.deskDaysPct)}`} />
         ))}
         {r.gender
-          .filter((g) => g.label === "F")
+          .filter((g) => g.label === "Woman")
           .map((g) => (
             <Row key={g.label} k="Female visitors" v={`${pct(g.peoplePct)} / ${pct(g.deskDaysPct)}`} t="target ~40%" />
           ))}

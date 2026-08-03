@@ -5,6 +5,7 @@ import { db, users } from "@/db";
 import { eq } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { normaliseUrl } from "@/lib/url";
+import { resolveGender } from "@/lib/profile-options";
 
 export type ProfileState = { ok?: boolean; error?: string };
 
@@ -19,7 +20,7 @@ export async function saveProfileAction(
   const roleCategory = String(formData.get("roleCategory") || "");
   const experienceLevel = String(formData.get("experienceLevel") || "");
   const eaFunding = String(formData.get("eaFunding") || "");
-  const gender = String(formData.get("gender") || "");
+  const gender = resolveGender(formData);
   const funders = formData.getAll("funders").map(String);
   const causeAreaOther = String(formData.get("causeAreaOther") || "");
 

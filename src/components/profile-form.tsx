@@ -8,6 +8,7 @@ import {
   EXPERIENCE_LEVELS,
   FUNDERS,
   GENDERS,
+  GENDER_SELF_DESCRIBE,
 } from "@/lib/profile-options";
 import { btnPrimary, btnSecondary, inputCls, labelCls } from "@/components/ui";
 
@@ -84,6 +85,11 @@ export function ProfileFields({
   namePrefix?: string;
 }) {
   const [cause, setCause] = useState(initial?.causeArea || "");
+  const knownGender =
+    initial?.gender && (GENDERS as readonly string[]).includes(initial.gender);
+  const [gender, setGender] = useState(
+    initial?.gender ? (knownGender ? initial.gender : GENDER_SELF_DESCRIBE) : ""
+  );
   return (
     <>
       <div>
@@ -184,12 +190,30 @@ export function ProfileFields({
       </div>
       <div>
         <label className={labelCls}>Gender (optional)</label>
-        <select name="gender" className={inputCls} defaultValue={initial?.gender || ""}>
+        <select
+          name="gender"
+          className={inputCls}
+          value={gender}
+          onChange={(e) => setGender(e.target.value)}
+        >
           <option value="">Prefer not to answer</option>
           {GENDERS.map((g) => (
             <option key={g}>{g}</option>
           ))}
         </select>
+        {gender === GENDER_SELF_DESCRIBE && (
+          <input
+            name="genderSelfDescribe"
+            maxLength={60}
+            defaultValue={
+              initial?.gender && !(GENDERS as readonly string[]).includes(initial.gender)
+                ? initial.gender
+                : ""
+            }
+            placeholder="In your own words"
+            className={`${inputCls} mt-2`}
+          />
+        )}
       </div>
       <p className="text-xs text-slate-400">
         These answers are used only for aggregate reporting to funders — they

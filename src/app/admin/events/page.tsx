@@ -1,4 +1,4 @@
-import { db, events, eventAttendance } from "@/db";
+import { db, events, eventAttendance, users } from "@/db";
 import { desc, inArray } from "drizzle-orm";
 import { Page, H1, Sub } from "@/components/ui";
 import { EventsClient, EventRow } from "./events-client";
@@ -16,6 +16,13 @@ export default async function EventsPage() {
           .where(inArray(eventAttendance.eventId, all.map((e) => e.id)))
       : [];
 
+  const proposerNames = new Map(
+    (await db.select({ id: users.id, name: users.name }).from(users)).map((u) => [
+      u.id,
+      u.name,
+    ])
+  );
+
   const rows: EventRow[] = all.map((e) => {
     const forEvent = attendance.filter((a) => a.eventId === e.id);
     return {
@@ -31,6 +38,9 @@ export default async function EventsPage() {
       headcount: e.headcount,
       source: e.source,
       url: e.url,
+      status: e.status,
+      proposalNote: e.proposalNote,
+      proposedBy: e.createdBy ? proposerNames.get(e.createdBy) ?? null : null,
       checkins: forEvent.filter((a) => a.source === "checkin").length,
       manual: forEvent.filter((a) => a.source === "manual").length,
       rsvps: forEvent.filter((a) => a.source === "rsvp").length,

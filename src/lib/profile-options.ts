@@ -57,7 +57,39 @@ export const FREQUENCIES = [
   "Several days a week",
 ] as const;
 
-export const GENDERS = ["F", "M", "Other", "Prefer not to say"] as const;
+// Self-describe is stored as the typed text; reports bucket anything outside
+// this list as "Self-described" so a single answer can't identify someone.
+// The blank option in the form already covers "prefer not to answer".
+export const GENDERS = [
+  "Woman",
+  "Man",
+  "Non-binary",
+  "Prefer to self-describe",
+] as const;
+
+export const GENDER_SELF_DESCRIBE = "Prefer to self-describe";
+
+/** Store the typed words when someone self-describes, else the chosen option. */
+export function resolveGender(formData: FormData): string {
+  const choice = String(formData.get("gender") || "");
+  if (choice !== GENDER_SELF_DESCRIBE) return choice;
+  return String(formData.get("genderSelfDescribe") || "").trim().slice(0, 60);
+}
+
+/** Older records used F/M — keep them counted correctly. */
+export function isWomanGender(value: string | null): boolean {
+  return value === "Woman" || value === "F";
+}
+
+export function genderReportLabel(value: string | null): string {
+  if (!value) return "Not stated";
+  if (value === "F") return "Woman";
+  if (value === "M") return "Man";
+  return (GENDERS as readonly string[]).includes(value) &&
+    value !== GENDER_SELF_DESCRIBE
+    ? value
+    : "Self-described";
+}
 
 export const DECLINE_REASONS = [
   "Not a fit for the space right now",

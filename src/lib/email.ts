@@ -12,6 +12,8 @@ export async function sendEmail(opts: {
   subject: string;
   html: string;
   kind: string;
+  /** Optional calendar invite, shown by mail clients as an acceptable event. */
+  icsAttachment?: { filename: string; content: string };
 }): Promise<void> {
   await ensureMigrated();
   let delivered = false;
@@ -24,6 +26,17 @@ export async function sendEmail(opts: {
         to: opts.to,
         subject: opts.subject,
         html: wrap(opts.html),
+        ...(opts.icsAttachment
+          ? {
+              attachments: [
+                {
+                  filename: opts.icsAttachment.filename,
+                  content: Buffer.from(opts.icsAttachment.content).toString("base64"),
+                  contentType: "text/calendar; method=REQUEST; charset=utf-8",
+                },
+              ],
+            }
+          : {}),
       });
       delivered = !result.error;
       if (result.error) console.error("[email] resend error:", result.error);

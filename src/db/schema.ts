@@ -251,6 +251,12 @@ export const events = pgTable("events", {
   source: text("source", { enum: ["manual", "luma"] })
     .notNull()
     .default("manual"),
+  // Members can propose events; admins confirm. Only confirmed events show to
+  // members and count towards the funder-facing event figures.
+  status: text("status", { enum: ["proposed", "confirmed", "declined"] })
+    .notNull()
+    .default("confirmed"),
+  proposalNote: text("proposal_note"),
   externalId: text("external_id").unique(), // Luma UID for sync upserts
   url: text("url"), // luma.com event page
   createdBy: text("created_by"),
