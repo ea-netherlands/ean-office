@@ -26,8 +26,10 @@ export function JoinForm({
         <Icon name="confetti" className="text-5xl text-teal-600 mb-3" />
         <h2 className="text-xl font-bold">Request received!</h2>
         <p className="text-slate-500 mt-2 max-w-sm mx-auto">
-          We&apos;ve emailed you a confirmation, and you&apos;ll hear from a
-          real human <strong>within one working day</strong>.
+          We&apos;ve sent you an automatic acknowledgement now. A real person
+          then reads your request — usually{" "}
+          <strong>within one working day</strong> — and you&apos;ll get an
+          email either way once they have.
         </p>
       </Card>
     );
@@ -68,9 +70,10 @@ export function JoinForm({
           </label>
           <input
             name="profileUrl"
-            type="url"
+            type="text"
+            inputMode="url"
             required
-            placeholder="https://…"
+            placeholder="linkedin.com/in/yourname"
             className={inputCls}
           />
           <p className="text-xs text-slate-400 mt-1">

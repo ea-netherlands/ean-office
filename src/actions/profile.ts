@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db, users } from "@/db";
 import { eq } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
+import { normaliseUrl } from "@/lib/url";
 
 export type ProfileState = { ok?: boolean; error?: string };
 
@@ -65,7 +66,7 @@ export async function saveCommunityProfileAction(
       bio: String(formData.get("bio") || "").slice(0, 500) || null,
       expertise: String(formData.get("expertise") || "").slice(0, 300) || null,
       publicCauseAreas: publicCauseAreas.length > 0 ? publicCauseAreas : null,
-      publicLink: String(formData.get("publicLink") || "").slice(0, 300) || null,
+      publicLink: normaliseUrl(String(formData.get("publicLink") || "").slice(0, 300)),
     })
     .where(eq(users.id, user.id));
 

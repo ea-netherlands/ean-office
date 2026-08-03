@@ -6,6 +6,7 @@ import { newId } from "@/lib/ids";
 import { sendEmail, link } from "@/lib/email";
 import { appUrl } from "@/lib/auth";
 import { formatDayLong } from "@/lib/dates";
+import { normaliseUrl } from "@/lib/url";
 
 export type JoinState = { ok?: boolean; error?: string };
 
@@ -38,6 +39,10 @@ export async function submitJoinRequest(
   if (!name || !email.includes("@")) return { error: "Name and a valid email are required." };
   if (!descriptor) return { error: "Please pick what best describes you." };
   if (!profileUrl) return { error: "Please add a link — LinkedIn, a personal site, or an EA Forum profile." };
+  const normalisedUrl = normaliseUrl(profileUrl);
+  if (!normalisedUrl) {
+    return { error: "That link doesn't look right — something like linkedin.com/in/yourname works." };
+  }
   if (!about) return { error: "Please tell us a little about what you're working on." };
   if (!expectedFrequency) return { error: "Please pick how often you expect to come." };
   if (!guidelines) return { error: "Please read and accept the office guidelines." };
@@ -74,7 +79,7 @@ export async function submitJoinRequest(
     role: "visitor" as const,
     status: "pending" as const,
     descriptor,
-    profileUrl,
+    profileUrl: normalisedUrl,
     about,
     expectedFrequency,
     accessibilityNotes: accessibilityNotes || null,
@@ -109,7 +114,7 @@ export async function submitJoinRequest(
     kind: "request_ack",
     html: `<p>Hi ${name},</p>
 <p>Thanks for your interest in the EA Netherlands office! We've received your request to visit on <strong>${formatDayLong(requestedDate)}</strong> at ${requestedArrival}.</p>
-<p>Someone from the team will confirm <strong>within one working day</strong>.</p>
+<p>This message is automatic — but a real person reads every request. One of the team will look at yours <strong>within one working day</strong> and you'll get an email either way once they have.</p>
 <p>In the meantime: ${link(`${appUrl()}/info`, "practical info about the office")}.</p>`,
   });
 

@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 export type Settings = {
   desk_count: number;
   flex_count: number;
-  flex_unavailable_window: string; // "12:00–13:00", informational
+  flex_unavailable_window: string; // "12:30–13:30", informational
   arrival_slots: string[]; // first-visit arrival options
   host_coverage_days: number[]; // ISO weekdays with host coverage, 1=Mon
   block_horizon_weeks: number;
@@ -29,7 +29,7 @@ export type Settings = {
 export const DEFAULT_SETTINGS: Settings = {
   desk_count: 8,
   flex_count: 5,
-  flex_unavailable_window: "12:00–13:00",
+  flex_unavailable_window: "12:30–13:30",
   arrival_slots: ["11:00", "13:00"],
   host_coverage_days: [1, 2, 3, 4], // Monday–Thursday
   block_horizon_weeks: 12,
@@ -46,7 +46,8 @@ export const DEFAULT_SETTINGS: Settings = {
   office_address:
     "HNK Houthavens, Van Diemenstraat 92, 1013 CN Amsterdam (ground floor — ask for 'Effectief Altruïsme Nederland', or walk towards the elevators, turn right through the connecting doors, first office on the right with the EA logos)",
   // Real value is set in the database via /admin/settings — never in source.
-  wifi_password: "ask a host",
+  // Replace with the real password from /admin/settings — never in source.
+  wifi_password: "shared in your welcome email",
   luma_ics_url: "https://api.lu.ma/ics/get?entity=calendar&id=cal-akaE66Y0BQlrCVY",
   info_public_md: `## Where
 
@@ -66,7 +67,7 @@ Monday–Friday, 9:00–19:00. Events outside office hours are possible — and 
 
 ## Lunch
 
-Most people have lunch together between 12:00 and 13:00. Bring your own (there's a fridge and microwave) or buy it in the building — the ground-floor restaurant is open 9:00–17:00.
+Communal lunch is **12:30–13:30**. Bring your own (there's a fridge and a microwave) or buy it in the building — the ground-floor restaurant is open 9:00–17:00. There are always vegan options, and if you're ordering in with the group, the Lebanese sajeria nearby does very good vegan wraps.
 
 ## Checking in
 
@@ -87,7 +88,7 @@ The basic use of the office during office hours (9–17) is quiet work; during l
 If you feel unwelcome or uncomfortable for any reason, please let us know — it's important to us. The full [code of conduct is on our website](https://effectiefaltruisme.nl/en/legal/code-of-conduct). We reserve the right to revoke access — for endangering people's health or safety, not helping build a supportive community, or repeatedly breaking or losing property.`,
   info_members_md: `## Wifi
 
-In our office — network **Doing wifi better**, password **{{wifi_password}}**.
+In our office — network **Doing wifi better**. The password is **{{wifi_password}}**. If it's ever changed, we'll share the new one here and in the office.
 
 In the HNK building — network **HNK Public** (a pop-up asks for your name and email, every time, sorry).
 
