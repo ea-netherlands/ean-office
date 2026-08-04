@@ -7,6 +7,7 @@ import { getCurrentUser, isActiveMember, appUrl } from "@/lib/auth";
 import { newId } from "@/lib/ids";
 import { sendEmail, link } from "@/lib/email";
 import { formatDayLong, todayAms } from "@/lib/dates";
+import { validateEventHours } from "@/lib/event-hours";
 
 export type ProposeState = { ok?: boolean; error?: string };
 
@@ -35,6 +36,8 @@ export async function proposeEventAction(
   if (!title) return { error: "Give your event a name." };
   if (!date) return { error: "Pick a date." };
   if (date < todayAms()) return { error: "That date has already passed." };
+  const hoursError = validateEventHours(type, startsAt, endsAt);
+  if (hoursError) return { error: hoursError };
 
   await db.insert(events).values({
     id: newId("ev"),

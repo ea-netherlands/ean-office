@@ -21,6 +21,7 @@ import { getSettings, setSetting, Settings } from "@/lib/settings";
 import { clearAllNoShows } from "@/lib/noshow";
 import { buildIcs } from "@/lib/ics";
 import { bookDay } from "@/lib/booking";
+import { validateEventHours } from "@/lib/event-hours";
 
 async function requireAdmin() {
   const user = await getCurrentUser();
@@ -336,13 +337,17 @@ export async function createEventAction(
   const title = String(formData.get("title") || "").trim();
   const date = String(formData.get("date") || "");
   const type = String(formData.get("type") || "other");
+  const startsAt = String(formData.get("startsAt") || "") || null;
+  const endsAt = String(formData.get("endsAt") || "") || null;
   if (!title || !date) return { error: "Title and date are required." };
+  const hoursError = validateEventHours(type, startsAt, endsAt);
+  if (hoursError) return { error: hoursError };
   await db.insert(events).values({
     id: newId("ev"),
     title,
     date,
-    startsAt: String(formData.get("startsAt") || "") || null,
-    endsAt: String(formData.get("endsAt") || "") || null,
+    startsAt,
+    endsAt,
     type: type as typeof events.$inferInsert.type,
     causeArea: String(formData.get("causeArea") || "") || null,
     organiser: (String(formData.get("organiser") || "ean") as "ean" | "hosted"),

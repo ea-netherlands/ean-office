@@ -1,9 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { proposeEventAction, ProposeState } from "@/actions/propose-event";
 import { Card, btnPrimary, btnSecondary, inputCls, labelCls, Icon } from "@/components/ui";
+import { AvailabilityCalendar, Availability } from "./availability-calendar";
+import { EVENING_START_MIN, EVENING_END_MAX, needsEveningWindow } from "@/lib/event-hours";
 
 const TYPES = [
   ["reading_group", "Reading group"],
@@ -15,11 +17,14 @@ const TYPES = [
   ["other", "Something else"],
 ] as const;
 
-export function ProposeForm() {
+export function ProposeForm({ availability }: { availability: Availability[] }) {
   const [state, action, pending] = useActionState<ProposeState, FormData>(
     proposeEventAction,
     {}
   );
+  const [date, setDate] = useState("");
+  const [type, setType] = useState<string>("reading_group");
+  const evening = needsEveningWindow(type);
 
   if (state.ok) {
     return (
@@ -50,14 +55,30 @@ export function ProposeForm() {
             className={inputCls}
           />
         </div>
+        <div>
+          <label className={labelCls}>Which evenings are free?</label>
+          <AvailabilityCalendar availability={availability} selected={date} onSelect={setDate} />
+        </div>
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>Date *</label>
-            <input name="date" type="date" required className={inputCls} />
+            <input
+              name="date"
+              type="date"
+              required
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className={inputCls}
+            />
           </div>
           <div>
             <label className={labelCls}>Kind of event</label>
-            <select name="type" className={inputCls} defaultValue="reading_group">
+            <select
+              name="type"
+              className={inputCls}
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+            >
               {TYPES.map(([v, l]) => (
                 <option key={v} value={v}>
                   {l}
@@ -67,13 +88,31 @@ export function ProposeForm() {
           </div>
           <div>
             <label className={labelCls}>Starts</label>
-            <input name="startsAt" type="time" className={inputCls} />
+            <input
+              name="startsAt"
+              type="time"
+              min={evening ? EVENING_START_MIN : undefined}
+              max={evening ? EVENING_END_MAX : undefined}
+              className={inputCls}
+            />
           </div>
           <div>
             <label className={labelCls}>Ends</label>
-            <input name="endsAt" type="time" className={inputCls} />
+            <input
+              name="endsAt"
+              type="time"
+              min={evening ? EVENING_START_MIN : undefined}
+              max={evening ? EVENING_END_MAX : undefined}
+              className={inputCls}
+            />
           </div>
         </div>
+        {evening && (
+          <p className="text-xs text-slate-500">
+            Evening events run {EVENING_START_MIN}–{EVENING_END_MAX} — the office alarm activates at{" "}
+            {EVENING_END_MAX}, so everything needs to wrap up before then.
+          </p>
+        )}
         <div>
           <label className={labelCls}>Roughly how many people?</label>
           <input
@@ -94,9 +133,9 @@ export function ProposeForm() {
           />
         </div>
         <p className="text-xs text-slate-400">
-          Events run outside office hours (after 17:00 or at weekends). The
-          alarm is active from 22:00 and the connecting doors close at 18:00 —
-          an admin will walk you through the checklist once it&apos;s confirmed.
+          Events run outside office hours, from 17:30. The connecting doors
+          close at 18:00 — an admin will walk you through the checklist once
+          it&apos;s confirmed.
         </p>
       </Card>
 

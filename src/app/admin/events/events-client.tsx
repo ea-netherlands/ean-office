@@ -15,6 +15,7 @@ import {
 import { CAUSE_AREAS } from "@/lib/profile-options";
 import { Badge, Card, btnPrimary, btnSecondary, inputCls, labelCls } from "@/components/ui";
 import { formatDay } from "@/lib/dates";
+import { EVENING_START_MIN, EVENING_END_MAX, needsEveningWindow } from "@/lib/event-hours";
 
 export type EventRow = {
   id: string;
@@ -53,6 +54,8 @@ const EVENT_TYPES = [
 export function EventsClient({ rows }: { rows: EventRow[] }) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
+  const [newType, setNewType] = useState<string>("talk");
+  const newEvening = needsEveningWindow(newType);
   const [state, action, pending] = useActionState<AdminActionState, FormData>(
     async (prev, fd) => {
       const res = await createEventAction(prev, fd);
@@ -90,7 +93,12 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
             </div>
             <div>
               <label className={labelCls}>Type *</label>
-              <select name="type" className={inputCls} defaultValue="talk">
+              <select
+                name="type"
+                className={inputCls}
+                value={newType}
+                onChange={(e) => setNewType(e.target.value)}
+              >
                 {EVENT_TYPES.map(([v, l]) => (
                   <option key={v} value={v}>
                     {l}
@@ -100,12 +108,31 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
             </div>
             <div>
               <label className={labelCls}>Starts</label>
-              <input name="startsAt" type="time" className={inputCls} />
+              <input
+                name="startsAt"
+                type="time"
+                min={newEvening ? EVENING_START_MIN : undefined}
+                max={newEvening ? EVENING_END_MAX : undefined}
+                className={inputCls}
+              />
             </div>
             <div>
               <label className={labelCls}>Ends</label>
-              <input name="endsAt" type="time" className={inputCls} />
+              <input
+                name="endsAt"
+                type="time"
+                min={newEvening ? EVENING_START_MIN : undefined}
+                max={newEvening ? EVENING_END_MAX : undefined}
+                className={inputCls}
+              />
             </div>
+            {newEvening && (
+              <p className="text-xs text-slate-400 sm:col-span-2">
+                Evening events run {EVENING_START_MIN}–{EVENING_END_MAX} — the
+                alarm activates at {EVENING_END_MAX}. Themed coworking days run
+                during office hours and are exempt.
+              </p>
+            )}
             <div>
               <label className={labelCls}>Cause area</label>
               <select name="causeArea" className={inputCls} defaultValue="">
