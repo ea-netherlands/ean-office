@@ -19,7 +19,7 @@ export default async function CheckinPage() {
   if (!user) {
     return (
       <Shell>
-        <h1 className="text-2xl font-bold">Welcome!</h1>
+        <h1 className="text-2xl">Welcome!</h1>
         <p className="text-slate-500 mt-2 mb-6">
           Log in to check in — it takes one tap after that.
         </p>
@@ -77,7 +77,7 @@ export default async function CheckinPage() {
       {checkedIn ? (
         <>
           <Icon name="circle-check" className="text-6xl text-teal-600 mb-3" />
-          <h1 className="text-2xl font-bold">
+          <h1 className="text-2xl">
             {justCheckedIn ? "Checked in. Welcome!" : "You're already checked in"}
           </h1>
           <p className="text-slate-500 mt-2">
@@ -86,7 +86,7 @@ export default async function CheckinPage() {
         </>
       ) : (
         <>
-          <h1 className="text-2xl font-bold">Hi {user.name.split(" ")[0]}</h1>
+          <h1 className="text-2xl">Hi {user.name.split(" ")[0]}</h1>
           <p className="text-slate-600 mt-2 mb-5">
             You&apos;re not booked today — check in anyway?
             {cap.full && " The day is technically full, but you're here, so come on in."}

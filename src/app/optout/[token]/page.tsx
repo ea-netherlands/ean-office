@@ -17,7 +17,7 @@ export default async function OptoutPage({
   if (!verified) {
     return (
       <Shell>
-        <h1 className="text-xl font-bold">This link has expired</h1>
+        <h1 className="text-xl">This link has expired</h1>
         <p className="text-slate-500 mt-2 text-sm">
           You can change email preferences any time from your profile page.
         </p>
@@ -27,7 +27,7 @@ export default async function OptoutPage({
 
   return (
     <Shell>
-      <h1 className="text-xl font-bold">Stop check-in emails?</h1>
+      <h1 className="text-xl">Stop check-in emails?</h1>
       <p className="text-slate-600 mt-2 mb-5 text-sm">
         We won&apos;t email you about missed check-ins again. (You can turn
         them back on from your profile page.)

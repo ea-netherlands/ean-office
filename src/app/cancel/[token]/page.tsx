@@ -22,7 +22,7 @@ export default async function CancelPage({
   if (!verified) {
     return (
       <Shell>
-        <h1 className="text-xl font-bold">This link has expired</h1>
+        <h1 className="text-xl">This link has expired</h1>
         <p className="text-slate-500 mt-2 text-sm">
           The booking day has probably passed. You can manage bookings any
           time at <a href="/me" className="text-teal-700">your bookings page</a>.
@@ -38,7 +38,7 @@ export default async function CancelPage({
   if (!booking) {
     return (
       <Shell>
-        <h1 className="text-xl font-bold">Booking not found</h1>
+        <h1 className="text-xl">Booking not found</h1>
       </Shell>
     );
   }
@@ -48,7 +48,7 @@ export default async function CancelPage({
     return (
       <Shell>
         <Icon name="circle-check" className="text-5xl text-teal-600 mb-2" />
-        <h1 className="text-xl font-bold">Already cancelled</h1>
+        <h1 className="text-xl">Already cancelled</h1>
         <p className="text-slate-500 mt-2 text-sm">
           {formatDayLong(booking.date)} is free again. Thanks for freeing the desk!
         </p>
@@ -58,7 +58,7 @@ export default async function CancelPage({
 
   return (
     <Shell>
-      <h1 className="text-xl font-bold">Cancel this booking?</h1>
+      <h1 className="text-xl">Cancel this booking?</h1>
       <p className="text-slate-600 mt-2 mb-5 text-sm">
         {owner?.name} · <strong>{formatDayLong(booking.date)}</strong>
         {slotSuffix(asSlot(booking.slot))}

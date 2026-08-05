@@ -23,7 +23,7 @@ export function TokenConfirm({
   if (done) {
     return (
       <div>
-        <h2 className="text-lg font-bold text-teal-800">{doneTitle}</h2>
+        <h2 className="text-lg text-teal-800">{doneTitle}</h2>
         <p className="text-sm text-slate-500 mt-1">{doneText}</p>
       </div>
     );

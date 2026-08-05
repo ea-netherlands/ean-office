@@ -20,7 +20,7 @@ export default async function LoginPage({
       <Nav user={null} />
       <Page>
         <div className="max-w-sm mx-auto mt-8">
-          <h1 className="text-2xl font-bold mb-2">Log in</h1>
+          <h1 className="text-2xl mb-2">Log in</h1>
           <p className="text-slate-500 text-sm mb-6">
             No passwords here — enter your email and we&apos;ll send you a link.
           </p>

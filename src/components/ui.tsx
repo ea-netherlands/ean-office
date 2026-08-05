@@ -26,6 +26,21 @@ export function H1({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Card and section headings. Weight, family and tracking come from the
+ * `h1,h2,h3` rule in globals.css — don't add `font-bold`/`font-semibold`
+ * here or at call sites; Sentient is a 500 face in this system.
+ */
+export function H2({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <h2 className={className}>{children}</h2>;
+}
+
 export function Sub({ children }: { children: React.ReactNode }) {
   return <p className="text-slate-600 text-sm mb-5">{children}</p>;
 }

@@ -58,7 +58,7 @@ export default async function AdminTodayPage() {
       </div>
 
       <Card>
-        <h2 className="font-semibold mb-3">Who&apos;s in</h2>
+        <h2 className="mb-3">Who&apos;s in</h2>
         {booked.length === 0 ? (
           <p className="text-sm text-slate-500">No bookings today.</p>
         ) : (

@@ -72,7 +72,7 @@ export function AvailabilityCalendar({
               onClick={() => onSelect(day)}
               title={title}
               aria-label={title}
-              className={`relative aspect-square rounded-md text-xs flex items-center justify-center ${tone} ${
+              className={`relative aspect-square rounded-lg text-xs flex items-center justify-center ${tone} ${
                 isSelected ? "ring-2 ring-teal-500 ring-offset-1" : ""
               }`}
             >
@@ -105,7 +105,7 @@ export function AvailabilityCalendar({
 function Legend({ swatch, label }: { swatch: string; label: string }) {
   return (
     <span className="flex items-center gap-1.5">
-      <span className={`w-3 h-3 rounded-sm inline-block ${swatch}`} />
+      <span className={`w-3 h-3 rounded-full inline-block ${swatch}`} />
       {label}
     </span>
   );

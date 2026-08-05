@@ -24,7 +24,7 @@ export default async function HomePage() {
         <Nav user={null} />
         <Page>
           <div className="max-w-lg mx-auto mt-10 text-center">
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h1 className="text-3xl">
               EA Netherlands Office
             </h1>
             <p className="text-slate-500 mt-3 mb-8">
@@ -103,7 +103,7 @@ export default async function HomePage() {
         {!cap.closed && (
           <Card className="mb-4">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold">Who&apos;s coming today</h2>
+              <h2>Who&apos;s coming today</h2>
               <span className="text-sm text-slate-500">
                 {cap.desksFreeAllDay} desk
                 {cap.desksFreeAllDay === 1 ? "" : "s"} ·{" "}
@@ -147,7 +147,7 @@ export default async function HomePage() {
 
         {upcomingEvents.length > 0 && (
           <Card>
-            <h2 className="font-semibold mb-3">Coming up</h2>
+            <h2 className="mb-3">Coming up</h2>
             <ul className="space-y-3">
               {upcomingEvents.map((e) => (
                 <li key={e.id} className="flex items-start justify-between gap-3">

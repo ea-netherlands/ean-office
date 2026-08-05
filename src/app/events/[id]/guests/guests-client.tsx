@@ -26,7 +26,7 @@ export function GuestsClient({ guests }: { guests: GuestRow[] }) {
     <div className="space-y-4">
       {pending.length > 0 && (
         <div className="space-y-2">
-          <h2 className="font-semibold text-sm text-slate-600">
+          <h2 className="text-sm text-slate-600">
             Waiting on you ({pending.length})
           </h2>
           {pending.map((g) => (
@@ -36,7 +36,7 @@ export function GuestsClient({ guests }: { guests: GuestRow[] }) {
       )}
       {decided.length > 0 && (
         <div className="space-y-2">
-          <h2 className="font-semibold text-sm text-slate-600">Decided</h2>
+          <h2 className="text-sm text-slate-600">Decided</h2>
           {decided.map((g) => (
             <GuestCard key={g.id} guest={g} />
           ))}

@@ -201,7 +201,7 @@ export function BookGrid(props: {
         >
           ←
         </Link>
-        <h2 className="font-semibold">{props.monthLabel}</h2>
+        <h2>{props.monthLabel}</h2>
         <Link
           href={`/book?m=${props.nextMonth}`}
           className="px-3 py-1.5 rounded-lg border border-slate-300 text-sm hover:bg-slate-50"
@@ -294,7 +294,7 @@ export function BookGrid(props: {
       {profileFor && (
         <div className="fixed inset-0 z-30 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-xl p-5 max-h-[90vh] overflow-y-auto">
-            <h3 className="font-semibold text-lg mb-1">One quick thing first</h3>
+            <h3 className="text-lg mb-1">One quick thing first</h3>
             <p className="text-sm text-slate-500 mb-4">
               Five questions, thirty seconds. They power the aggregate usage
               reports that keep this office funded.
@@ -442,7 +442,7 @@ function DayPanel({
   if (day.closed && day.themedEvent) {
     return (
       <div className="mt-4 bg-white border border-slate-200 rounded-xl p-4">
-        <h3 className="font-semibold">{formatDayLong(day.date)}</h3>
+        <h3>{formatDayLong(day.date)}</h3>
         <p className="text-sm text-teal-700 mt-0.5">
           <Icon name="target-arrow" className="mr-1" />
           {day.themedEvent.title}
@@ -489,7 +489,7 @@ function DayPanel({
 
   return (
     <div className="mt-4 bg-white border border-slate-200 rounded-xl p-4">
-      <h3 className="font-semibold">{formatDayLong(day.date)}</h3>
+      <h3>{formatDayLong(day.date)}</h3>
 
       {/* Which hours — the whole panel below follows this choice. */}
       <div className="mt-3 flex gap-1.5">

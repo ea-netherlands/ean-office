@@ -67,7 +67,7 @@ export function MembersClient({ rows }: { rows: MemberRow[] }) {
     <div className="space-y-4">
       {trialsToReview.length > 0 && (
         <Card className="border-orange-300 bg-orange-50">
-          <h2 className="font-semibold mb-2">Trials to review</h2>
+          <h2 className="mb-2">Trials to review</h2>
           <p className="text-sm text-slate-600 mb-3">
             These trials have ended — confirm them as regular members, extend,
             or end. (Members see no difference; this is EAN&apos;s own tracking.)

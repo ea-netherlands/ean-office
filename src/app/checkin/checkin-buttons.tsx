@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { checkinAction, eventCheckinAction } from "@/actions/checkin";
-import { btnPrimary } from "@/components/ui";
+import { btnPrimary, Icon } from "@/components/ui";
 
 export function CheckinButtons({ full }: { full: boolean }) {
   const router = useRouter();
@@ -46,14 +46,18 @@ export function EventCheckinButtons({
     <div className="space-y-2 w-full">
       {events.map((e) =>
         e.done ? (
-          <p key={e.id} className="text-sm text-teal-700 font-medium py-2">
-            ✓ You&apos;re counted for “{e.title}”
+          <p
+            key={e.id}
+            className="text-sm text-teal-700 font-medium py-2 inline-flex items-center gap-1.5"
+          >
+            <Icon name="circle-check" />
+            You&apos;re counted for “{e.title}”
           </p>
         ) : (
           <button
             key={e.id}
             disabled={pending}
-            className="w-full border border-indigo-300 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 rounded-xl px-4 py-3 text-sm font-medium cursor-pointer"
+            className="btn-key-subtle w-full border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-800 rounded-2xl px-4 py-3 text-sm font-medium cursor-pointer"
             onClick={() =>
               startTransition(async () => {
                 await eventCheckinAction(e.id);

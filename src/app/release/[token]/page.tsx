@@ -24,7 +24,7 @@ export default async function ReleasePage({
   if (!verified) {
     return (
       <Shell>
-        <h1 className="text-xl font-bold">This link has expired</h1>
+        <h1 className="text-xl">This link has expired</h1>
         <p className="text-slate-500 mt-2 text-sm">
           The booking day has probably passed. You can manage bookings any time
           at <a href="/me" className="text-teal-700">your bookings page</a>.
@@ -40,7 +40,7 @@ export default async function ReleasePage({
   if (!booking) {
     return (
       <Shell>
-        <h1 className="text-xl font-bold">Booking not found</h1>
+        <h1 className="text-xl">Booking not found</h1>
       </Shell>
     );
   }
@@ -52,7 +52,7 @@ export default async function ReleasePage({
     return (
       <Shell>
         <Icon name="circle-check" className="text-5xl text-teal-600 mb-2" />
-        <h1 className="text-xl font-bold">That booking is already cancelled</h1>
+        <h1 className="text-xl">That booking is already cancelled</h1>
         <p className="text-slate-500 mt-2 text-sm">
           {formatDayLong(booking.date)} is free again — thank you.
         </p>
@@ -64,7 +64,7 @@ export default async function ReleasePage({
     return (
       <Shell>
         <Icon name="circle-check" className="text-5xl text-teal-600 mb-2" />
-        <h1 className="text-xl font-bold">Your afternoon is free</h1>
+        <h1 className="text-xl">Your afternoon is free</h1>
         <p className="text-slate-500 mt-2 text-sm">
           You have desk {booking.deskNumber} for the morning ({cfg.am_window})
           on {formatDayLong(booking.date)}. Someone else can take it from lunch.
@@ -76,7 +76,7 @@ export default async function ReleasePage({
   if (slot === "pm") {
     return (
       <Shell>
-        <h1 className="text-xl font-bold">That&apos;s an afternoon booking</h1>
+        <h1 className="text-xl">That&apos;s an afternoon booking</h1>
         <p className="text-slate-500 mt-2 text-sm">
           Nothing to free up. Can&apos;t make it at all? Cancel from{" "}
           <a href="/me" className="text-teal-700">your bookings page</a>.
@@ -87,7 +87,7 @@ export default async function ReleasePage({
 
   return (
     <Shell>
-      <h1 className="text-xl font-bold">Only here this morning?</h1>
+      <h1 className="text-xl">Only here this morning?</h1>
       <p className="text-slate-600 mt-2 mb-5 text-sm">
         {owner?.name} · <strong>{formatDayLong(booking.date)}</strong>
         <br />

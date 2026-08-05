@@ -36,7 +36,7 @@ export function CommunityProfileCard({
   return (
     <Card>
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold">
+        <h2>
           Who&apos;s-in profile{" "}
           {community.profileVisible ? (
             <Badge tone="teal">visible to members</Badge>

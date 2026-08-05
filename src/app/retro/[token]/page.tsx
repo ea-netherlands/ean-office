@@ -19,7 +19,7 @@ export default async function RetroPage({
   if (!verified) {
     return (
       <Shell>
-        <h1 className="text-xl font-bold">This link has expired</h1>
+        <h1 className="text-xl">This link has expired</h1>
         <p className="text-slate-500 mt-2 text-sm">
           If you were at the office that day, just mention it to any admin and
           they&apos;ll fix the record.
@@ -31,7 +31,7 @@ export default async function RetroPage({
   const date = verified.subject.split(":")[1];
   return (
     <Shell>
-      <h1 className="text-xl font-bold">Were you at the office?</h1>
+      <h1 className="text-xl">Were you at the office?</h1>
       <p className="text-slate-600 mt-2 mb-5 text-sm">
         <strong>{formatDayLong(date)}</strong> — one tap and we&apos;ll record
         you as present. Thanks for fixing our data!

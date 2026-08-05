@@ -46,7 +46,7 @@ export default async function ReportsPage({
 
       {/* Data quality panel — always visible, never hidden */}
       <Card className="mb-4 border-teal-300 bg-teal-50/50">
-        <h2 className="font-semibold mb-2">Data quality</h2>
+        <h2 className="mb-2">Data quality</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
           <Stat
             label="Check-in rate"
@@ -75,7 +75,7 @@ export default async function ReportsPage({
 
       {/* Usage */}
       <Card className="mb-4">
-        <h2 className="font-semibold mb-3">Usage</h2>
+        <h2 className="mb-3">Usage</h2>
         <MetricTable
           rows={[
             ["Visits — attended (check-ins)", String(r.visitsAttended), "—"],
@@ -132,7 +132,7 @@ export default async function ReportsPage({
 
       {/* Events */}
       <Card className="mb-4">
-        <h2 className="font-semibold mb-3">Events</h2>
+        <h2 className="mb-3">Events</h2>
         <MetricTable
           rows={[
             [
@@ -172,7 +172,7 @@ export default async function ReportsPage({
 
       {/* Demographics */}
       <Card className="mb-4">
-        <h2 className="font-semibold mb-1">Who uses the office</h2>
+        <h2 className="mb-1">Who uses the office</h2>
         <p className="text-xs text-slate-500 mb-3">
           From intake profiles, weighted by attendance. Each figure twice — %
           of people and % of desk-days. When they diverge, that&apos;s your
@@ -212,7 +212,7 @@ export default async function ReportsPage({
 
       {/* What still needs the survey */}
       <Card>
-        <h2 className="font-semibold mb-2">Still needs the annual survey</h2>
+        <h2 className="mb-2">Still needs the annual survey</h2>
         <p className="text-sm text-slate-600">
           The app can&apos;t produce these and doesn&apos;t try: new
           connections made, additional productive hours, counterfactual
@@ -260,7 +260,7 @@ function MetricTable({
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs uppercase tracking-wide text-slate-400">
+          <tr className="text-left text-xs text-slate-500">
             {(header ?? ["Metric", "Current", "Target"]).map((h, i) => (
               <th key={i} className={`py-1.5 ${i > 0 ? "text-right" : ""}`}>
                 {h}

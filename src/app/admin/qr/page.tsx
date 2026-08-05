@@ -41,7 +41,7 @@ export default async function QrPage() {
             className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center bg-white"
             style={{ pageBreakInside: "avoid" }}
           >
-            <h2 className="text-2xl font-bold mb-1">Working here today?</h2>
+            <h2 className="text-2xl mb-1">Working here today?</h2>
             <p className="text-slate-500 mb-4">
               Scan to check in — two taps. It helps us show funders the office
               is being used.

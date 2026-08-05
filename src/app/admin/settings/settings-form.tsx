@@ -15,7 +15,7 @@ export function SettingsForm({ cfg }: { cfg: Settings }) {
   return (
     <form action={action} className="space-y-4">
       <Card className="space-y-3">
-        <h2 className="font-semibold">Capacity</h2>
+        <h2>Capacity</h2>
         <div className="grid grid-cols-2 gap-3">
           <Num name="desk_count" label="Desks (occupancy denominator)" value={cfg.desk_count} />
           <Num name="flex_count" label="Lunch-table spots" value={cfg.flex_count} />
@@ -47,7 +47,7 @@ export function SettingsForm({ cfg }: { cfg: Settings }) {
       </Card>
 
       <Card className="space-y-3">
-        <h2 className="font-semibold">First visits</h2>
+        <h2>First visits</h2>
         <div>
           <label className={labelCls}>Days with host coverage</label>
           <div className="flex gap-1.5">
@@ -90,7 +90,7 @@ export function SettingsForm({ cfg }: { cfg: Settings }) {
       </Card>
 
       <Card className="space-y-3">
-        <h2 className="font-semibold">Booking rules</h2>
+        <h2>Booking rules</h2>
         <div className="grid grid-cols-2 gap-3">
           <Num
             name="block_horizon_weeks"
@@ -111,7 +111,7 @@ export function SettingsForm({ cfg }: { cfg: Settings }) {
       </Card>
 
       <Card className="space-y-3">
-        <h2 className="font-semibold">No-shows &amp; check-in</h2>
+        <h2>No-shows &amp; check-in</h2>
         <div className="grid grid-cols-2 gap-3">
           <Num name="noshow_threshold" label="Email after N no-shows" value={cfg.noshow_threshold} />
           <Num name="noshow_window_days" label="Rolling window (days)" value={cfg.noshow_window_days} />
@@ -139,7 +139,7 @@ export function SettingsForm({ cfg }: { cfg: Settings }) {
       </Card>
 
       <Card className="space-y-3">
-        <h2 className="font-semibold">Practical</h2>
+        <h2>Practical</h2>
         <div>
           <label className={labelCls}>Office address</label>
           <input name="office_address" defaultValue={cfg.office_address} className={inputCls} />

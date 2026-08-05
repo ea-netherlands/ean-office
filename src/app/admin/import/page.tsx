@@ -12,7 +12,7 @@ export default function ImportPage() {
         nobody is counted as a member yet — they land as{" "}
         <strong>imported</strong>, and become a real, counted member only
         once they log in and accept the guidelines at{" "}
-        <code className="text-xs bg-slate-100 rounded px-1 py-0.5">
+        <code className="text-xs bg-slate-100 rounded-lg px-1 py-0.5">
           /welcome
         </code>
         . Safe to re-run after fixing a typo: anyone already in the system is

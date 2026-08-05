@@ -60,7 +60,7 @@ export function MeClient({
   return (
     <div className="space-y-4">
       <Card>
-        <h2 className="font-semibold mb-3">Upcoming</h2>
+        <h2 className="mb-3">Upcoming</h2>
         {upcoming.length === 0 ? (
           <p className="text-sm text-slate-500">
             Nothing booked. <a href="/book" className="text-teal-700 font-medium">Book a desk →</a>
@@ -115,7 +115,7 @@ export function MeClient({
 
       <Card>
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold">Your profile</h2>
+          <h2>Your profile</h2>
           <button
             className="text-sm text-teal-700 font-medium cursor-pointer"
             onClick={() => setShowProfile((v) => !v)}
@@ -143,7 +143,7 @@ export function MeClient({
       </Card>
 
       <Card>
-        <h2 className="font-semibold mb-3">Preferences</h2>
+        <h2 className="mb-3">Preferences</h2>
         <form action={prefsAction} className="space-y-3">
           <div>
             <label className={labelCls}>Name</label>

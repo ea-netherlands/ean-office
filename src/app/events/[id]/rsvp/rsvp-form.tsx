@@ -22,7 +22,7 @@ export function RsvpForm({
     return (
       <Card className="text-center py-10">
         <Icon name="circle-check" className="text-5xl text-teal-600 mb-3" />
-        <h2 className="text-xl font-bold">Request sent</h2>
+        <h2 className="text-xl">Request sent</h2>
         <p className="text-slate-500 mt-2 max-w-sm mx-auto">
           The organiser will confirm shortly — you&apos;ll get an email
           either way.

@@ -171,7 +171,7 @@ export async function askQuestionAction(
     kind: "request_question",
     html: `<p>Hi ${user.name},</p>
 <p>Thanks for your request to visit the office. Before we confirm, one quick question:</p>
-<blockquote style="border-left:3px solid #0f766e;padding-left:12px;color:#333;">${question.replace(/</g, "&lt;")}</blockquote>
+<blockquote style="border-left:3px solid #16879c;padding-left:12px;color:#333;">${question.replace(/</g, "&lt;")}</blockquote>
 <p>Just reply to this email and we'll take it from there.</p>
 <p>The EA Netherlands team</p>`,
   });

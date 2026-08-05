@@ -30,7 +30,7 @@ export function ProposeForm({ availability }: { availability: Availability[] }) 
     return (
       <Card className="text-center py-10">
         <Icon name="circle-check" className="text-5xl text-teal-600 mb-3" />
-        <h2 className="text-xl font-bold">Sent to the team</h2>
+        <h2 className="text-xl">Sent to the team</h2>
         <p className="text-slate-500 mt-2 max-w-sm mx-auto">
           An admin will confirm or come back to you with questions. Once it's
           confirmed you&apos;ll get an email and it&apos;ll show on the office

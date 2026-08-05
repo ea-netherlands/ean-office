@@ -167,7 +167,7 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
 
       {proposals.length > 0 && (
         <Card className="border-teal-300 bg-teal-50/50">
-          <h2 className="font-semibold mb-1">Member proposals</h2>
+          <h2 className="mb-1">Member proposals</h2>
           <p className="text-sm text-slate-600 mb-3">
             Not visible to anyone else and not counted in reports until you
             confirm them.

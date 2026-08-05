@@ -55,6 +55,13 @@ body {
   font-family: var(--font-sans);
 }
 
+/* Headings are Sentient 500 with no tracking, full stop — the pairing is
+   fixed in the design system, so this is deliberately NOT inside a
+   @layer: unlayered CSS outranks Tailwind's `@layer utilities`, which
+   makes the rule win over a stray `font-bold` or `tracking-tight` at a
+   call site. Don't wrap it in `@layer base` — that would flip the
+   precedence and quietly bold every heading in the app (and Sentient
+   ships no 600 face, so the 600s would synthesise). */
 h1,
 h2,
 h3 {
@@ -101,6 +108,14 @@ h3 {
 @utility rule-dashed-x {
   border-left: 1px dashed var(--color-slate-300);
   border-right: 1px dashed var(--color-slate-300);
+}
+
+/* Native controls default to the browser's own accent (Chrome blue).
+   EA Teal is the only accent hue, so claim them. */
+input[type="checkbox"],
+input[type="radio"],
+progress {
+  accent-color: var(--color-teal-600);
 }
 
 :focus-visible {

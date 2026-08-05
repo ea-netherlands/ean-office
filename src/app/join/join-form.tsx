@@ -24,7 +24,7 @@ export function JoinForm({
     return (
       <Card className="text-center py-10">
         <Icon name="confetti" className="text-5xl text-teal-600 mb-3" />
-        <h2 className="text-xl font-bold">Request received!</h2>
+        <h2 className="text-xl">Request received!</h2>
         <p className="text-slate-500 mt-2 max-w-sm mx-auto">
           We&apos;ve sent you an automatic acknowledgement now. A real person
           then reads your request — usually{" "}
@@ -38,7 +38,7 @@ export function JoinForm({
   return (
     <form action={action} className="space-y-6">
       <Card className="space-y-4">
-        <h2 className="font-semibold">About you</h2>
+        <h2>About you</h2>
         <div>
           <label className={labelCls}>Name *</label>
           <input name="name" required className={inputCls} autoComplete="name" />
@@ -130,7 +130,7 @@ export function JoinForm({
       </Card>
 
       <Card className="space-y-4">
-        <h2 className="font-semibold">When would you like to come?</h2>
+        <h2>When would you like to come?</h2>
         <p className="text-sm text-slate-500">
           First visits happen on days a host is around, arriving at{" "}
           {arrivals.join(" or ")}, so someone can welcome you properly.
@@ -174,7 +174,7 @@ export function JoinForm({
       </Card>
 
       <Card className="space-y-4">
-        <h2 className="font-semibold">A little about your work</h2>
+        <h2>A little about your work</h2>
         <p className="text-sm text-slate-500">
           Five quick questions we report only in aggregate — they never affect
           whether you&apos;re admitted.

@@ -71,7 +71,7 @@ export function RequestCard({
     >
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h3 className="font-semibold">
+          <h3>
             {req.name}{" "}
             {req.stale && <Badge tone="amber">waiting {"≥"}2 working days</Badge>}
             {req.status === "awaiting_reply" && (
@@ -206,7 +206,7 @@ export function RequestCard({
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wide text-slate-400">{label}</dt>
+      <dt className="text-xs text-slate-500">{label}</dt>
       <dd className="text-slate-700">{value || "—"}</dd>
     </div>
   );

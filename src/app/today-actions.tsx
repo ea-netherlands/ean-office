@@ -92,7 +92,12 @@ export function RsvpButton({
   const [pending, startTransition] = useTransition();
   const [done, setDone] = useState(rsvped);
   if (done) {
-    return <span className="text-xs text-teal-700 font-medium whitespace-nowrap">Going ✓</span>;
+    return (
+      <span className="text-xs text-teal-700 font-medium whitespace-nowrap inline-flex items-center gap-1">
+        Going
+        <Icon name="circle-check" />
+      </span>
+    );
   }
   return (
     <button

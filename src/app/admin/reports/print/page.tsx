@@ -24,7 +24,7 @@ export default async function PrintReportPage({
   return (
     <main className="max-w-2xl mx-auto px-8 py-10 text-[13px] leading-relaxed bg-white min-h-screen">
       <PrintButton />
-      <h1 className="text-xl font-bold">EA Netherlands Office — usage report</h1>
+      <h1 className="text-xl">EA Netherlands Office — usage report</h1>
       <p className="text-slate-500 mb-6">
         {formatDayLong(from)} – {formatDayLong(to)} · generated {formatDayLong(today)}
       </p>
@@ -99,7 +99,7 @@ export default async function PrintReportPage({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-5">
-      <h2 className="font-bold border-b border-slate-300 pb-1 mb-2">{title}</h2>
+      <h2 className="border-b border-slate-300 pb-1 mb-2">{title}</h2>
       {children}
     </section>
   );

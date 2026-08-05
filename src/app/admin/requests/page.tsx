@@ -62,7 +62,7 @@ export default async function RequestsPage() {
 
       {decided.length > 0 && (
         <>
-          <h2 className="font-semibold mt-8 mb-3 text-slate-500">Recently decided</h2>
+          <h2 className="mt-8 mb-3 text-slate-500">Recently decided</h2>
           <div className="space-y-2">
             {decided.map((r) => (
               <RequestCard key={r.req.id} req={toInfo(r)} compact />
