@@ -179,11 +179,27 @@ async function main() {
     ...new Set(lines.slice(1).map((l) => splitCsvLine(l)[col.name]?.trim()).filter(Boolean)),
   ].sort();
 
+  // Human decisions on names the matcher can't settle, so they survive a
+  // re-run against a different roster.
+  const overridesFile = path.join(outDir, "name-overrides.csv");
+  const overrides = new Map<string, string>();
+  if (fs.existsSync(overridesFile)) {
+    for (const line of fs.readFileSync(overridesFile, "utf8").split("\n").slice(1)) {
+      const [name, email] = splitCsvLine(line).map((c) => c.trim());
+      if (name && EMAIL_RE.test(email ?? "")) overrides.set(name, email.toLowerCase());
+    }
+  }
+
   const resolved = new Map<string, string>();
   const ambiguous: { name: string; options: Member[] }[] = [];
   const missing: string[] = [];
 
   for (const name of sheetNames) {
+    const override = overrides.get(name);
+    if (override) {
+      resolved.set(name, override);
+      continue;
+    }
     const candidates = roster.filter((m) => isCandidate(name, m));
     if (candidates.length === 1) resolved.set(name, candidates[0].email);
     else if (candidates.length > 1) ambiguous.push({ name, options: candidates });
