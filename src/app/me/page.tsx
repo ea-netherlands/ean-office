@@ -5,6 +5,7 @@ import { Page, H1, Sub, Card, Badge } from "@/components/ui";
 import { db, bookings } from "@/db";
 import { and, eq, gte, inArray, asc } from "drizzle-orm";
 import { todayAms, formatDayLong } from "@/lib/dates";
+import { asSlot } from "@/lib/slots";
 import { MeClient } from "./me-client";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +48,7 @@ export default async function MePage() {
             date: b.date,
             dateLabel: formatDayLong(b.date),
             seatType: b.seatType,
+            slot: asSlot(b.slot),
             status: b.status as "booked" | "waitlisted",
             seriesId: b.seriesId,
           }))}

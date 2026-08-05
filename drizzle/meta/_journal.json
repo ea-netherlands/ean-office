@@ -43,6 +43,27 @@
       "when": 1785779809221,
       "tag": "0005_known_skaar",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785839200544,
+      "tag": "0006_wise_rocket_racer",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785840801030,
+      "tag": "0007_furry_romulus",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785933789829,
+      "tag": "0008_half_day_slots",
+      "breakpoints": true
     }
   ]
 }

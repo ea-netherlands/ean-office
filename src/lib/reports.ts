@@ -2,10 +2,17 @@ import { db, bookings, checkins, users, events, eventAttendance } from "@/db";
 import { and, eq, gte, lte, inArray } from "drizzle-orm";
 import { getSettings } from "./settings";
 import { addDays, isWorkingDay, todayAms } from "./dates";
+import { asSlot, slotWeight } from "./slots";
 import { genderReportLabel } from "./profile-options";
 
 // Every figure here is one EAN has reported to EAIF or set as a target.
 // Occupancy is always a percentage of desks (8), never of total seats.
+//
+// Half days are counted as half a desk-day rather than by splitting the
+// denominator into half-days, so the occupancy series stays comparable with
+// every period reported before half-day booking existed. Visit counts and
+// the check-in rate are per person per day, so someone who books a morning
+// and an afternoon separately is still one visit.
 
 export type DemographicRow = {
   label: string;
@@ -31,6 +38,8 @@ export type Report = {
   flexDaysUsed: number; // overflow, reported separately
   walkIns: number;
   waitlistedDays: number;
+  halfDayBookings: number; // count of morning/afternoon bookings
+  halfDayShare: number; // 0..1 of all bookings
   // membership
   newMembers: number;
   trialsEnded: number;
@@ -103,6 +112,16 @@ export async function getReport(from: string, to: string): Promise<Report> {
   );
   const deskAttended = attendedBookings.filter((b) => b.seatType === "desk");
 
+  // Desk-days: a morning or an afternoon is half of one.
+  const deskDays = (rows: typeof booked) =>
+    rows.reduce((s, b) => s + slotWeight(asSlot(b.slot)), 0);
+  // Person-days: two half bookings on one day are one visit, not two.
+  const userDays = (rows: typeof booked) =>
+    new Set(rows.map((b) => `${b.userId}:${b.date}`));
+  const bookedUserDays = userDays(booked);
+  const attendedUserDays = userDays(attendedBookings);
+  const halfDayBookings = booked.filter((b) => asSlot(b.slot) !== "day").length;
+
   const denom = workingDays * cfg.desk_count;
   const uniqueVisitorIds = new Set(checkinRows.map((c) => c.userId));
 
@@ -118,9 +137,12 @@ export async function getReport(from: string, to: string): Promise<Report> {
       ? 0
       : [...byMonth.values()].reduce((s, set) => s + set.size, 0) / byMonth.size;
 
-  // membership
+  // membership — bulk-imported rows are excluded until claimed (source flips
+  // to "import" only at insert time and never changes), so a spreadsheet
+  // import never reads as a spike in new members.
   const newMembers = allUsers.filter(
     (u) =>
+      u.source !== "import" &&
       u.approvedAt &&
       u.approvedAt.toISOString().slice(0, 10) >= from &&
       u.approvedAt.toISOString().slice(0, 10) <= to
@@ -239,18 +261,20 @@ export async function getReport(from: string, to: string): Promise<Report> {
     to,
     months,
     workingDays,
-    visitsBooked: booked.length,
+    visitsBooked: bookedUserDays.size,
     visitsAttended: checkinRows.length,
     visitsPerMonth: checkinRows.length / months,
     uniqueVisitors: uniqueVisitorIds.size,
     uniqueVisitorsPerMonth: uniquePerMonth,
-    occupancyBooked: pct(deskBooked.length, denom),
-    occupancyAttended: pct(deskAttended.length, denom),
-    flexDaysUsed: booked.filter((b) => b.seatType === "flex").length,
+    occupancyBooked: pct(deskDays(deskBooked), denom),
+    occupancyAttended: pct(deskDays(deskAttended), denom),
+    flexDaysUsed: deskDays(booked.filter((b) => b.seatType === "flex")),
     walkIns: booked.filter((b) => b.source === "walkin").length,
     waitlistedDays: new Set(
       bookingRows.filter((b) => b.status === "waitlisted").map((b) => b.date)
     ).size,
+    halfDayBookings,
+    halfDayShare: pct(halfDayBookings, booked.length),
     newMembers,
     trialsEnded: trialsEndedUsers.length,
     trialsConverted,
@@ -282,7 +306,7 @@ export async function getReport(from: string, to: string): Promise<Report> {
       (u) => u.eaFunding === "direct" || u.eaFunding === "employer"
     ),
     pctEaAligned: share((u) => !!u.causeArea && EA_CAUSES.includes(u.causeArea)),
-    checkinRate: pct(attendedBookings.length, booked.length),
+    checkinRate: pct(attendedUserDays.size, bookedUserDays.size),
     retroCheckins: checkinRows.filter((c) => c.isRetroactive).length,
     profileCoveragePeople: fresh.people,
     profileCoverageDeskDays: fresh.deskDays,
@@ -291,9 +315,15 @@ export async function getReport(from: string, to: string): Promise<Report> {
 }
 
 export function methodologyNote(r: Report): string {
+  const halfDays =
+    r.halfDayBookings > 0
+      ? ` Occupancy is measured in desk-days against ${r.workingDays} working days × 8 desks; a morning or afternoon booking counts as half a desk-day, so figures stay comparable with earlier periods (${Math.round(
+          r.halfDayShare * 100
+        )}% of bookings in this period were half days).`
+      : "";
   return `Attendance is self-recorded via QR check-in; the check-in rate for this period was ${Math.round(
     r.checkinRate * 100
-  )}%, so actual usage is likely somewhat higher. Demographic figures come from self-reported member profiles covering ${Math.round(
+  )}%, so actual usage is likely somewhat higher.${halfDays} Demographic figures come from self-reported member profiles covering ${Math.round(
     r.profileCoverageDeskDays * 100
   )}% of desk-days in this period.`;
 }

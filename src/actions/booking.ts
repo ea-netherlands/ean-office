@@ -8,12 +8,14 @@ import {
   bookDay,
   cancelBooking,
   cancelSeries,
+  changeSlot,
   createBlockBooking,
   previewBlockBooking,
   switchSeat,
   SeatTarget,
   BlockPreview,
 } from "@/lib/booking";
+import { Slot } from "@/lib/slots";
 import { getSettings } from "@/lib/settings";
 
 export type BookActionState = {
@@ -24,6 +26,7 @@ export type BookActionState = {
   needsProfile?: boolean;
   date?: string;
   deskNumber?: number;
+  slot?: Slot;
 };
 
 /**
@@ -44,6 +47,7 @@ export async function bookDateAction(
     skipProfile?: boolean;
     deskNumber?: number;
     seatType?: "desk" | "flex";
+    slot?: Slot;
   } = {}
 ): Promise<BookActionState> {
   const user = await getCurrentUser();
@@ -63,18 +67,21 @@ export async function bookDateAction(
     return { needsProfile: true, date, error: "Please complete your profile first — it takes 30 seconds." };
   }
 
+  const slot = opts.slot ?? "day";
   const res = await bookDay(user!.id, date, {
     deskNumber: opts.deskNumber,
     seatType: opts.seatType,
+    slot,
   });
   revalidatePath("/book");
   revalidatePath("/");
   if (!res.ok) return { error: res.error };
-  if ("waitlisted" in res) return { ok: true, waitlisted: true, date };
+  if ("waitlisted" in res) return { ok: true, waitlisted: true, date, slot };
   return {
     ok: true,
     seatType: res.seatType,
     date,
+    slot,
     deskNumber: "booking" in res ? res.booking.deskNumber ?? undefined : undefined,
   };
 }
@@ -91,13 +98,31 @@ export async function switchSeatAction(
   return res;
 }
 
-export async function joinWaitlistAction(date: string): Promise<BookActionState> {
+/** Stretch a half day to a full one, trim one, or swap morning for afternoon. */
+export async function changeSlotAction(
+  bookingId: string,
+  slot: Slot
+): Promise<{ ok: boolean; error?: string; deskNumber?: number | null }> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Not logged in." };
+  const res = await changeSlot(bookingId, user.id, slot);
+  revalidatePath("/book");
+  revalidatePath("/me");
+  revalidatePath("/");
+  if (!res.ok) return { ok: false, error: res.error };
+  return { ok: true, deskNumber: res.deskNumber };
+}
+
+export async function joinWaitlistAction(
+  date: string,
+  slot: Slot = "day"
+): Promise<BookActionState> {
   const user = await getCurrentUser();
   if (!isActiveMember(user)) return { error: "You need to be logged in as a member." };
-  const res = await bookDay(user!.id, date, { allowWaitlist: true });
+  const res = await bookDay(user!.id, date, { allowWaitlist: true, slot });
   revalidatePath("/book");
   if (!res.ok) return { error: res.error };
-  return { ok: true, waitlisted: "waitlisted" in res, date };
+  return { ok: true, waitlisted: "waitlisted" in res, date, slot };
 }
 
 export async function cancelBookingAction(
@@ -139,13 +164,14 @@ export type BlockState = {
 
 export async function blockPreviewAction(
   weekdays: number[],
-  until: string
+  until: string,
+  slot: Slot = "day"
 ): Promise<BlockState> {
   const user = await getCurrentUser();
   if (!isActiveMember(user)) return { error: "You need to be logged in as a member." };
   if (weekdays.length === 0) return { error: "Pick at least one weekday." };
   if (!until) return { error: "Pick an end date." };
-  const preview = await previewBlockBooking(user!.id, weekdays, until);
+  const preview = await previewBlockBooking(user!.id, weekdays, until, slot);
   return {
     preview: {
       ...preview,
@@ -160,11 +186,12 @@ export async function blockPreviewAction(
 
 export async function blockCreateAction(
   weekdays: number[],
-  until: string
+  until: string,
+  slot: Slot = "day"
 ): Promise<BlockState> {
   const user = await getCurrentUser();
   if (!isActiveMember(user)) return { error: "You need to be logged in as a member." };
-  const res = await createBlockBooking(user!.id, weekdays, until);
+  const res = await createBlockBooking(user!.id, weekdays, until, slot);
   revalidatePath("/book");
   revalidatePath("/me");
   if (!res.ok) return { error: res.error };

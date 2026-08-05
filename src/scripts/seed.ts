@@ -26,6 +26,7 @@ import {
 } from "../db/schema";
 import { newId } from "../lib/ids";
 import { addDays, isWorkingDay, isoWeekday, todayAms } from "../lib/dates";
+import { Half, Slot, halves } from "../lib/slots";
 
 // Deterministic RNG so reseeding gives the same demo data.
 let rngState = 42;
@@ -218,9 +219,19 @@ async function main() {
   // ---------- block series for a few regulars ----------
   console.log("Block series…");
   const regulars = [...members].sort((a, b) => b.heaviness - a.heaviness).slice(0, 4);
-  const seriesInfo: { userId: string; weekdays: number[]; start: string; end: string; seriesId: string }[] = [];
+  const seriesInfo: {
+    userId: string;
+    weekdays: number[];
+    slot: Slot;
+    start: string;
+    end: string;
+    seriesId: string;
+  }[] = [];
   for (const [i, reg] of regulars.entries()) {
     const weekdays = [[2], [2, 4], [3], [1, 3]][i];
+    // One standing morning and one standing afternoon, so the demo shows a
+    // shared desk rather than only full days.
+    const slot: Slot = (["day", "am", "day", "pm"] as Slot[])[i];
     const start = addDays(seedStart, 14);
     const end = addDays(today, 35);
     const seriesId = newId("ser");
@@ -228,10 +239,11 @@ async function main() {
       id: seriesId,
       userId: reg.id,
       weekdays,
+      slot,
       startDate: start,
       endDate: end,
     });
-    seriesInfo.push({ userId: reg.id, weekdays, start, end, seriesId });
+    seriesInfo.push({ userId: reg.id, weekdays, slot, start, end, seriesId });
   }
 
   // ---------- bookings + check-ins, day by day ----------
@@ -246,14 +258,40 @@ async function main() {
     const isFuture = d >= today;
     const wd = isoWeekday(d);
     const bookedToday = new Set<string>();
-    let desksUsed = 0;
-    let flexUsed = 0;
+
+    // Desks and lunch-table spots fill per half, so a morning and an
+    // afternoon booking can share one desk — the same packing the real
+    // allocator does.
+    const deskFree: Record<Half, boolean[]> = {
+      am: Array(9).fill(true),
+      pm: Array(9).fill(true),
+    };
+    const flexUsed: Record<Half, number> = { am: 0, pm: 0 };
+    const takeDesk = (slot: Slot): number | null => {
+      const hs = halves(slot);
+      const candidates: number[] = [];
+      for (let n = 1; n <= 8; n++) if (hs.every((h) => deskFree[h][n])) candidates.push(n);
+      if (candidates.length === 0) return null;
+      let n = candidates[0];
+      if (slot !== "day") {
+        const other: Half = slot === "am" ? "pm" : "am";
+        n = candidates.find((c) => !deskFree[other][c]) ?? candidates[0];
+      }
+      for (const h of hs) deskFree[h][n] = false;
+      return n;
+    };
+    const flexRoom = (slot: Slot) =>
+      Math.min(...halves(slot).map((h) => 5 - flexUsed[h]));
+    const takeFlex = (slot: Slot) => {
+      for (const h of halves(slot)) flexUsed[h]++;
+    };
 
     // block-series bookings first (max 4 desks by construction)
     for (const s of seriesInfo) {
       if (d < s.start || d > s.end || !s.weekdays.includes(wd)) continue;
-      if (desksUsed >= 8) break;
       const cancelled = chance(0.08);
+      const deskNumber = cancelled ? null : takeDesk(s.slot);
+      if (!cancelled && deskNumber === null) break; // room full
       const id = newId("bk");
       const attended = !cancelled && isPast && chance(0.92);
       const checkedIn = attended && chance(CHECKIN_RATE);
@@ -262,8 +300,9 @@ async function main() {
         userId: s.userId,
         date: d,
         seriesId: s.seriesId,
+        slot: s.slot,
         seatType: "desk",
-        deskNumber: cancelled ? null : desksUsed + 1,
+        deskNumber,
         status: cancelled ? "cancelled" : "booked",
         source: "block",
         noShow: false, // set by the no-show pass below
@@ -272,7 +311,6 @@ async function main() {
       });
       if (!cancelled) {
         bookedToday.add(s.userId);
-        desksUsed++;
         bookingCount++;
         if (checkedIn) {
           await db.insert(checkins).values({
@@ -294,9 +332,19 @@ async function main() {
     for (const m of everyone) {
       if (bookedToday.has(m.id)) continue;
       if (!chance(m.heaviness * busyness * (isFuture ? 0.55 : 1))) continue;
-      const seatType = desksUsed < 8 ? "desk" : flexUsed < 5 ? "flex" : null;
-      if (!seatType) continue;
+      // About a fifth of one-off bookings are half days.
+      const slot: Slot = chance(0.2) ? (chance(0.55) ? "am" : "pm") : "day";
       const cancelled = isPast && chance(0.07);
+      const deskNumber = cancelled ? null : takeDesk(slot);
+      const seatType = cancelled
+        ? "desk"
+        : deskNumber !== null
+          ? "desk"
+          : flexRoom(slot) > 0
+            ? "flex"
+            : null;
+      if (!seatType) continue; // room is full for those hours
+      if (!cancelled && seatType === "flex") takeFlex(slot);
       const id = newId("bk");
       const isWalkin = isPast && chance(0.06);
       const checkedIn = !cancelled && isPast && (isWalkin || chance(CHECKIN_RATE));
@@ -304,8 +352,9 @@ async function main() {
         id,
         userId: m.id,
         date: d,
-        seatType,
-        deskNumber: !cancelled && seatType === "desk" ? desksUsed + 1 : null,
+        slot,
+        seatType: seatType ?? "desk",
+        deskNumber,
         status: cancelled ? "cancelled" : "booked",
         source: isWalkin ? "walkin" : "self",
         noShow: false,
@@ -314,8 +363,6 @@ async function main() {
       });
       if (cancelled) continue;
       bookedToday.add(m.id);
-      if (seatType === "desk") desksUsed++;
-      else flexUsed++;
       bookingCount++;
       if (checkedIn) {
         const retro = chance(0.06);

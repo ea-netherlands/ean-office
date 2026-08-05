@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { Nav } from "@/components/nav";
 import { Page, H1, Sub, Card, Badge, btnPrimary, btnSecondary } from "@/components/ui";
@@ -14,6 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   await ensureMigrated();
   const user = await getCurrentUser();
+  if (user?.status === "imported") redirect("/welcome");
   const today = todayAms();
 
   if (!user) {
@@ -92,6 +94,7 @@ export default async function HomePage() {
               checkedIn={!!myCheckin}
               seatType={myBooking?.seatType}
               deskNumber={myBooking?.deskNumber ?? undefined}
+              slot={myBooking?.slot}
               full={cap.full}
             />
           )}
@@ -102,8 +105,14 @@ export default async function HomePage() {
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-semibold">Who&apos;s coming today</h2>
               <span className="text-sm text-slate-500">
-                {cap.desksLeft} desk{cap.desksLeft === 1 ? "" : "s"} ·{" "}
-                {cap.flexLeft} lunch-table spot{cap.flexLeft === 1 ? "" : "s"} left
+                {cap.desksFreeAllDay} desk
+                {cap.desksFreeAllDay === 1 ? "" : "s"} ·{" "}
+                {cap.flexFreeAllDay} lunch-table spot
+                {cap.flexFreeAllDay === 1 ? "" : "s"} left
+                {/* Whole-day seats can be gone while a half is still free. */}
+                {cap.desksFreeAllDay === 0 && cap.pm.desksLeft > 0 && (
+                  <> · {cap.pm.desksLeft} free this afternoon</>
+                )}
               </span>
             </div>
             {others.length === 0 && !myBooking ? (
@@ -117,6 +126,7 @@ export default async function HomePage() {
                   name: p.name,
                   seatType: p.seatType,
                   deskNumber: p.deskNumber,
+                  slot: p.slot,
                   isYou: p.id === user.id,
                   profile: p.profile,
                 }))}

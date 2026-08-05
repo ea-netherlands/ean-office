@@ -28,6 +28,22 @@ export function SettingsForm({ cfg }: { cfg: Settings }) {
             className={inputCls}
           />
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls}>Morning half-day hours</label>
+            <input name="am_window" defaultValue={cfg.am_window} className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Afternoon half-day hours</label>
+            <input name="pm_window" defaultValue={cfg.pm_window} className={inputCls} />
+          </div>
+        </div>
+        <p className="text-xs text-slate-400">
+          These are shown to members, not enforced. Overlapping them across the
+          lunch hour is deliberate: the morning person packs up for lunch as
+          the afternoon person arrives for it, so a shared desk changes hands
+          while nobody is working at it.
+        </p>
       </Card>
 
       <Card className="space-y-3">

@@ -6,6 +6,10 @@ export type Settings = {
   desk_count: number;
   flex_count: number;
   flex_unavailable_window: string; // "12:30–13:30", informational
+  // Half-day windows. They overlap across the lunch hour on purpose: the
+  // morning person packs up for lunch as the afternoon person arrives for it.
+  am_window: string;
+  pm_window: string;
   arrival_slots: string[]; // first-visit arrival options
   host_coverage_days: number[]; // ISO weekdays with host coverage, 1=Mon
   block_horizon_weeks: number;
@@ -29,6 +33,8 @@ export const DEFAULT_SETTINGS: Settings = {
   desk_count: 8,
   flex_count: 5,
   flex_unavailable_window: "12:30–13:30",
+  am_window: "9:00–13:30",
+  pm_window: "12:30–19:00",
   arrival_slots: ["11:00", "13:00"],
   host_coverage_days: [1, 2, 3, 4], // Monday–Thursday
   block_horizon_weeks: 12,
@@ -62,6 +68,10 @@ Monday–Friday, 9:00–19:00. Events outside office hours are possible — and 
 
 8 proper desks plus a lunch table with 5 workable spots. The lunch table is used for lunch from {{flex_window}} — if you're working there, you'll need to pack up for that hour. Lounge seats are informal overflow: no booking needed, just sit.
 
+## Half days
+
+Desks can be booked for the whole day, just the morning, or just the afternoon — the handover is lunch, so if you have the morning please pack up by the end of it, and if you have the afternoon the desk is yours once lunch clears. Two people sharing a desk is normal and nobody has to negotiate it. Only in for the morning on a day you booked in full? The reminder email has a one-tap link to hand back your afternoon.
+
 ## Lunch
 
 Communal lunch is **12:30–13:30**. Bring your own (there's a fridge and a microwave) or buy it in the building — the ground-floor restaurant is open 9:00–17:00. There are always vegan options, and if you're ordering in with the group, the Lebanese sajeria nearby does very good vegan wraps.
@@ -77,7 +87,7 @@ The basic use of the office during office hours (9–17) is quiet work; during l
 - **The 5-minute rule** — conversations up to 5 minutes are fine at the desks. Longer? Please continue outside, in the lounge or a phone booth.
 - **The main rule: talk to each other.** Need the window open or closed? Say it. Too much chatter nearby? Let people know.
 - **Be nice and be respectful.** We want a supportive, deeply caring, encouraging environment. Be considerate of other people's boundaries; harmful or thoughtless behaviour — unwanted attention, unkindness, talking over people — doesn't belong here.
-- **Cancel bookings you won't use** — with eight desks, one tap makes a real difference.
+- **Cancel bookings you won't use** — with eight desks, one tap makes a real difference. Only staying half the day? Book a half day, or hand back the half you won't use.
 - **Tidiness** — clean up after yourself; if something's broken or lost, tell us straight away.
 - **Dress code** — wear what you find comfortable.
 - **Alcohol** — permitted after office hours in the social area (not at the desks); don't disturb people still working.

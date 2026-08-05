@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { getCurrentUser, isActiveMember } from "@/lib/auth";
 import { Nav } from "@/components/nav";
 import { Page, H1, Sub } from "@/components/ui";
-import { capacityForRange } from "@/lib/booking";
+import { capacityForRange, desksLeftFor, flexLeftFor } from "@/lib/booking";
+import { asSlot, SLOTS } from "@/lib/slots";
 import { getSettings } from "@/lib/settings";
 import { db, bookings, events } from "@/db";
 import { and, eq, gte, lte, inArray } from "drizzle-orm";
@@ -18,6 +19,7 @@ export default async function BookPage({
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/book");
+  if (user.status === "imported") redirect("/welcome");
   if (!isActiveMember(user)) redirect("/");
 
   const { m } = await searchParams;
@@ -43,7 +45,10 @@ export default async function BookPage({
         inArray(bookings.status, ["booked", "waitlisted"])
       )
     );
-  const mineByDate = new Map(mine.map((b) => [b.date, b]));
+  const mineByDate = new Map<string, typeof mine>();
+  for (const b of mine) {
+    mineByDate.set(b.date, [...(mineByDate.get(b.date) ?? []), b]);
+  }
 
   const monthEvents = await db
     .select()
@@ -58,7 +63,7 @@ export default async function BookPage({
   const themedByDate = new Map(
     monthEvents
       .filter((e) => e.type === "themed_coworking")
-      .map((e) => [e.date, e.title])
+      .map((e) => [e.date, { id: e.id, title: e.title }])
   );
 
   const blockCap = Math.floor(cfg.desk_count * cfg.block_max_share);
@@ -66,14 +71,22 @@ export default async function BookPage({
   for (let d = first; d <= last; d = addDays(d, 1)) {
     if (isoWeekday(d) >= 6) continue; // office is Mon–Fri
     const cap = capMap.get(d)!;
-    const my = mineByDate.get(d);
+    const my = mineByDate.get(d) ?? [];
+    const themed = themedByDate.get(d) ?? null;
+    // Seats left per bookable slot, so the day panel can label each option.
+    const desksLeft = Object.fromEntries(
+      SLOTS.map((s) => [s, desksLeftFor(cap, s)])
+    ) as DayInfo["desksLeft"];
+    const flexLeft = Object.fromEntries(
+      SLOTS.map((s) => [s, flexLeftFor(cap, s)])
+    ) as DayInfo["flexLeft"];
     days.push({
       date: d,
       weekday: isoWeekday(d),
-      closed: cap.closed,
+      closed: cap.closed || !!themed,
       past: d < today,
-      desksLeft: cap.desksLeft,
-      flexLeft: cap.flexLeft,
+      desksLeft,
+      flexLeft,
       full: cap.full,
       waitlistCount: cap.waitlistCount,
       people: cap.people.map((p) => ({
@@ -81,19 +94,20 @@ export default async function BookPage({
         name: p.name,
         seatType: p.seatType,
         deskNumber: p.deskNumber,
+        slot: p.slot,
         isYou: p.id === user.id,
         profile: p.profile,
       })),
-      mine: my
-        ? {
-            bookingId: my.id,
-            status: my.status as "booked" | "waitlisted",
-            seatType: my.seatType,
-            seriesId: my.seriesId,
-          }
-        : null,
-      blockCapReached: cap.blockDesks >= blockCap,
-      themedEvent: themedByDate.get(d) ?? null,
+      // A member can hold a morning and an afternoon on the same day.
+      mine: my.map((b) => ({
+        bookingId: b.id,
+        status: b.status as "booked" | "waitlisted",
+        seatType: b.seatType,
+        slot: asSlot(b.slot),
+        seriesId: b.seriesId,
+      })),
+      blockCapReached: cap.am.blockDesks >= blockCap && cap.pm.blockDesks >= blockCap,
+      themedEvent: themed,
     });
   }
 
@@ -106,8 +120,9 @@ export default async function BookPage({
       <Page>
         <H1>Book a desk</H1>
         <Sub>
-          {cfg.desk_count} desks and {cfg.flex_count} lunch-table spots per day.
-          Tap a day to book — cancelling later takes one tap too.
+          {cfg.desk_count} desks and {cfg.flex_count} lunch-table spots per day,
+          bookable for the whole day or just a morning or afternoon. Tap a day
+          to book — cancelling later takes one tap too.
         </Sub>
         <BookGrid
           days={days}
@@ -117,6 +132,8 @@ export default async function BookPage({
           nextMonth={nextMonth}
           today={today}
           flexWindow={cfg.flex_unavailable_window}
+          amWindow={cfg.am_window}
+          pmWindow={cfg.pm_window}
           horizonWeeks={cfg.block_horizon_weeks}
           hasProfile={!!user.causeArea}
           deskCount={cfg.desk_count}

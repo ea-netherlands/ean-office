@@ -16,7 +16,12 @@ function sign(payload: string): string {
   return createHmac("sha256", secret()).update(payload).digest("base64url");
 }
 
-export type TokenPurpose = "cancel" | "retro" | "optout" | "cancel_series";
+export type TokenPurpose =
+  | "cancel"
+  | "retro"
+  | "optout"
+  | "cancel_series"
+  | "release"; // give up the afternoon of a full-day booking
 
 export function makeToken(
   purpose: TokenPurpose,

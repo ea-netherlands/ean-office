@@ -19,6 +19,21 @@ export function todayAms(): string {
   return amsDate(new Date());
 }
 
+const clockFmt = new Intl.DateTimeFormat("en-GB", {
+  timeZone: TZ,
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/** Minutes since midnight on the Amsterdam wall clock. */
+export function minutesOfDayAms(d: Date = new Date()): number {
+  const parts = clockFmt.formatToParts(d);
+  const at = (type: string) =>
+    Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return at("hour") * 60 + at("minute");
+}
+
 /** Parse YYYY-MM-DD as a UTC-noon Date — safe for date arithmetic across DST. */
 export function parseDay(day: string): Date {
   return new Date(`${day}T12:00:00Z`);

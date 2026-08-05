@@ -95,7 +95,18 @@ export default async function ReportsPage({
               "75%",
               r.occupancyAttended >= 0.75,
             ],
-            ["Lunch-table days used (overflow)", String(r.flexDaysUsed), "—"],
+            [
+              "Lunch-table days used (overflow)",
+              r.flexDaysUsed.toFixed(r.flexDaysUsed % 1 === 0 ? 0 : 1),
+              "—",
+            ],
+            [
+              "Half-day bookings",
+              r.halfDayBookings > 0
+                ? `${r.halfDayBookings} (${pctStr(r.halfDayShare)} of bookings)`
+                : "0",
+              "—",
+            ],
             ["Walk-ins", String(r.walkIns), "—"],
             ["Days with a waitlist", String(r.waitlistedDays), "—"],
             ["New members onboarded", String(r.newMembers), "—"],

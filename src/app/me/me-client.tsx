@@ -6,21 +6,19 @@ import {
   cancelBookingAction,
   cancelSeriesAction,
 } from "@/actions/booking";
-import {
-  updatePrefsAction,
-  saveCommunityProfileAction,
-  ProfileState,
-} from "@/actions/profile";
+import { updatePrefsAction, ProfileState } from "@/actions/profile";
 import { logoutAction } from "@/actions/auth";
 import { ProfileForm } from "@/components/profile-form";
-import { CAUSE_AREAS } from "@/lib/profile-options";
+import { CommunityProfileCard } from "@/components/community-profile-card";
 import { Card, Badge, btnPrimary, btnSecondary, btnDanger, inputCls, labelCls } from "@/components/ui";
+import { Slot, SLOT_LABEL } from "@/lib/slots";
 
 type BookingRow = {
   id: string;
   date: string;
   dateLabel: string;
   seatType: string;
+  slot: Slot;
   status: "booked" | "waitlisted";
   seriesId: string | null;
 };
@@ -73,6 +71,7 @@ export function MeClient({
               <li key={b.id} className="py-2.5 flex items-center justify-between gap-2">
                 <div>
                   <span className="text-sm font-medium">{b.dateLabel}</span>{" "}
+                  {b.slot !== "day" && <Badge tone="teal">{SLOT_LABEL[b.slot]}</Badge>}
                   {b.seatType === "flex" && <Badge tone="amber">lunch table</Badge>}
                   {b.status === "waitlisted" && <Badge tone="amber">waitlist</Badge>}
                   {b.seriesId && <Badge>repeating</Badge>}
@@ -179,118 +178,3 @@ export function MeClient({
   );
 }
 
-function CommunityProfileCard({
-  community,
-}: {
-  community: {
-    profileVisible: boolean;
-    bio: string | null;
-    expertise: string | null;
-    publicCauseAreas: string[] | null;
-    publicLink: string | null;
-  };
-}) {
-  const [open, setOpen] = useState(community.profileVisible);
-  const [visible, setVisible] = useState(community.profileVisible);
-  const [state, action, pending] = useActionState<ProfileState, FormData>(
-    saveCommunityProfileAction,
-    {}
-  );
-
-  return (
-    <Card>
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold">
-          Who&apos;s-in profile{" "}
-          {community.profileVisible ? (
-            <Badge tone="teal">visible to members</Badge>
-          ) : (
-            <Badge>off</Badge>
-          )}
-        </h2>
-        <button
-          className="text-sm text-teal-700 font-medium cursor-pointer"
-          onClick={() => setOpen((v) => !v)}
-        >
-          {open ? "Close" : "Edit"}
-        </button>
-      </div>
-      {!open && (
-        <p className="text-sm text-slate-500 mt-1">
-          Optional: let other members tap your name on the booking calendar to
-          see what you work on. Completely separate from the reporting
-          questions below, which are never shown to anyone.
-        </p>
-      )}
-      {open && (
-        <form action={action} className="mt-4 space-y-3">
-          <label className="flex items-start gap-2 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              name="profileVisible"
-              checked={visible}
-              onChange={(e) => setVisible(e.target.checked)}
-              className="mt-0.5"
-            />
-            <span>Show my profile to other members on the booking calendar</span>
-          </label>
-          <div>
-            <label className={labelCls}>What I&apos;m working on</label>
-            <textarea
-              name="bio"
-              rows={2}
-              maxLength={500}
-              defaultValue={community.bio ?? ""}
-              className={inputCls}
-              placeholder="e.g. Researching pandemic preparedness policy at Utrecht University."
-            />
-          </div>
-          <div>
-            <label className={labelCls}>Ask me about</label>
-            <input
-              name="expertise"
-              maxLength={300}
-              defaultValue={community.expertise ?? ""}
-              className={inputCls}
-              placeholder="e.g. biosecurity, grant writing, career switching from consultancy"
-            />
-          </div>
-          <div>
-            <label className={labelCls}>Cause areas I&apos;m interested in</label>
-            <div className="grid grid-cols-2 gap-1">
-              {CAUSE_AREAS.filter((c) => c !== "Other").map((c) => (
-                <label key={c} className="flex items-center gap-2 text-sm text-slate-600">
-                  <input
-                    type="checkbox"
-                    name="publicCauseAreas"
-                    value={c}
-                    defaultChecked={community.publicCauseAreas?.includes(c)}
-                  />
-                  {c}
-                </label>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className={labelCls}>
-              Link (LinkedIn, site, EA Forum, LessWrong)
-            </label>
-            <input
-              name="publicLink"
-              type="text"
-              inputMode="url"
-              maxLength={300}
-              defaultValue={community.publicLink ?? ""}
-              className={inputCls}
-            />
-          </div>
-          {state.ok && <p className="text-sm text-teal-700">Saved.</p>}
-          {state.error && <p className="text-sm text-red-600">{state.error}</p>}
-          <button type="submit" disabled={pending} className={btnPrimary}>
-            {pending ? "Saving…" : "Save"}
-          </button>
-        </form>
-      )}
-    </Card>
-  );
-}

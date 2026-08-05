@@ -5,18 +5,21 @@ import Link from "next/link";
 import { checkinAction } from "@/actions/checkin";
 import { rsvpAction } from "@/actions/checkin";
 import { btnPrimary, btnSecondary, Icon } from "@/components/ui";
+import { Slot, SLOT_LABEL } from "@/lib/slots";
 
 export function TodayActions({
   booked,
   checkedIn,
   seatType,
   deskNumber,
+  slot,
   full,
 }: {
   booked: boolean;
   checkedIn: boolean;
   seatType?: string;
   deskNumber?: number;
+  slot?: Slot;
   full: boolean;
 }) {
   const [pending, startTransition] = useTransition();
@@ -38,7 +41,7 @@ export function TodayActions({
     <div>
       {booked ? (
         <p className="text-lg font-semibold">
-          You&apos;re booked today
+          You&apos;re booked {slot && slot !== "day" ? `this ${SLOT_LABEL[slot]}` : "today"}
           {seatType === "flex"
             ? " (lunch table)"
             : deskNumber

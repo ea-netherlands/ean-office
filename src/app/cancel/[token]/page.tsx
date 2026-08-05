@@ -2,6 +2,7 @@ import { verifyToken } from "@/lib/tokens";
 import { db, bookings, users, ensureMigrated } from "@/db";
 import { eq } from "drizzle-orm";
 import { formatDayLong } from "@/lib/dates";
+import { asSlot, slotSuffix } from "@/lib/slots";
 import { Icon } from "@/components/ui";
 import { CancelConfirm } from "./cancel-confirm";
 
@@ -60,6 +61,7 @@ export default async function CancelPage({
       <h1 className="text-xl font-bold">Cancel this booking?</h1>
       <p className="text-slate-600 mt-2 mb-5 text-sm">
         {owner?.name} · <strong>{formatDayLong(booking.date)}</strong>
+        {slotSuffix(asSlot(booking.slot))}
         {booking.seatType === "flex" ? " (lunch table)" : ""}
       </p>
       <CancelConfirm token={token} />

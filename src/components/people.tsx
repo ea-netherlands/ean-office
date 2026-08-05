@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { Avatar, Badge } from "./ui";
+import { Slot, SLOT_BADGE } from "@/lib/slots";
 
 export type PersonChipData = {
   id: string;
   name: string;
   seatType?: string;
   deskNumber?: number | null;
+  slot?: Slot;
   isYou?: boolean;
   profile: {
     bio: string | null;
@@ -49,6 +51,9 @@ export function PeopleList({ people }: { people: PersonChipData[] }) {
               ) : p.deskNumber ? (
                 <span className="text-slate-400">d{p.deskNumber}</span>
               ) : null}
+              {p.slot && p.slot !== "day" && (
+                <span className="text-slate-400">{SLOT_BADGE[p.slot]}</span>
+              )}
               {clickable && <span className="text-teal-600">›</span>}
             </button>
           );

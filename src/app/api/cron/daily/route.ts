@@ -5,6 +5,8 @@ import {
   users,
   visitRequests,
   checkins,
+  events,
+  eventGuests,
   ensureMigrated,
 } from "@/db";
 import { and, eq, lt, inArray, isNull } from "drizzle-orm";
@@ -21,7 +23,8 @@ import { markNoShowsForDate, runNoShowLadder, flaggedUsers } from "@/lib/noshow"
 import { getSettings } from "@/lib/settings";
 import { getReport } from "@/lib/reports";
 import { sendEmail, link } from "@/lib/email";
-import { cancelUrl } from "@/lib/booking";
+import { cancelUrl, releaseUrl } from "@/lib/booking";
+import { asSlot, SLOT_LABEL, slotSuffix, slotWindow } from "@/lib/slots";
 import { appUrl } from "@/lib/auth";
 
 // The one daily job. Schedule for 08:00 Europe/Amsterdam (06:00 UTC in
@@ -37,6 +40,7 @@ export async function GET(request: NextRequest) {
   }
 
   const today = todayAms();
+  const cfg = await getSettings();
   const result: Record<string, unknown> = { today };
 
   // 1. Mark no-shows for the last few days (covers a missed run).
@@ -61,12 +65,20 @@ export async function GET(request: NextRequest) {
   let reminders = 0;
   for (const { b, u } of todays) {
     if (b.reminderSentAt) continue;
+    const slot = asSlot(b.slot);
+    // A day only half-used is the commonest quiet waste of a desk, so give
+    // full-day bookers a one-tap way to hand back the afternoon.
+    const releaseNote =
+      slot === "day"
+        ? `<p><strong>Only here this morning?</strong> ${link(releaseUrl(b), "Free up your afternoon")} — you keep the desk until lunch and someone else can use it after.</p>`
+        : "";
     await sendEmail({
       to: u.email,
-      subject: `You're booked at the office today`,
+      subject: `You're booked at the office today${slotSuffix(slot)}`,
       kind: "morning_reminder",
       html: `<p>Hi ${u.name},</p>
-<p>You're booked for <strong>today, ${formatDayLong(today)}</strong>${b.seatType === "flex" ? " (lunch table)" : ""}. Scan the QR code by the door when you arrive — two taps, and it keeps the office's funding numbers honest.</p>
+<p>You're booked for <strong>today, ${formatDayLong(today)}</strong>${slot === "day" ? "" : ` (${SLOT_LABEL[slot]}, ${slotWindow(slot, cfg)})`}${b.seatType === "flex" ? " — lunch table" : ""}. Scan the QR code by the door when you arrive — two taps, and it keeps the office's funding numbers honest.</p>
+${releaseNote}
 <p>Can't make it? ${link(cancelUrl(b), "Cancel in one tap")} — no login needed, and it frees the desk for someone else.</p>`,
     });
     await db
@@ -78,7 +90,6 @@ export async function GET(request: NextRequest) {
   result.reminders = reminders;
 
   // 4. Expire "awaiting reply" requests past the expiry window.
-  const cfg = await getSettings();
   const awaiting = await db
     .select()
     .from(visitRequests)
@@ -175,6 +186,65 @@ ${endingSoon.length > 0 ? `<li>Trials ending within two weeks: <strong>${endingS
     .where(lt(checkins.date, purgeBefore))
     .returning();
   result.purgedCheckins = purged.length;
+
+  // 9. GDPR: bulk-imported rows nobody ever claimed don't earn indefinite
+  // retention just for sitting on an old spreadsheet.
+  const importPurgeBefore = new Date();
+  importPurgeBefore.setFullYear(importPurgeBefore.getFullYear() - 1);
+  const purgedImports = await db
+    .delete(users)
+    .where(
+      and(
+        eq(users.status, "imported"),
+        isNull(users.claimedAt),
+        lt(users.createdAt, importPurgeBefore)
+      )
+    )
+    .returning();
+  result.purgedUnclaimedImports = purgedImports.length;
+
+  // 10. Nudge yesterday's approved event guests to apply as a regular.
+  const yesterday = addDays(today, -1);
+  const dueGuests = await db
+    .select({ g: eventGuests, u: users, e: events })
+    .from(eventGuests)
+    .innerJoin(users, eq(users.id, eventGuests.userId))
+    .innerJoin(events, eq(events.id, eventGuests.eventId))
+    .where(
+      and(
+        eq(eventGuests.status, "approved"),
+        eq(events.date, yesterday),
+        isNull(eventGuests.nudgeSentAt)
+      )
+    );
+  let eventGuestNudges = 0;
+  for (const { g, u, e } of dueGuests) {
+    if (u.status === "trial" || u.status === "active") {
+      // Already a regular by the time the event happened — nothing to nudge.
+      await db.update(eventGuests).set({ nudgeSentAt: new Date() }).where(eq(eventGuests.id, g.id));
+      continue;
+    }
+    await sendEmail({
+      to: u.email,
+      subject: "Come back any time — join as a regular",
+      kind: "event_guest_nudge",
+      html: `<p>Hi ${u.name},</p>
+<p>Hope you enjoyed <strong>${e.title}</strong>! If you'd like to work from the office more regularly — any weekday, not just event days — you can ${link(`${appUrl()}/join`, "apply for a desk")}.</p>`,
+    });
+    await db.update(eventGuests).set({ nudgeSentAt: new Date() }).where(eq(eventGuests.id, g.id));
+    eventGuestNudges++;
+  }
+  result.eventGuestNudges = eventGuestNudges;
+
+  // 11. GDPR: one-off event guests who never came back don't earn
+  // indefinite retention either — same one-year window as unclaimed imports.
+  const guestPurgeBefore = new Date();
+  guestPurgeBefore.setFullYear(guestPurgeBefore.getFullYear() - 1);
+  const purgedGuests = await db
+    .delete(users)
+    .where(and(eq(users.status, "event_guest"), lt(users.createdAt, guestPurgeBefore)))
+    .returning();
+  result.purgedEventGuests = purgedGuests.length;
 
   return Response.json(result);
 }

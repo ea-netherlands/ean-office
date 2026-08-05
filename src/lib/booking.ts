@@ -11,9 +11,23 @@ import {
   isWeekend,
   todayAms,
 } from "./dates";
+import { minutesOfDayAms } from "./dates";
 import { sendEmail, btn, link } from "./email";
 import { makeToken } from "./tokens";
 import { appUrl } from "./auth";
+import {
+  Half,
+  HALVES,
+  Slot,
+  SLOT_LABEL,
+  asSlot,
+  currentHalf,
+  halves,
+  overlaps,
+  slotSuffix,
+  slotWeight,
+  slotWindow,
+} from "./slots";
 
 export type Booking = typeof bookings.$inferSelect;
 
@@ -29,22 +43,61 @@ export type DayPerson = {
   name: string;
   seatType: string;
   deskNumber: number | null;
+  slot: Slot;
   // Present only when the member opted in to a visible community profile.
   profile: PersonProfile | null;
 };
 
-export type DayCapacity = {
-  date: string;
+/** Occupancy of one half of the day. */
+export type HalfCapacity = {
   desksBooked: number;
   flexBooked: number;
   blockDesks: number;
   desksLeft: number;
   flexLeft: number;
   full: boolean;
+};
+
+export type DayCapacity = {
+  date: string;
+  am: HalfCapacity;
+  pm: HalfCapacity;
+  /**
+   * Seats free for a whole-day booking. Not min(am, pm): a desk taken in
+   * either half can't be held all day, so two disjoint half-day bookings on
+   * different desks cost two whole-day desks, not one.
+   */
+  desksFreeAllDay: number;
+  flexFreeAllDay: number;
+  full: boolean; // nothing free in either half
   waitlistCount: number;
   closed: boolean; // weekend or holiday
   people: DayPerson[];
 };
+
+/** Desks free for a booking of this slot. */
+export function desksLeftFor(cap: DayCapacity, slot: Slot): number {
+  return slot === "day" ? cap.desksFreeAllDay : cap[slot].desksLeft;
+}
+
+export function flexLeftFor(cap: DayCapacity, slot: Slot): number {
+  return slot === "day" ? cap.flexFreeAllDay : cap[slot].flexLeft;
+}
+
+export function hasRoomFor(cap: DayCapacity, slot: Slot): boolean {
+  return desksLeftFor(cap, slot) > 0 || flexLeftFor(cap, slot) > 0;
+}
+
+function emptyHalf(cfg: Settings): HalfCapacity {
+  return {
+    desksBooked: 0,
+    flexBooked: 0,
+    blockDesks: 0,
+    desksLeft: cfg.desk_count,
+    flexLeft: cfg.flex_count,
+    full: false,
+  };
+}
 
 export async function capacityForRange(
   startDate: string,
@@ -58,6 +111,7 @@ export async function capacityForRange(
       seatType: bookings.seatType,
       status: bookings.status,
       source: bookings.source,
+      slot: bookings.slot,
       userId: bookings.userId,
       userName: users.name,
       deskNumber: bookings.deskNumber,
@@ -78,19 +132,20 @@ export async function capacityForRange(
     );
 
   const map = new Map<string, DayCapacity>();
+  const deskTaken = new Map<string, Record<Half, Set<number>>>();
   for (let d = startDate; d <= endDate; d = addDays(d, 1)) {
     map.set(d, {
       date: d,
-      desksBooked: 0,
-      flexBooked: 0,
-      blockDesks: 0,
-      desksLeft: cfg.desk_count,
-      flexLeft: cfg.flex_count,
+      am: emptyHalf(cfg),
+      pm: emptyHalf(cfg),
+      desksFreeAllDay: cfg.desk_count,
+      flexFreeAllDay: cfg.flex_count,
       full: false,
       waitlistCount: 0,
       closed: isWeekend(d) || isHoliday(d),
       people: [],
     });
+    deskTaken.set(d, { am: new Set(), pm: new Set() });
   }
   for (const r of rows) {
     const day = map.get(r.date);
@@ -99,17 +154,23 @@ export async function capacityForRange(
       day.waitlistCount++;
       continue;
     }
-    if (r.seatType === "desk") {
-      day.desksBooked++;
-      if (r.source === "block") day.blockDesks++;
-    } else {
-      day.flexBooked++;
+    const slot = asSlot(r.slot);
+    for (const half of halves(slot)) {
+      const c = day[half];
+      if (r.seatType === "desk") {
+        c.desksBooked++;
+        if (r.source === "block") c.blockDesks++;
+        if (r.deskNumber) deskTaken.get(r.date)![half].add(r.deskNumber);
+      } else {
+        c.flexBooked++;
+      }
     }
     day.people.push({
       id: r.userId,
       name: r.userName,
       seatType: r.seatType,
       deskNumber: r.deskNumber,
+      slot,
       profile: r.profileVisible
         ? {
             bio: r.bio,
@@ -121,9 +182,26 @@ export async function capacityForRange(
     });
   }
   for (const day of map.values()) {
-    day.desksLeft = Math.max(0, cfg.desk_count - day.desksBooked);
-    day.flexLeft = Math.max(0, cfg.flex_count - day.flexBooked);
-    day.full = day.desksLeft === 0 && day.flexLeft === 0;
+    for (const half of HALVES) {
+      const c = day[half];
+      c.desksLeft = Math.max(0, cfg.desk_count - c.desksBooked);
+      c.flexLeft = Math.max(0, cfg.flex_count - c.flexBooked);
+      c.full = c.desksLeft === 0 && c.flexLeft === 0;
+    }
+    const taken = deskTaken.get(day.date)!;
+    let freeBothHalves = 0;
+    for (let n = 1; n <= cfg.desk_count; n++) {
+      if (!taken.am.has(n) && !taken.pm.has(n)) freeBothHalves++;
+    }
+    // The per-half counts also cover desk rows with no number assigned, so
+    // take the tightest of the three views.
+    day.desksFreeAllDay = Math.min(
+      day.am.desksLeft,
+      day.pm.desksLeft,
+      freeBothHalves
+    );
+    day.flexFreeAllDay = Math.min(day.am.flexLeft, day.pm.flexLeft);
+    day.full = day.am.full && day.pm.full;
   }
   return map;
 }
@@ -135,10 +213,13 @@ export async function capacityForDay(date: string): Promise<DayCapacity> {
 
 // ---------- booking ----------
 
-/** Desk numbers already reserved on a given day. */
-export async function takenDeskNumbers(date: string): Promise<Set<number>> {
+/** Which desk numbers are held in each half of a day. */
+export async function deskTakenSets(
+  date: string,
+  excludeBookingId?: string
+): Promise<Record<Half, Set<number>>> {
   const rows = await db
-    .select({ n: bookings.deskNumber })
+    .select({ id: bookings.id, n: bookings.deskNumber, slot: bookings.slot })
     .from(bookings)
     .where(
       and(
@@ -147,28 +228,76 @@ export async function takenDeskNumbers(date: string): Promise<Set<number>> {
         eq(bookings.seatType, "desk")
       )
     );
-  return new Set(rows.map((r) => r.n).filter((n): n is number => n !== null));
+  const sets: Record<Half, Set<number>> = { am: new Set(), pm: new Set() };
+  for (const r of rows) {
+    if (r.n === null) continue;
+    if (excludeBookingId && r.id === excludeBookingId) continue;
+    for (const half of halves(asSlot(r.slot))) sets[half].add(r.n);
+  }
+  return sets;
+}
+
+/** Desk numbers a booking of this slot can't have. */
+export async function takenDeskNumbers(
+  date: string,
+  slot: Slot = "day",
+  excludeBookingId?: string
+): Promise<Set<number>> {
+  const sets = await deskTakenSets(date, excludeBookingId);
+  const out = new Set<number>();
+  for (const half of halves(slot)) for (const n of sets[half]) out.add(n);
+  return out;
 }
 
 async function assignDeskNumber(
   date: string,
   deskCount: number,
-  requested?: number
+  slot: Slot,
+  requested?: number,
+  excludeBookingId?: string
 ): Promise<{ ok: true; n: number | null } | { ok: false; error: string }> {
-  const taken = await takenDeskNumbers(date);
+  const sets = await deskTakenSets(date, excludeBookingId);
+  const conflicts = (n: number) => halves(slot).some((h) => sets[h].has(n));
+
   if (requested) {
     if (requested < 1 || requested > deskCount) {
       return { ok: false, error: `There is no desk ${requested}.` };
     }
-    if (taken.has(requested)) {
-      return { ok: false, error: `Desk ${requested} is already taken that day.` };
+    if (conflicts(requested)) {
+      return {
+        ok: false,
+        error:
+          slot === "day"
+            ? `Desk ${requested} isn't free for the whole day.`
+            : `Desk ${requested} is already taken that ${SLOT_LABEL[slot]}.`,
+      };
     }
     return { ok: true, n: requested };
   }
-  for (let n = 1; n <= deskCount; n++) {
-    if (!taken.has(n)) return { ok: true, n };
+
+  const free: number[] = [];
+  for (let n = 1; n <= deskCount; n++) if (!conflicts(n)) free.push(n);
+  if (free.length === 0) return { ok: true, n: null }; // caller checked capacity
+
+  if (slot !== "day") {
+    // Pair halves onto one desk where we can, so whole desks stay open for
+    // people who want a full day.
+    const other: Half = slot === "am" ? "pm" : "am";
+    const paired = free.find((n) => sets[other].has(n));
+    if (paired) return { ok: true, n: paired };
   }
-  return { ok: true, n: null }; // shouldn't happen while desksLeft > 0
+  return { ok: true, n: free[0] };
+}
+
+/** Why a requested slot can't sit alongside one the member already holds. */
+function clashMessage(held: Slot, wanted: Slot): string {
+  if (held === wanted) {
+    return held === "day"
+      ? "You already have a booking for that day."
+      : `You already have that ${SLOT_LABEL[held]} booked.`;
+  }
+  if (held === "day") return "You're already booked for the whole of that day.";
+  return `You already have the ${SLOT_LABEL[held]} that day — change that booking to a full day instead.`;
 }
 
 export type BookResult =
@@ -186,10 +315,12 @@ export async function bookDay(
     seriesId?: string;
     deskNumber?: number; // request a specific desk
     seatType?: "desk" | "flex"; // request a seat kind (flex = lunch table)
+    slot?: Slot; // full day (default), morning or afternoon
   } = {}
 ): Promise<BookResult> {
   const cfg = await getSettings();
   const source = opts.source ?? "self";
+  const slot = opts.slot ?? "day";
 
   if (date < todayAms()) return { ok: false, error: "That day has passed." };
   if (isWeekend(date)) return { ok: false, error: "The office is closed at weekends." };
@@ -205,13 +336,19 @@ export async function bookDay(
         inArray(bookings.status, ["booked", "waitlisted"])
       )
     );
-  if (existing.length > 0) {
-    return { ok: false, error: "You already have a booking for that day." };
+  // Holding a morning and an afternoon separately is fine; overlapping isn't.
+  const clash = existing.find((b) => overlaps(asSlot(b.slot), slot));
+  if (clash) {
+    return { ok: false, error: clashMessage(asSlot(clash.slot), slot) };
   }
 
   if (source === "self") {
+    // Half days count as half, so the cap means the same amount of office
+    // time however it's sliced.
     const future = await db
-      .select({ n: sql<number>`count(*)::int` })
+      .select({
+        n: sql<number>`coalesce(sum(case when ${bookings.slot} = 'day' then 1 else 0.5 end), 0)::float`,
+      })
       .from(bookings)
       .where(
         and(
@@ -221,44 +358,69 @@ export async function bookDay(
           eq(bookings.source, "self")
         )
       );
-    if (future[0].n >= cfg.max_future_bookings) {
+    if (Number(future[0].n) + slotWeight(slot) > cfg.max_future_bookings) {
       return {
         ok: false,
-        error: `You can hold at most ${cfg.max_future_bookings} future bookings at once.`,
+        error: `You can hold at most ${cfg.max_future_bookings} future booking-days at once (a half day counts as a half).`,
       };
     }
   }
 
   const cap = await capacityForDay(date);
+  const desksLeft = desksLeftFor(cap, slot);
+  const flexLeft = flexLeftFor(cap, slot);
   const wantsFlex = opts.seatType === "flex";
   let seatType: "desk" | "flex" | null = null;
   if (wantsFlex) {
-    if (cap.flexLeft > 0) seatType = "flex";
-  } else if (cap.desksLeft > 0) seatType = "desk";
-  else if (cap.flexLeft > 0 && !opts.deskNumber) seatType = "flex";
+    if (flexLeft > 0) seatType = "flex";
+  } else if (desksLeft > 0) seatType = "desk";
+  else if (flexLeft > 0 && !opts.deskNumber) seatType = "flex";
 
-  if (opts.deskNumber && cap.desksLeft === 0) {
-    return { ok: false, error: "All desks are taken that day." };
+  if (opts.deskNumber && desksLeft === 0) {
+    return {
+      ok: false,
+      error:
+        slot === "day"
+          ? "No desk is free for the whole of that day."
+          : `All desks are taken that ${SLOT_LABEL[slot]}.`,
+    };
   }
   if (wantsFlex && !seatType && !opts.allowWaitlist) {
-    return { ok: false, error: "The lunch table is full that day." };
+    return {
+      ok: false,
+      error: `The lunch table is full that ${slot === "day" ? "day" : SLOT_LABEL[slot]}.`,
+    };
   }
 
   let deskNumber: number | null = null;
   if (seatType === "desk") {
-    const assigned = await assignDeskNumber(date, cfg.desk_count, opts.deskNumber);
+    const assigned = await assignDeskNumber(
+      date,
+      cfg.desk_count,
+      slot,
+      opts.deskNumber
+    );
     if (!assigned.ok) return { ok: false, error: assigned.error };
     deskNumber = assigned.n;
   }
 
   if (!seatType) {
-    if (!opts.allowWaitlist) return { ok: false, error: "That day is full." };
+    if (!opts.allowWaitlist) {
+      return {
+        ok: false,
+        error:
+          slot === "day"
+            ? "That day is full."
+            : `That ${SLOT_LABEL[slot]} is full.`,
+      };
+    }
     const [wl] = await db
       .insert(bookings)
       .values({
         id: newId("bk"),
         userId,
         date,
+        slot,
         seatType: "desk",
         status: "waitlisted",
         source,
@@ -273,6 +435,7 @@ export async function bookDay(
       id: newId("bk"),
       userId,
       date,
+      slot,
       seatType,
       deskNumber,
       status: "booked",
@@ -294,23 +457,52 @@ export function cancelUrl(booking: Booking): string {
   return `${appUrl()}/cancel/${makeToken("cancel", booking.id, exp)}`;
 }
 
+/** One-tap "I'm only here this morning" — frees the desk from lunch. */
+export function releaseUrl(booking: Booking): string {
+  const exp = new Date(`${booking.date}T23:59:59+02:00`);
+  return `${appUrl()}/release/${makeToken("release", booking.id, exp)}`;
+}
+
+/** "desk 3" / "a lunch-table spot" */
+export function describeSeat(booking: Booking): string {
+  return booking.seatType === "desk"
+    ? `desk ${booking.deskNumber ?? ""}`.trim()
+    : "a lunch-table spot";
+}
+
+/** "Tuesday 4 August 2026 (morning, 9:00–13:30)" */
+export function describeWhen(booking: Booking, cfg: Settings): string {
+  const slot = asSlot(booking.slot);
+  if (slot === "day") return formatDayLong(booking.date);
+  return `${formatDayLong(booking.date)} (${SLOT_LABEL[slot]}, ${slotWindow(slot, cfg)})`;
+}
+
 async function sendBookingConfirmation(
   email: string,
   name: string,
   booking: Booking
 ): Promise<void> {
   const cfg = await getSettings();
+  const slot = asSlot(booking.slot);
   const flexNote =
     booking.seatType === "flex"
-      ? `<p><strong>Heads up:</strong> you're at the lunch table, which is used for lunch from ${cfg.flex_unavailable_window} — you'll need to pack up for that hour.</p>`
+      ? `<p><strong>Heads up:</strong> ${flexWarning(cfg, slot)}</p>`
       : "";
+  // Half-day bookers share the desk, so the handover matters to someone else.
+  const shareNote =
+    slot === "am"
+      ? `<p>Someone may have the same desk for the afternoon, so please pack up by the end of lunch (${cfg.flex_unavailable_window}).</p>`
+      : slot === "pm"
+        ? `<p>Someone may have the same desk for the morning — it'll be free from the start of lunch (${cfg.flex_unavailable_window}).</p>`
+        : "";
   await sendEmail({
     to: email,
-    subject: `Booked: ${formatDayLong(booking.date)}`,
+    subject: `Booked: ${formatDayLong(booking.date)}${slotSuffix(slot)}`,
     kind: "booking_confirmed",
     html: `<p>Hi ${name},</p>
-<p>You're booked for <strong>${formatDayLong(booking.date)}</strong> (${booking.seatType === "desk" ? `desk ${booking.deskNumber ?? ""}`.trim() : "lunch-table spot"}).</p>
+<p>You're booked for <strong>${describeWhen(booking, cfg)}</strong> — ${describeSeat(booking)}.</p>
 ${flexNote}
+${shareNote}
 <p>Plans changed? ${link(cancelUrl(booking), "Cancel in one tap")} — no login needed, and it frees the desk for someone else.</p>`,
   });
 }
@@ -336,10 +528,16 @@ export async function switchSeat(
   }
   if (booking.date < todayAms()) return { ok: false, error: "That day has passed." };
 
+  const slot = asSlot(booking.slot);
   if (target.type === "flex") {
     if (booking.seatType === "flex") return { ok: true }; // already there
     const cap = await capacityForDay(booking.date);
-    if (cap.flexLeft <= 0) return { ok: false, error: "The lunch table is full that day." };
+    if (flexLeftFor(cap, slot) <= 0) {
+      return {
+        ok: false,
+        error: `The lunch table is full that ${slot === "day" ? "day" : SLOT_LABEL[slot]}.`,
+      };
+    }
     await db
       .update(bookings)
       .set({ seatType: "flex", deskNumber: null })
@@ -348,7 +546,9 @@ export async function switchSeat(
     const assigned = await assignDeskNumber(
       booking.date,
       cfg.desk_count,
-      target.deskNumber
+      slot,
+      target.deskNumber,
+      bookingId
     );
     if (!assigned.ok) return { ok: false, error: assigned.error };
     await db
@@ -360,6 +560,120 @@ export async function switchSeat(
   // Moving off a desk or off the table can free a seat for the waitlist.
   await promoteWaitlist(booking.date);
   return { ok: true };
+}
+
+export type ChangeSlotResult =
+  | { ok: true; slot: Slot; seatType: "desk" | "flex"; deskNumber: number | null }
+  | { ok: false; error: string };
+
+/**
+ * Stretch a half day into a full one, trim a full day back to a half, or
+ * swap morning for afternoon. Keeps the same desk when it's free across the
+ * new hours, otherwise moves to one that is.
+ */
+export async function changeSlot(
+  bookingId: string,
+  userId: string,
+  slot: Slot
+): Promise<ChangeSlotResult> {
+  const cfg = await getSettings();
+  const [booking] = await db
+    .select()
+    .from(bookings)
+    .where(eq(bookings.id, bookingId));
+  if (!booking || booking.userId !== userId) {
+    return { ok: false, error: "Booking not found." };
+  }
+  if (booking.status !== "booked") {
+    return { ok: false, error: "Only confirmed bookings can be changed." };
+  }
+  if (booking.date < todayAms()) return { ok: false, error: "That day has passed." };
+
+  const current = asSlot(booking.slot);
+  const seatType = booking.seatType as "desk" | "flex";
+  if (current === slot) {
+    return { ok: true, slot, seatType, deskNumber: booking.deskNumber };
+  }
+
+  // Your own other booking that day (a separate half) can be in the way.
+  const others = await db
+    .select()
+    .from(bookings)
+    .where(
+      and(
+        eq(bookings.userId, userId),
+        eq(bookings.date, booking.date),
+        inArray(bookings.status, ["booked", "waitlisted"])
+      )
+    );
+  const clash = others.find(
+    (b) => b.id !== bookingId && overlaps(asSlot(b.slot), slot)
+  );
+  if (clash) {
+    return {
+      ok: false,
+      error: `That would clash with your ${SLOT_LABEL[asSlot(clash.slot)]} booking on the same day.`,
+    };
+  }
+
+  if (seatType === "flex") {
+    const cap = await capacityForDay(booking.date);
+    const held = halves(current);
+    for (const half of halves(slot)) {
+      if (held.includes(half)) continue; // already ours
+      if (cap[half].flexLeft <= 0) {
+        return {
+          ok: false,
+          error: `The lunch table is full that ${SLOT_LABEL[half === "am" ? "am" : "pm"]}.`,
+        };
+      }
+    }
+    await db.update(bookings).set({ slot }).where(eq(bookings.id, bookingId));
+    await promoteWaitlist(booking.date);
+    return { ok: true, slot, seatType, deskNumber: null };
+  }
+
+  // Try to keep the desk they know; fall back to any desk free across the
+  // new hours before giving up.
+  let deskNumber: number | null = null;
+  const keep = booking.deskNumber
+    ? await assignDeskNumber(
+        booking.date,
+        cfg.desk_count,
+        slot,
+        booking.deskNumber,
+        bookingId
+      )
+    : { ok: false as const, error: "" };
+  if (keep.ok) {
+    deskNumber = keep.n;
+  } else {
+    const moved = await assignDeskNumber(
+      booking.date,
+      cfg.desk_count,
+      slot,
+      undefined,
+      bookingId
+    );
+    if (!moved.ok || moved.n === null) {
+      return {
+        ok: false,
+        error:
+          slot === "day"
+            ? "No desk is free for the whole of that day."
+            : `No desk is free that ${SLOT_LABEL[slot]}.`,
+      };
+    }
+    deskNumber = moved.n;
+  }
+
+  await db
+    .update(bookings)
+    .set({ slot, deskNumber })
+    .where(eq(bookings.id, bookingId));
+  // Trimming a full day to a half frees the other half for the waitlist.
+  await promoteWaitlist(booking.date);
+  return { ok: true, slot, seatType, deskNumber };
 }
 
 // ---------- cancellation + waitlist promotion ----------
@@ -389,42 +703,47 @@ export async function cancelBooking(
 
 export async function promoteWaitlist(date: string): Promise<void> {
   const cap = await capacityForDay(date);
-  // Prefer desks over flex.
-  let seatType: "desk" | "flex" | null = null;
-  if (cap.desksLeft > 0) seatType = "desk";
-  else if (cap.flexLeft > 0) seatType = "flex";
-  if (!seatType) return;
-
-  const [next] = await db
+  const waiting = await db
     .select()
     .from(bookings)
     .where(and(eq(bookings.date, date), eq(bookings.status, "waitlisted")))
-    .orderBy(asc(bookings.createdAt))
-    .limit(1);
-  if (!next) return;
+    .orderBy(asc(bookings.createdAt));
 
-  let deskNumber: number | null = null;
-  if (seatType === "desk") {
-    const cfg = await getSettings();
-    const assigned = await assignDeskNumber(date, cfg.desk_count);
-    if (assigned.ok) deskNumber = assigned.n;
-  }
-  const [promoted] = await db
-    .update(bookings)
-    .set({ status: "booked", seatType, deskNumber })
-    .where(eq(bookings.id, next.id))
-    .returning();
+  // A freed morning can't satisfy someone waiting on a full day, so walk the
+  // queue in order and promote the first person the freed hours actually fit.
+  for (const next of waiting) {
+    const slot = asSlot(next.slot);
+    // Prefer desks over flex.
+    let seatType: "desk" | "flex" | null = null;
+    if (desksLeftFor(cap, slot) > 0) seatType = "desk";
+    else if (flexLeftFor(cap, slot) > 0) seatType = "flex";
+    if (!seatType) continue;
 
-  const [user] = await db.select().from(users).where(eq(users.id, next.userId));
-  if (user) {
-    await sendEmail({
-      to: user.email,
-      subject: `A desk opened up for ${formatDay(date)}`,
-      kind: "waitlist_promoted",
-      html: `<p>Hi ${user.name},</p>
-<p>Good news — a ${seatType === "desk" ? "desk" : "lunch-table spot"} opened up for <strong>${formatDayLong(date)}</strong> and it's now yours.</p>
+    let deskNumber: number | null = null;
+    if (seatType === "desk") {
+      const cfg = await getSettings();
+      const assigned = await assignDeskNumber(date, cfg.desk_count, slot);
+      if (assigned.ok) deskNumber = assigned.n;
+    }
+    const [promoted] = await db
+      .update(bookings)
+      .set({ status: "booked", seatType, deskNumber })
+      .where(eq(bookings.id, next.id))
+      .returning();
+
+    const [user] = await db.select().from(users).where(eq(users.id, next.userId));
+    if (user) {
+      const cfg = await getSettings();
+      await sendEmail({
+        to: user.email,
+        subject: `A desk opened up for ${formatDay(date)}${slotSuffix(slot)}`,
+        kind: "waitlist_promoted",
+        html: `<p>Hi ${user.name},</p>
+<p>Good news — a ${seatType === "desk" ? "desk" : "lunch-table spot"} opened up for <strong>${describeWhen(promoted, cfg)}</strong> and it's now yours.</p>
 <p>Can't make it after all? ${link(cancelUrl(promoted), "Cancel in one tap")}.</p>`,
-    });
+      });
+    }
+    return;
   }
 }
 
@@ -442,7 +761,8 @@ export type BlockPreview = {
 export async function previewBlockBooking(
   userId: string,
   weekdays: number[],
-  until: string
+  until: string,
+  slot: Slot = "day"
 ): Promise<BlockPreview> {
   const cfg = await getSettings();
   const start = addDays(todayAms(), 1);
@@ -462,7 +782,7 @@ export async function previewBlockBooking(
 
   const capMap = await capacityForRange(start, endDate);
   const own = await db
-    .select({ date: bookings.date })
+    .select({ date: bookings.date, slot: bookings.slot })
     .from(bookings)
     .where(
       and(
@@ -472,7 +792,11 @@ export async function previewBlockBooking(
         lte(bookings.date, endDate)
       )
     );
-  const ownDates = new Set(own.map((b) => b.date));
+  // Only your own bookings that overlap the slot you're repeating block it —
+  // a standing Tuesday morning can sit next to a one-off Tuesday afternoon.
+  const ownDates = new Set(
+    own.filter((b) => overlaps(asSlot(b.slot), slot)).map((b) => b.date)
+  );
 
   for (let d = start; d <= endDate; d = addDays(d, 1)) {
     if (!weekdays.includes(isoWeekday(d))) continue;
@@ -486,11 +810,12 @@ export async function previewBlockBooking(
       continue;
     }
     const cap = capMap.get(d)!;
-    if (cap.desksLeft <= 0) {
+    if (desksLeftFor(cap, slot) <= 0) {
       preview.skippedFull.push(d);
       continue;
     }
-    if (cap.blockDesks >= blockCap) {
+    // The repeat-booking cap applies to every half the series would occupy.
+    if (halves(slot).some((h) => cap[h].blockDesks >= blockCap)) {
       preview.skippedBlockCap.push(d);
       continue;
     }
@@ -502,9 +827,10 @@ export async function previewBlockBooking(
 export async function createBlockBooking(
   userId: string,
   weekdays: number[],
-  until: string
+  until: string,
+  slot: Slot = "day"
 ): Promise<{ ok: boolean; booked: string[]; preview: BlockPreview; error?: string }> {
-  const preview = await previewBlockBooking(userId, weekdays, until);
+  const preview = await previewBlockBooking(userId, weekdays, until, slot);
   if (preview.eligible.length === 0) {
     return { ok: false, booked: [], preview, error: "No bookable days in that range." };
   }
@@ -514,6 +840,7 @@ export async function createBlockBooking(
       id: newId("ser"),
       userId,
       weekdays,
+      slot,
       startDate: preview.eligible[0],
       endDate: preview.endDate,
     })
@@ -525,6 +852,7 @@ export async function createBlockBooking(
       source: "block",
       sendConfirmation: false,
       seriesId: series.id,
+      slot,
     });
     if (res.ok && !("waitlisted" in res)) booked.push(date);
   }
@@ -545,12 +873,13 @@ export async function createBlockBooking(
             .filter(Boolean)
             .join(", ")}). You can still join the waitlist for those from the booking page.</p>`
         : "";
+    const unit = slot === "day" ? "days" : `${SLOT_LABEL[slot]}s`;
     await sendEmail({
       to: user.email,
-      subject: `Booked: ${booked.length} days through ${formatDay(preview.endDate)}`,
+      subject: `Booked: ${booked.length} ${unit} through ${formatDay(preview.endDate)}`,
       kind: "block_summary",
       html: `<p>Hi ${user.name},</p>
-<p>Your repeating booking is in — <strong>${booked.length} days</strong>:</p>
+<p>Your repeating booking is in — <strong>${booked.length} ${unit}</strong>:</p>
 <p>${booked.map(formatDay).join(" · ")}</p>
 ${skippedNote}
 <p>Each day is cancellable on its own from ${link(`${appUrl()}/me`, "your bookings page")}, or cancel the whole series there.</p>`,
@@ -598,7 +927,7 @@ export async function checkInUser(
     .where(and(eq(checkins.userId, userId), eq(checkins.date, date)));
   if (existing.length > 0) return { ok: true, kind: "already" }; // idempotent
 
-  const [booking] = await db
+  const mine = await db
     .select()
     .from(bookings)
     .where(
@@ -608,6 +937,12 @@ export async function checkInUser(
         eq(bookings.status, "booked")
       )
     );
+  // Someone holding a morning and an afternoon has two rows — attribute the
+  // check-in to the one covering the hours they walked in during.
+  const nowHalf: Half =
+    date === todayAms() ? currentHalf(minutesOfDayAms()) : "am";
+  const booking =
+    mine.find((b) => halves(asSlot(b.slot)).includes(nowHalf)) ?? mine[0];
 
   let walkIn = false;
   let overCapacity = false;
@@ -615,13 +950,18 @@ export async function checkInUser(
 
   if (!booking && !opts.retroactive) {
     // Walk-in: create a booking if there's space; check them in regardless.
+    // Someone arriving after lunch only takes the afternoon, so an afternoon
+    // drop-in doesn't read as a whole desk-day in the reports.
+    const slot: Slot = date === todayAms() && nowHalf === "pm" ? "pm" : "day";
     const cap = await capacityForDay(date);
-    const seatType = cap.desksLeft > 0 ? "desk" : cap.flexLeft > 0 ? "flex" : "desk";
-    overCapacity = cap.full;
+    const desksLeft = desksLeftFor(cap, slot);
+    const seatType =
+      desksLeft > 0 ? "desk" : flexLeftFor(cap, slot) > 0 ? "flex" : "desk";
+    overCapacity = !hasRoomFor(cap, slot);
     let deskNumber: number | null = null;
-    if (seatType === "desk" && cap.desksLeft > 0) {
+    if (seatType === "desk" && desksLeft > 0) {
       const cfg = await getSettings();
-      const assigned = await assignDeskNumber(date, cfg.desk_count);
+      const assigned = await assignDeskNumber(date, cfg.desk_count, slot);
       if (assigned.ok) deskNumber = assigned.n;
     }
     const [wb] = await db
@@ -630,6 +970,7 @@ export async function checkInUser(
         id: newId("bk"),
         userId,
         date,
+        slot,
         seatType,
         deskNumber,
         status: "booked",
@@ -661,6 +1002,14 @@ export async function retroCheckinWindowOk(date: string): Promise<boolean> {
   return todayAms() <= addDays(date, 1);
 }
 
-export function flexWarning(cfg: Settings): string {
-  return `The lunch table is used for lunch from ${cfg.flex_unavailable_window}, so you'll need to pack up for an hour. Fine for a half day or if you're happy to break — less good for deep work.`;
+export function flexWarning(cfg: Settings, slot: Slot = "day"): string {
+  // A half day stops (or starts) at exactly the hour the table is cleared, so
+  // the usual pack-up warning doesn't apply to it.
+  if (slot === "am") {
+    return `The lunch table is cleared for lunch at ${cfg.flex_unavailable_window.split("–")[0]} — which is when a morning booking ends anyway, so it works out.`;
+  }
+  if (slot === "pm") {
+    return `The lunch table is in use for lunch until ${cfg.flex_unavailable_window.split("–")[1] ?? ""}, so settle in once it's cleared.`;
+  }
+  return `The lunch table is used for lunch from ${cfg.flex_unavailable_window}, so you'll need to pack up for an hour. Fine if you're happy to break — less good for deep work, and a half-day booking avoids it entirely.`;
 }

@@ -22,11 +22,28 @@ export const users = pgTable(
       .notNull()
       .default("visitor"),
     status: text("status", {
-      enum: ["pending", "trial", "active", "inactive", "declined"],
+      enum: [
+        "pending",
+        "trial",
+        "active",
+        "inactive",
+        "declined",
+        "imported",
+        "event_guest",
+      ],
     })
       .notNull()
       .default("pending"),
     trialEndsAt: date("trial_ends_at"),
+
+    // provenance — where this row came from, and (for bulk imports) whether
+    // they've claimed the account yet. "imported" rows are silent and
+    // uncounted until someone accepts the guidelines at /welcome.
+    source: text("source", { enum: ["join", "import", "admin"] })
+      .notNull()
+      .default("join"),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    importBatch: text("import_batch"),
 
     // intake — part 1
     profileUrl: text("profile_url"),
@@ -137,6 +154,9 @@ export const bookingSeries = pgTable("booking_series", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   weekdays: integer("weekdays").array().notNull(), // 1=Mon … 5=Fri
+  slot: text("slot", { enum: ["day", "am", "pm"] })
+    .notNull()
+    .default("day"),
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -160,6 +180,20 @@ export const bookings = pgTable(
       .default("desk"),
     deskNumber: integer("desk_number"), // 1..desk_count, desks only
 
+    // Half days. `slot` is the source of truth; coversAm/coversPm are derived
+    // from it by Postgres so the partial unique indexes below can enforce
+    // overlap for free — a "day" row sits in both indexes and therefore
+    // collides with either half, with no overlap logic in application code.
+    slot: text("slot", { enum: ["day", "am", "pm"] })
+      .notNull()
+      .default("day"),
+    coversAm: boolean("covers_am")
+      .notNull()
+      .generatedAlwaysAs(sql`slot IN ('day', 'am')`),
+    coversPm: boolean("covers_pm")
+      .notNull()
+      .generatedAlwaysAs(sql`slot IN ('day', 'pm')`),
+
     status: text("status", { enum: ["booked", "cancelled", "waitlisted"] })
       .notNull()
       .default("booked"),
@@ -174,12 +208,25 @@ export const bookings = pgTable(
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   },
   (t) => [
-    uniqueIndex("bookings_user_date_booked")
+    // One booking per person per half, and one person per desk per half. A
+    // full-day row has both flags set, so it lands in both indexes of each
+    // pair — which is what makes day-vs-half conflicts impossible.
+    uniqueIndex("bookings_user_date_am")
       .on(t.userId, t.date)
-      .where(sql`${t.status} = 'booked'`),
-    uniqueIndex("bookings_date_desk_booked")
+      .where(sql`${t.status} = 'booked' AND ${t.coversAm}`),
+    uniqueIndex("bookings_user_date_pm")
+      .on(t.userId, t.date)
+      .where(sql`${t.status} = 'booked' AND ${t.coversPm}`),
+    uniqueIndex("bookings_date_desk_am")
       .on(t.date, t.deskNumber)
-      .where(sql`${t.status} = 'booked' AND ${t.deskNumber} IS NOT NULL`),
+      .where(
+        sql`${t.status} = 'booked' AND ${t.deskNumber} IS NOT NULL AND ${t.coversAm}`
+      ),
+    uniqueIndex("bookings_date_desk_pm")
+      .on(t.date, t.deskNumber)
+      .where(
+        sql`${t.status} = 'booked' AND ${t.deskNumber} IS NOT NULL AND ${t.coversPm}`
+      ),
     index("bookings_date_idx").on(t.date),
   ]
 );
@@ -286,6 +333,38 @@ export const eventAttendance = pgTable(
       .on(t.eventId, t.userId, t.source)
       .where(sql`${t.userId} IS NOT NULL`),
   ]
+);
+
+// Requests to join a themed coworking day, curated by the event's organiser
+// (its createdBy, or any admin) rather than first-come. Deliberately separate
+// from eventAttendance, which records facts (attended/rsvp'd), not pending
+// decisions.
+export const eventGuests = pgTable(
+  "event_guests",
+  {
+    id: text("id").primaryKey(),
+    eventId: text("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: text("status", { enum: ["pending", "approved", "declined"] })
+      .notNull()
+      .default("pending"),
+    accessibilityNotes: text("accessibility_notes"),
+    guidelinesAcceptedAt: timestamp("guidelines_accepted_at", {
+      withTimezone: true,
+    }).notNull(),
+    decidedBy: text("decided_by"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    // Post-event "come back as a regular" nudge, sent once the day after.
+    nudgeSentAt: timestamp("nudge_sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [uniqueIndex("event_guests_unique").on(t.eventId, t.userId)]
 );
 
 // ---------- email log (dev visibility + audit) ----------

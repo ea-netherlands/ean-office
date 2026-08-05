@@ -2,6 +2,7 @@ import { db, bookings, checkins, users } from "@/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { Page, H1, Sub, Card, Badge, Avatar } from "@/components/ui";
 import { todayAms, formatDayLong, formatInstant } from "@/lib/dates";
+import { asSlot, halves, SLOT_LABEL } from "@/lib/slots";
 import { getSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -26,8 +27,17 @@ export default async function AdminTodayPage() {
   const checkinByUser = new Map(todayCheckins.map((c) => [c.c.userId, c.c]));
   const booked = rows.filter((r) => r.b.status === "booked");
   const waitlisted = rows.filter((r) => r.b.status === "waitlisted");
-  const deskCount = booked.filter((r) => r.b.seatType === "desk").length;
-  const checkedInCount = booked.filter((r) => checkinByUser.has(r.b.userId)).length;
+  // Morning and afternoon fill up independently, so report them that way.
+  const desksIn = (half: "am" | "pm") =>
+    booked.filter(
+      (r) => r.b.seatType === "desk" && halves(asSlot(r.b.slot)).includes(half)
+    ).length;
+  const splitDesks = desksIn("am") !== desksIn("pm");
+  // Two half bookings by one person are one body in the room.
+  const peopleBooked = new Set(booked.map((r) => r.b.userId));
+  const checkedInCount = new Set(
+    booked.filter((r) => checkinByUser.has(r.b.userId)).map((r) => r.b.userId)
+  ).size;
 
   return (
     <Page wide>
@@ -35,8 +45,15 @@ export default async function AdminTodayPage() {
       <Sub>{formatDayLong(today)}</Sub>
 
       <div className="grid grid-cols-3 gap-3 mb-5">
-        <Stat label="Desks booked" value={`${deskCount}/${cfg.desk_count}`} />
-        <Stat label="Checked in" value={`${checkedInCount}/${booked.length}`} />
+        <Stat
+          label={splitDesks ? "Desks booked (AM · PM)" : "Desks booked"}
+          value={
+            splitDesks
+              ? `${desksIn("am")} · ${desksIn("pm")}/${cfg.desk_count}`
+              : `${desksIn("am")}/${cfg.desk_count}`
+          }
+        />
+        <Stat label="Checked in" value={`${checkedInCount}/${peopleBooked.size}`} />
         <Stat label="Waitlist" value={String(waitlisted.length)} />
       </div>
 
@@ -59,6 +76,9 @@ export default async function AdminTodayPage() {
                       ) : r.b.deskNumber ? (
                         <Badge tone="teal">desk {r.b.deskNumber}</Badge>
                       ) : null}
+                      {asSlot(r.b.slot) !== "day" && (
+                        <Badge tone="stone">{SLOT_LABEL[asSlot(r.b.slot)]}</Badge>
+                      )}
                       {r.b.source === "walkin" && <Badge tone="indigo">walk-in</Badge>}
                       {r.b.source === "block" && <Badge>repeating</Badge>}
                     </p>

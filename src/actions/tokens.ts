@@ -1,9 +1,9 @@
 "use server";
 
-import { db, users, ensureMigrated } from "@/db";
+import { db, bookings, users, ensureMigrated } from "@/db";
 import { eq } from "drizzle-orm";
 import { verifyToken } from "@/lib/tokens";
-import { cancelBooking, checkInUser } from "@/lib/booking";
+import { cancelBooking, changeSlot, checkInUser } from "@/lib/booking";
 import { clearNoShow } from "@/lib/noshow";
 
 // Actions behind signed single-purpose email links. No session required, and
@@ -17,6 +17,28 @@ export async function cancelByTokenAction(
   if (!verified) return { error: "This link has expired." };
   const res = await cancelBooking(verified.subject);
   if (!res.ok) return { error: "Booking not found." };
+  return { ok: true };
+}
+
+/**
+ * "Only here this morning" from the reminder email — trims a full day back to
+ * a morning so the desk is bookable from lunch, instead of quietly sitting
+ * empty all afternoon.
+ */
+export async function releaseByTokenAction(
+  token: string
+): Promise<{ ok?: boolean; error?: string }> {
+  await ensureMigrated();
+  const verified = verifyToken(token, "release");
+  if (!verified) return { error: "This link has expired." };
+  const [booking] = await db
+    .select()
+    .from(bookings)
+    .where(eq(bookings.id, verified.subject));
+  if (!booking) return { error: "Booking not found." };
+  // The token names the booking, so its owner is who we act as.
+  const res = await changeSlot(booking.id, booking.userId, "am");
+  if (!res.ok) return { error: res.error };
   return { ok: true };
 }
 

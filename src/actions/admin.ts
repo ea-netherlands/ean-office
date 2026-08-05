@@ -260,6 +260,7 @@ export async function addMemberAction(
     email,
     role: "member",
     status: "active",
+    source: "admin",
     approvedAt: new Date(),
   });
   revalidatePath("/admin/members");
@@ -320,6 +321,8 @@ export async function saveSettingsAction(
     .filter((s) => /^\d{2}:\d{2}$/.test(s));
   if (slots.length > 0) await setSetting("arrival_slots", slots);
   await setSetting("flex_unavailable_window", String(formData.get("flex_unavailable_window") || "12:00–13:00"));
+  await setSetting("am_window", String(formData.get("am_window") || "9:00–13:30"));
+  await setSetting("pm_window", String(formData.get("pm_window") || "12:30–19:00"));
   await setSetting("office_address", String(formData.get("office_address") || ""));
   await setSetting("luma_ics_url", String(formData.get("luma_ics_url") || "").trim());
 

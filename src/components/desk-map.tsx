@@ -1,5 +1,7 @@
 "use client";
 
+import { halves, Slot, SLOT_LABEL } from "@/lib/slots";
+
 // The office floor plan, from James's sketch. A unit grid keeps every desk
 // the same footprint: desks 2/3/4/5 and 7/8 lie two units wide by one deep,
 // desks 1 and 6 are the same desks rotated 90° — one unit wide, spanning
@@ -11,13 +13,16 @@
 // A full desk is 2 units across, so the rotated ones (1, 6) are 1 unit.
 
 export type DeskOccupant = { name: string; isYou: boolean };
+/** Who holds each half of a desk. Both point at one person for a full day. */
+export type DeskHalves = { am?: DeskOccupant; pm?: DeskOccupant };
 
 const GRID_COLS = "2.5fr 0.35fr 1fr 2fr 2fr 1fr";
 const GRID_ROWS = "2.25rem 1rem 2.25rem 2.25rem";
 
 export function DeskMap({
   deskCount,
-  occupants, // deskNumber -> occupant
+  occupants, // deskNumber -> who holds each half
+  slot, // the hours being booked or viewed
   onPick,
   onPickFlex,
   disabled,
@@ -26,7 +31,8 @@ export function DeskMap({
   flexWindow,
 }: {
   deskCount: number;
-  occupants: Map<number, DeskOccupant>;
+  occupants: Map<number, DeskHalves>;
+  slot: Slot;
   onPick?: (n: number) => void;
   onPickFlex?: () => void;
   disabled?: boolean;
@@ -36,7 +42,13 @@ export function DeskMap({
 }) {
   const desk = (n: number, style: React.CSSProperties) => (
     <div style={style} key={n}>
-      <Desk n={n} occupant={occupants.get(n)} onPick={onPick} disabled={disabled} />
+      <Desk
+        n={n}
+        halves={occupants.get(n)}
+        slot={slot}
+        onPick={onPick}
+        disabled={disabled}
+      />
     </div>
   );
 
@@ -46,7 +58,13 @@ export function DeskMap({
       <div className="grid grid-cols-4 gap-1.5">
         {Array.from({ length: deskCount }, (_, i) => (
           <div key={i + 1} className="h-10">
-            <Desk n={i + 1} occupant={occupants.get(i + 1)} onPick={onPick} disabled={disabled} />
+            <Desk
+              n={i + 1}
+              halves={occupants.get(i + 1)}
+              slot={slot}
+              onPick={onPick}
+              disabled={disabled}
+            />
           </div>
         ))}
       </div>
@@ -170,36 +188,74 @@ function LunchTable({
   );
 }
 
+/**
+ * One desk, viewed through the hours you're booking. A desk is free only if
+ * every half you want is free — so a desk with just a morning booked reads as
+ * available when you're picking an afternoon, and as half-taken when you're
+ * picking a whole day.
+ */
 function Desk({
   n,
-  occupant,
+  halves: deskHalves,
+  slot,
   onPick,
   disabled,
 }: {
   n: number;
-  occupant?: DeskOccupant;
+  halves?: DeskHalves;
+  slot: Slot;
   onPick?: (n: number) => void;
   disabled?: boolean;
 }) {
-  const free = !occupant;
+  const wanted = halves(slot).map((h) => deskHalves?.[h]);
+  const holders = wanted.filter((o): o is DeskOccupant => !!o);
+  const free = holders.length === 0;
+  const yours = holders.some((o) => o.isYou);
   const clickable = free && !!onPick && !disabled;
-  const initials = occupant ? initialsOf(occupant.name) : null;
+
+  // Shared desks: in a whole-day view, one booked half still blocks you; in a
+  // half-day view, the other half's holder is just your neighbour in time.
+  const otherHalf =
+    slot === "am" ? deskHalves?.pm : slot === "pm" ? deskHalves?.am : undefined;
+  const partlyTaken = slot === "day" && holders.length === 1;
+
+  const names = holders.map((o) => (o.isYou ? "you" : initialsOf(o.name)));
+  const label = free
+    ? otherHalf
+      ? "½ free"
+      : null
+    : partlyTaken
+      ? `½ ${names[0]}`
+      : [...new Set(names)].join("/");
+
+  const named = (o: DeskOccupant) => (o.isYou ? "you" : o.name);
+  // Two different people across the halves is the only case worth spelling out.
+  const shared =
+    slot === "day" &&
+    deskHalves?.am &&
+    deskHalves?.pm &&
+    deskHalves.am.name !== deskHalves.pm.name;
+
+  const title = free
+    ? otherHalf
+      ? `Desk ${n} — free ${SLOT_LABEL[slot]} (${named(otherHalf)} ${otherHalf.isYou ? "have" : "has"} the other half)`
+      : `Desk ${n} — free`
+    : shared
+      ? `Desk ${n} — morning: ${named(deskHalves!.am!)}, afternoon: ${named(deskHalves!.pm!)}`
+      : `Desk ${n} — ${named(holders[0])}${
+          partlyTaken ? ` (${deskHalves?.am ? "morning" : "afternoon"} only)` : ""
+        }`;
+
   return (
     <button
       type="button"
       disabled={!clickable}
       onClick={() => onPick?.(n)}
-      title={
-        occupant
-          ? occupant.isYou
-            ? `Desk ${n} — you`
-            : `Desk ${n} — ${occupant.name}`
-          : `Desk ${n} — free`
-      }
+      title={title}
       className={`w-full h-full rounded-lg border text-xs font-medium flex flex-col items-center justify-center gap-0 leading-tight transition-colors ${
-        occupant?.isYou
+        yours
           ? "bg-teal-600 border-teal-700 text-white"
-          : occupant
+          : !free
             ? "bg-slate-100 border-slate-200 text-slate-500 cursor-default"
             : clickable
               ? "bg-white border-teal-300 text-teal-800 hover:bg-teal-50 cursor-pointer"
@@ -207,9 +263,9 @@ function Desk({
       }`}
     >
       <span>{n}</span>
-      {occupant && (
-        <span className={`text-[9px] ${occupant.isYou ? "text-teal-100" : "text-slate-400"}`}>
-          {occupant.isYou ? "you" : initials}
+      {label && (
+        <span className={`text-[9px] ${yours ? "text-teal-100" : "text-slate-400"}`}>
+          {label}
         </span>
       )}
     </button>
