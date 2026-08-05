@@ -11,7 +11,7 @@ export default async function MembersPage() {
   const all = await db
     .select()
     .from(users)
-    .where(inArray(users.status, ["trial", "active", "inactive"]))
+    .where(inArray(users.status, ["trial", "active", "inactive", "imported"]))
     .orderBy(asc(users.name));
   const flagged = await flaggedUsers();
   const flaggedById = new Map(flagged.map((f) => [f.userId, f]));
@@ -30,15 +30,19 @@ export default async function MembersPage() {
     noShowOptOut: u.noshowEmailOptOut,
     hasProfile: !!u.causeArea,
     lastSeenAt: u.lastSeenAt ? u.lastSeenAt.toISOString().slice(0, 10) : null,
+    source: u.source,
   }));
+
+  const unclaimed = rows.filter((r) => r.status === "imported").length;
 
   return (
     <Page wide>
       <H1>Members</H1>
       <Sub>
-        {rows.filter((r) => r.status !== "inactive").length} active ·{" "}
-        {rows.filter((r) => r.role === "admin").length} admins ·{" "}
+        {rows.filter((r) => r.status === "active" || r.status === "trial").length}{" "}
+        active · {rows.filter((r) => r.role === "admin").length} admins ·{" "}
         {flagged.length} flagged for no-shows
+        {unclaimed > 0 && <> · {unclaimed} imported, not yet claimed</>}
       </Sub>
       <MembersClient rows={rows} />
     </Page>

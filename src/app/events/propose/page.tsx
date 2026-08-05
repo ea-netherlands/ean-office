@@ -46,6 +46,7 @@ async function getAvailability(): Promise<Availability[]> {
 export default async function ProposeEventPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/events/propose");
+  if (user.status === "imported") redirect("/welcome");
   if (!isActiveMember(user)) redirect("/");
 
   const availability = await getAvailability();

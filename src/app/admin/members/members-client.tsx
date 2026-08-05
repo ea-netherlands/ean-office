@@ -27,7 +27,10 @@ export type MemberRow = {
   noShowOptOut: boolean;
   hasProfile: boolean;
   lastSeenAt: string | null;
+  source: string;
 };
+
+type StatusFilter = "all" | "active" | "trial" | "imported" | "inactive";
 
 export function MembersClient({ rows }: { rows: MemberRow[] }) {
   const router = useRouter();
@@ -35,12 +38,21 @@ export function MembersClient({ rows }: { rows: MemberRow[] }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [addState, addAction] = useActionState<AdminActionState, FormData>(
     addMemberAction,
     {}
   );
 
   const trialsToReview = rows.filter((r) => r.trialEnded);
+
+  const q = search.trim().toLowerCase();
+  const visible = rows.filter((r) => {
+    if (statusFilter !== "all" && r.status !== statusFilter) return false;
+    if (!q) return true;
+    return r.name.toLowerCase().includes(q) || r.email.toLowerCase().includes(q);
+  });
 
   function run(action: () => Promise<AdminActionState>) {
     setError(null);
@@ -92,7 +104,29 @@ export function MembersClient({ rows }: { rows: MemberRow[] }) {
         </p>
       )}
 
-      <div className="flex justify-end">
+      <div className="flex gap-2 flex-wrap items-center justify-between">
+        <div className="flex gap-2 flex-wrap items-center">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name or email…"
+            className={`${inputCls} w-56`}
+          />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            className={inputCls}
+          >
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="trial">Trial</option>
+            <option value="imported">Imported, not claimed</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <span className="text-xs text-slate-400">
+            {visible.length} of {rows.length}
+          </span>
+        </div>
         <button className={btnSecondary} onClick={() => setShowAdd((v) => !v)}>
           + Add member manually
         </button>
@@ -117,7 +151,12 @@ export function MembersClient({ rows }: { rows: MemberRow[] }) {
 
       <Card>
         <ul className="divide-y divide-slate-100">
-          {rows.map((r) => (
+          {visible.length === 0 && (
+            <li className="py-6 text-center text-sm text-slate-400">
+              No members match that search.
+            </li>
+          )}
+          {visible.map((r) => (
             <li key={r.id} className="py-2.5">
               <button
                 className="w-full flex items-center justify-between gap-2 text-left cursor-pointer"
@@ -135,10 +174,12 @@ export function MembersClient({ rows }: { rows: MemberRow[] }) {
                         ? "green"
                         : r.status === "trial"
                           ? "teal"
-                          : "stone"
+                          : r.status === "imported"
+                            ? "amber"
+                            : "stone"
                     }
                   >
-                    {r.status}
+                    {r.status === "imported" ? "not yet claimed" : r.status}
                   </Badge>
                   {r.noShowCount > 0 && (
                     <Badge tone="red">

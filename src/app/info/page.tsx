@@ -43,9 +43,15 @@ export default async function InfoPage() {
               <p className="text-sm text-slate-500">
                 Members see more here — door instructions, wifi, meeting
                 rooms, facilities.{" "}
-                <a href="/login?next=/info" className="text-teal-700 font-medium">
-                  Log in
-                </a>{" "}
+                {user?.status === "imported" ? (
+                  <a href="/welcome" className="text-teal-700 font-medium">
+                    Finish setting up your account
+                  </a>
+                ) : (
+                  <a href="/login?next=/info" className="text-teal-700 font-medium">
+                    Log in
+                  </a>
+                )}{" "}
                 to view it.
               </p>
             </Card>

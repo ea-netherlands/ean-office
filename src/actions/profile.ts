@@ -74,6 +74,7 @@ export async function saveCommunityProfileAction(
   revalidatePath("/me");
   revalidatePath("/book");
   revalidatePath("/");
+  revalidatePath("/welcome");
   return { ok: true };
 }
 
