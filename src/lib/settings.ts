@@ -1,5 +1,5 @@
+import { cache } from "react";
 import { db, settings, ensureMigrated } from "@/db";
-import { eq } from "drizzle-orm";
 
 // Everything configurable lives here, editable from /admin/settings.
 export type Settings = {
@@ -136,7 +136,14 @@ Never-been-before guests should [sign up for a first visit](/join) — we respon
 There's always a host in the office to talk to. Otherwise: [info@effectiefaltruisme.nl](mailto:info@effectiefaltruisme.nl), or use the [anonymous feedback form](https://airtable.com/shrPaWBNeHIB7ewvt) — for concerns, requests, or an example of the office having a positive impact.`,
 };
 
-export async function getSettings(): Promise<Settings> {
+/**
+ * Deduplicated per request with React `cache`: booking one desk used to read
+ * this table four times over (profile gate, capacity, the booking itself, the
+ * confirmation email), and in production every read is a hop to Neon.
+ * Settings only change from /admin/settings, which revalidates afterwards, so
+ * a request never needs to see its own write.
+ */
+export const getSettings = cache(async (): Promise<Settings> => {
   await ensureMigrated();
   const rows = await db.select().from(settings);
   const merged: Record<string, unknown> = { ...DEFAULT_SETTINGS };
@@ -148,18 +155,21 @@ export async function getSettings(): Promise<Settings> {
     }
   }
   return merged as Settings;
-}
+});
 
+/**
+ * One upsert rather than a select plus a write. `key` is the primary key, so
+ * the conflict target does the existence check for us — saving the settings
+ * form writes ~20 keys, and that used to be ~40 round-trips.
+ */
 export async function setSetting<K extends keyof Settings>(
   key: K,
   value: Settings[K]
 ): Promise<void> {
   await ensureMigrated();
   const json = JSON.stringify(value);
-  const existing = await db.select().from(settings).where(eq(settings.key, key));
-  if (existing.length > 0) {
-    await db.update(settings).set({ value: json }).where(eq(settings.key, key));
-  } else {
-    await db.insert(settings).values({ key, value: json });
-  }
+  await db
+    .insert(settings)
+    .values({ key, value: json })
+    .onConflictDoUpdate({ target: settings.key, set: { value: json } });
 }

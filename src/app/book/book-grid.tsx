@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   bookDateAction,
@@ -18,7 +17,16 @@ import type { SeatTarget } from "@/lib/booking";
 import { DeskMap, DeskHalves, DeskOccupant } from "@/components/desk-map";
 import { ProfileForm } from "@/components/profile-form";
 import { PeopleList, PersonChipData } from "@/components/people";
-import { Avatar, btnPrimary, btnSecondary, btnDanger, inputCls, Icon } from "@/components/ui";
+import {
+  Avatar,
+  btnPrimary,
+  btnSecondary,
+  btnDanger,
+  inputCls,
+  Icon,
+  Spinner,
+  Notice,
+} from "@/components/ui";
 import { formatDayLong, WEEKDAY_NAMES } from "@/lib/dates";
 import { halves, Slot, SLOT_LABEL } from "@/lib/slots";
 
@@ -78,7 +86,6 @@ export function BookGrid(props: {
   hasProfile: boolean;
   deskCount: number;
 }) {
-  const router = useRouter();
   const [selected, setSelected] = useState<string | null>(null);
   const [slot, setSlot] = useState<Slot>("day");
   const [showBlock, setShowBlock] = useState(false);
@@ -88,9 +95,53 @@ export function BookGrid(props: {
     seat?: SeatTarget;
   } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   const [pending, startTransition] = useTransition();
+  /**
+   * Which action is in flight, so the button the member actually pressed is
+   * the one that says it's working — `pending` alone can't tell six buttons
+   * apart, and greying all of them out reads as the page having frozen.
+   */
+  const [busy, setBusy] = useState<
+    "book" | "waitlist" | "cancel" | "slot" | "seat" | null
+  >(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const scrollPanel = useRef(false);
 
   const day = props.days.find((d) => d.date === selected) ?? null;
+
+  /**
+   * The day panel renders below a five-week grid, so on a phone it opened
+   * entirely off-screen: tapping a day looked like nothing had happened.
+   * Bring it into view once it's actually in the DOM.
+   */
+  useEffect(() => {
+    if (!scrollPanel.current || !panelRef.current) return;
+    scrollPanel.current = false;
+    // "start", not "nearest": the panel is usually taller than a phone
+    // viewport, and "nearest" barely moves for an oversized element.
+    // Deliberately instant — `behavior: "smooth"` turned out to be a silent
+    // no-op in testing, and a scroll that sometimes doesn't happen is worse
+    // than one that always does. Restrained motion suits the system anyway.
+    panelRef.current.scrollIntoView({ block: "start" });
+  }, [selected]);
+
+  /**
+   * Booking makes the panel taller (the cancel button and "change to" row
+   * appear), which pushed the confirmation just past the bottom of the
+   * screen. Once there's an outcome to read, make sure it's on screen.
+   *
+   * Also keyed on `props.days`, because the revalidated data lands a beat
+   * after the message and re-renders the panel taller again — scrolling only
+   * once left the confirmation half off the bottom. `nearest` means this is a
+   * no-op as soon as it's fully visible, so the repeat is free.
+   */
+  useEffect(() => {
+    if (!message || !panelRef.current) return;
+    panelRef.current
+      .querySelector("[role=status]")
+      ?.scrollIntoView({ block: "nearest" });
+  }, [message, props.days]);
 
   /** Opening a day starts on whichever hours the member already holds. */
   function selectDay(d: DayInfo) {
@@ -100,7 +151,37 @@ export function BookGrid(props: {
     }
     setSelected(d.date);
     setMessage(null);
+    setFailed(false);
     setSlot(d.mine.length === 1 ? d.mine[0].slot : "day");
+    scrollPanel.current = true;
+  }
+
+  /**
+   * Runs an action with a named busy state and leaves the outcome next to the
+   * button. `revalidatePath` in the action already sends fresh data back with
+   * the response, so there's no `router.refresh()` here — that was a second
+   * full render of the page for every booking.
+   */
+  function run(
+    kind: NonNullable<typeof busy>,
+    work: () => Promise<{ message?: string; error?: string } | void>
+  ) {
+    setMessage(null);
+    setFailed(false);
+    setBusy(kind);
+    startTransition(async () => {
+      try {
+        const res = await work();
+        if (res?.error) {
+          setMessage(res.error);
+          setFailed(true);
+        } else if (res?.message) {
+          setMessage(res.message);
+        }
+      } finally {
+        setBusy(null);
+      }
+    });
   }
 
   function slotNote(s: Slot): string {
@@ -116,8 +197,7 @@ export function BookGrid(props: {
     seat?: SeatTarget
   ) {
     const deskNumber = seat?.type === "desk" ? seat.deskNumber : undefined;
-    setMessage(null);
-    startTransition(async () => {
+    run(seat ? "seat" : "book", async () => {
       const res = await bookDateAction(date, {
         skipProfile,
         deskNumber,
@@ -129,23 +209,23 @@ export function BookGrid(props: {
         return;
       }
       setProfileFor(null);
-      if (res.error) setMessage(res.error);
-      else if (res.seatType === "flex")
-        setMessage(
-          `Booked a lunch-table spot for ${formatDayLong(date)}${bookSlot === "day" ? "" : ` (${SLOT_LABEL[bookSlot]})`}.${
+      if (res.error) return { error: res.error };
+      if (res.seatType === "flex") {
+        return {
+          message: `Booked a lunch-table spot for ${formatDayLong(date)}${bookSlot === "day" ? "" : ` (${SLOT_LABEL[bookSlot]})`}.${
             bookSlot === "day"
               ? ` Reminder: the table is used for lunch ${props.flexWindow}, so you'll need to pack up for that hour.`
               : ""
-          }`
-        );
-      else
-        setMessage(
+          }`,
+        };
+      }
+      return {
+        message:
           `Booked desk ${res.deskNumber ?? ""} — see you ${formatDayLong(date)}${bookSlot === "day" ? "" : ` (${SLOT_LABEL[bookSlot]})`}!`.replace(
             "  ",
             " "
-          ) + slotNote(bookSlot)
-        );
-      router.refresh();
+          ) + slotNote(bookSlot),
+      };
     });
   }
 
@@ -154,18 +234,18 @@ export function BookGrid(props: {
     const held = mineFor(d, slot);
     if (held?.status === "booked") {
       // already booked those hours — move seats instead
-      startTransition(async () => {
+      run("seat", async () => {
         const res = await switchSeatAction(held.bookingId, seat);
+        if (res.error) return { error: res.error };
         const moved = `Moved to ${label} on ${formatDayLong(d.date)}${
           held.slot === "day" ? "" : ` (${SLOT_LABEL[held.slot]})`
         }.`;
-        setMessage(
-          res.error ??
-            (seat.type === "flex" && held.slot === "day"
+        return {
+          message:
+            seat.type === "flex" && held.slot === "day"
               ? `${moved} The table is used for lunch ${props.flexWindow}, so you'll need to pack up for that hour.`
-              : moved)
-        );
-        router.refresh();
+              : moved,
+        };
       });
     } else if (!held) {
       book(d.date, slot, false, seat);
@@ -173,19 +253,15 @@ export function BookGrid(props: {
   }
 
   function changeSlot(d: DayInfo, booking: MyBooking, next: Slot) {
-    setMessage(null);
-    startTransition(async () => {
+    run("slot", async () => {
       const res = await changeSlotAction(booking.bookingId, next);
-      if (res.error) setMessage(res.error);
-      else {
-        setSlot(next);
-        setMessage(
-          `${formatDayLong(d.date)} is now ${
-            next === "day" ? "a full day" : `${SLOT_LABEL[next]} only`
-          }${res.deskNumber ? ` — desk ${res.deskNumber}` : ""}.${slotNote(next)}`
-        );
-      }
-      router.refresh();
+      if (res.error) return { error: res.error };
+      setSlot(next);
+      return {
+        message: `${formatDayLong(d.date)} is now ${
+          next === "day" ? "a full day" : `${SLOT_LABEL[next]} only`
+        }${res.deskNumber ? ` — desk ${res.deskNumber}` : ""}.${slotNote(next)}`,
+      };
     });
   }
 
@@ -217,13 +293,15 @@ export function BookGrid(props: {
         Book repeating {showBlock ? "▴" : "▾"}
       </button>
       {showBlock && (
-        <BlockForm horizonWeeks={props.horizonWeeks} onDone={() => router.refresh()} />
+        <BlockForm horizonWeeks={props.horizonWeeks} />
       )}
 
-      {message && (
-        <div className="bg-teal-50 border border-teal-200 text-teal-900 text-sm rounded-xl px-3 py-2 mb-3">
+      {/* Outcomes live in the day panel, next to the button that caused them.
+          This copy is only for messages with no panel open to land in. */}
+      {message && !day && (
+        <Notice tone={failed ? "error" : "ok"} className="mb-3">
           {message}
-        </div>
+        </Notice>
       )}
 
       <div className="grid grid-cols-5 gap-1 text-center text-xs text-slate-400 mb-1">
@@ -247,6 +325,7 @@ export function BookGrid(props: {
       </div>
 
       {day && (
+        <div ref={panelRef} className="scroll-mt-16">
         <DayPanel
           day={day}
           slot={slot}
@@ -255,40 +334,44 @@ export function BookGrid(props: {
           amWindow={props.amWindow}
           pmWindow={props.pmWindow}
           pending={pending}
+          busy={busy}
+          message={message}
+          failed={failed}
           deskCount={props.deskCount}
           onPickSeat={(seat) => pickSeat(day, seat)}
           onBook={() => book(day.date, slot)}
           onChangeSlot={(booking, next) => changeSlot(day, booking, next)}
           onWaitlist={() =>
-            startTransition(async () => {
+            run("waitlist", async () => {
               const res = await joinWaitlistAction(day.date, slot);
-              setMessage(
-                res.error ??
-                  `You're on the waitlist for ${formatDayLong(day.date)}${
-                    slot === "day" ? "" : ` (${SLOT_LABEL[slot]})`
-                  } — we'll email you if a desk opens up.`
-              );
-              router.refresh();
+              if (res.error) return { error: res.error };
+              return {
+                message: `You're on the waitlist for ${formatDayLong(day.date)}${
+                  slot === "day" ? "" : ` (${SLOT_LABEL[slot]})`
+                } — we'll email you if a desk opens up.`,
+              };
             })
           }
           onCancel={(booking, all) =>
-            startTransition(async () => {
+            run("cancel", async () => {
+              let msg: string;
               if (all && booking.seriesId) {
                 const res = await cancelSeriesAction(booking.seriesId);
-                setMessage(`Cancelled ${res.cancelled} remaining days in the series.`);
+                msg = `Cancelled ${res.cancelled} remaining days in the series.`;
               } else {
-                await cancelBookingAction(booking.bookingId);
-                setMessage(
-                  `Cancelled ${formatDayLong(day.date)}${
-                    booking.slot === "day" ? "" : ` (${SLOT_LABEL[booking.slot]})`
-                  }.`
-                );
+                const res = await cancelBookingAction(booking.bookingId);
+                if (res.error) return { error: res.error };
+                msg = `Cancelled ${formatDayLong(day.date)}${
+                  booking.slot === "day" ? "" : ` (${SLOT_LABEL[booking.slot]})`
+                }.`;
               }
-              if (day.mine.length <= 1) setSelected(null);
-              router.refresh();
+              // Closing the panel would take the confirmation with it, so the
+              // day stays open and shows what happened.
+              return { message: msg };
             })
           }
         />
+        </div>
       )}
 
       {profileFor && (
@@ -410,6 +493,8 @@ function DayCell({
   );
 }
 
+type BusyKind = "book" | "waitlist" | "cancel" | "slot" | "seat" | null;
+
 function DayPanel({
   day,
   slot,
@@ -418,6 +503,9 @@ function DayPanel({
   amWindow,
   pmWindow,
   pending,
+  busy,
+  message,
+  failed,
   deskCount,
   onPickSeat,
   onBook,
@@ -432,6 +520,9 @@ function DayPanel({
   amWindow: string;
   pmWindow: string;
   pending: boolean;
+  busy: BusyKind;
+  message: string | null;
+  failed: boolean;
   deskCount: number;
   onPickSeat: (seat: SeatTarget) => void;
   onBook: () => void;
@@ -488,7 +579,10 @@ function DayPanel({
   const canPick = !pending && (!held || held.status === "booked");
 
   return (
-    <div className="mt-4 bg-white border border-slate-200 rounded-xl p-4">
+    <div
+      aria-busy={pending}
+      className="mt-4 bg-white border border-slate-200 rounded-xl p-4"
+    >
       <h3>{formatDayLong(day.date)}</h3>
 
       {/* Which hours — the whole panel below follows this choice. */}
@@ -573,11 +667,18 @@ function DayPanel({
               disabled={pending}
               className={btnDanger}
             >
-              {held.status === "waitlisted"
-                ? "Leave waitlist"
-                : held.seriesId
-                  ? "Cancel just this one"
-                  : `Cancel ${held.slot === "day" ? "this booking" : `this ${SLOT_LABEL[held.slot]}`}`}
+              {busy === "cancel" ? (
+                <>
+                  <Spinner />
+                  Cancelling…
+                </>
+              ) : held.status === "waitlisted" ? (
+                "Leave waitlist"
+              ) : held.seriesId ? (
+                "Cancel just this one"
+              ) : (
+                `Cancel ${held.slot === "day" ? "this booking" : `this ${SLOT_LABEL[held.slot]}`}`
+              )}
             </button>
             {held.seriesId && held.status === "booked" && (
               <button
@@ -591,20 +692,48 @@ function DayPanel({
           </>
         ) : slotFull ? (
           <button onClick={onWaitlist} disabled={pending} className={btnPrimary}>
-            Join the waitlist{slot === "day" ? "" : ` for the ${SLOT_LABEL[slot]}`}
+            {busy === "waitlist" ? (
+              <>
+                <Spinner />
+                Joining the waitlist…
+              </>
+            ) : (
+              <>
+                Join the waitlist
+                {slot === "day" ? "" : ` for the ${SLOT_LABEL[slot]}`}
+              </>
+            )}
           </button>
         ) : (
           <button onClick={onBook} disabled={pending} className={btnPrimary}>
-            {deskFullFlexAvailable ? "Book a lunch-table spot" : "Book"}
-            {slot === "day" ? " this day" : ` this ${SLOT_LABEL[slot]}`}
+            {busy === "book" ? (
+              <>
+                <Spinner />
+                Booking…
+              </>
+            ) : (
+              <>
+                {deskFullFlexAvailable ? "Book a lunch-table spot" : "Book"}
+                {slot === "day" ? " this day" : ` this ${SLOT_LABEL[slot]}`}
+              </>
+            )}
           </button>
         )}
       </div>
 
+      {/* The outcome, right under the button that caused it. */}
+      {message && (
+        <Notice tone={failed ? "error" : "ok"} className="mt-3">
+          {message}
+        </Notice>
+      )}
+
       {/* Reshape a booking you already hold, without cancelling it. */}
       {held?.status === "booked" && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-slate-500">Change to:</span>
+          <span className="text-xs text-slate-500">
+            {busy === "slot" ? "Changing…" : "Change to:"}
+          </span>
           {SLOT_ORDER.filter((s) => s !== held.slot).map((s) => (
             <button
               key={s}
@@ -629,13 +758,7 @@ function DayPanel({
   );
 }
 
-function BlockForm({
-  horizonWeeks,
-  onDone,
-}: {
-  horizonWeeks: number;
-  onDone: () => void;
-}) {
+function BlockForm({ horizonWeeks }: { horizonWeeks: number }) {
   const [weekdays, setWeekdays] = useState<number[]>([]);
   const [slot, setSlot] = useState<Slot>("day");
   const [until, setUntil] = useState("");
@@ -736,19 +859,23 @@ function BlockForm({
             onClick={() =>
               startTransition(async () => {
                 const res = await blockCreateAction(weekdays, until, slot);
+                // blockCreateAction revalidates /book, so the grid behind this
+                // form updates with the action response — no refresh needed.
                 if (res.error) setState({ error: res.error });
-                else {
-                  setDone(res.booked ?? []);
-                  onDone();
-                }
+                else setDone(res.booked ?? []);
               })
             }
           >
-            {pending
-              ? "Booking…"
-              : `Book ${state.preview.eligible.length} ${
-                  slot === "day" ? "days" : `${SLOT_LABEL[slot]}s`
-                }`}
+            {pending ? (
+              <>
+                <Spinner />
+                Booking…
+              </>
+            ) : (
+              `Book ${state.preview.eligible.length} ${
+                slot === "day" ? "days" : `${SLOT_LABEL[slot]}s`
+              }`
+            )}
           </button>
         </div>
       ) : (
@@ -761,7 +888,14 @@ function BlockForm({
             })
           }
         >
-          {pending ? "Checking…" : "Preview"}
+          {pending ? (
+            <>
+              <Spinner />
+              Checking…
+            </>
+          ) : (
+            "Preview"
+          )}
         </button>
       )}
       {state?.error && <p className="text-sm text-red-700 mt-2">{state.error}</p>}

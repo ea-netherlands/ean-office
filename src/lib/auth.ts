@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { createHash, randomBytes } from "crypto";
 import { db, ensureMigrated, loginTokens, sessions, users } from "@/db";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
@@ -87,7 +88,13 @@ export async function setSessionCookie(raw: string): Promise<void> {
   });
 }
 
-export async function getCurrentUser(): Promise<SessionUser | null> {
+/**
+ * Deduplicated per request with React `cache`. A page plus its server action
+ * would otherwise re-run the session join several times, and the row it
+ * returns is the whole user — so callers never need to re-select the user
+ * they've already been handed.
+ */
+export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   await ensureMigrated();
   const jar = await cookies();
   const raw = jar.get(SESSION_COOKIE)?.value;
@@ -100,7 +107,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       and(eq(sessions.tokenHash, hash(raw)), gt(sessions.expiresAt, new Date()))
     );
   return row?.user ?? null;
-}
+});
 
 export async function requireUser(): Promise<SessionUser> {
   const user = await getCurrentUser();

@@ -16,15 +16,28 @@ const globalForDb = globalThis as unknown as {
   migrated?: Promise<void>;
 };
 
+// DB_LOG=1 prints every statement with a running count, so you can see how
+// many round-trips a request costs. Worth checking after touching a hot path:
+// in production each one is a network hop to Neon.
+const logger = process.env.DB_LOG
+  ? {
+      logQuery(query: string) {
+        const g = globalThis as unknown as { __q?: number };
+        g.__q = (g.__q ?? 0) + 1;
+        console.log(`[db ${String(g.__q).padStart(3)}] ${query.slice(0, 110)}`);
+      },
+    }
+  : undefined;
+
 function createDb(): Db {
   if (process.env.DATABASE_URL) {
     const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-    return drizzlePg(pool, { schema });
+    return drizzlePg(pool, { schema, logger });
   }
   const dataDir = path.join(process.cwd(), "data", "office-db");
   fs.mkdirSync(dataDir, { recursive: true });
   const client = new PGlite(dataDir);
-  return drizzlePglite(client, { schema });
+  return drizzlePglite(client, { schema, logger });
 }
 
 function realDb(): Db {

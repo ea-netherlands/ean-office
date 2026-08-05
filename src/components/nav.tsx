@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { SessionUser } from "@/lib/auth";
+import { NavLink } from "./nav-link";
 
 export function Nav({ user }: { user: SessionUser | null }) {
   return (
@@ -38,25 +39,3 @@ export function Nav({ user }: { user: SessionUser | null }) {
   );
 }
 
-function NavLink({
-  href,
-  children,
-  accent,
-}: {
-  href: string;
-  children: React.ReactNode;
-  accent?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`px-2.5 py-1.5 rounded-2xl whitespace-nowrap transition-colors ${
-        accent
-          ? "btn-key bg-teal-600 hover:bg-teal-700 text-white font-medium"
-          : "text-slate-600 hover:bg-slate-100"
-      }`}
-    >
-      {children}
-    </Link>
-  );
-}

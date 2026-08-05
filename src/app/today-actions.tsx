@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { checkinAction } from "@/actions/checkin";
 import { rsvpAction } from "@/actions/checkin";
-import { btnPrimary, btnSecondary, Icon } from "@/components/ui";
+import { btnPrimary, btnSecondary, Icon, Spinner } from "@/components/ui";
 import { Slot, SLOT_LABEL } from "@/lib/slots";
 
 export function TodayActions({
@@ -64,7 +64,16 @@ export function TodayActions({
             })
           }
         >
-          {pending ? "Checking in…" : booked ? "Check in" : "I'm here — check in"}
+          {pending ? (
+            <>
+              <Spinner />
+              Checking in…
+            </>
+          ) : booked ? (
+            "Check in"
+          ) : (
+            "I'm here — check in"
+          )}
         </button>
         {!booked && !full && (
           <Link href="/book" className={btnSecondary}>
@@ -101,7 +110,7 @@ export function RsvpButton({
   }
   return (
     <button
-      className="text-xs border border-slate-300 rounded-full px-3 py-1 hover:bg-slate-50 whitespace-nowrap cursor-pointer"
+      className="text-xs border border-slate-300 rounded-full px-3 py-1 hover:bg-slate-50 whitespace-nowrap cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
       disabled={pending}
       onClick={() =>
         startTransition(async () => {
@@ -110,7 +119,14 @@ export function RsvpButton({
         })
       }
     >
-      RSVP
+      {pending ? (
+        <>
+          <Spinner />
+          Sending…
+        </>
+      ) : (
+        "RSVP"
+      )}
     </button>
   );
 }

@@ -15,6 +15,7 @@ import { minutesOfDayAms } from "./dates";
 import { sendEmail, btn, link } from "./email";
 import { makeToken } from "./tokens";
 import { appUrl } from "./auth";
+import { afterResponse } from "./after";
 import {
   Half,
   HALVES,
@@ -73,6 +74,12 @@ export type DayCapacity = {
   waitlistCount: number;
   closed: boolean; // weekend or holiday
   people: DayPerson[];
+  /**
+   * Which numbered desks are held in each half. Computed on the way to
+   * `desksFreeAllDay`, and exposed so callers that already have the capacity
+   * can assign a desk without a second query for the same rows.
+   */
+  deskTaken: Record<Half, Set<number>>;
 };
 
 /** Desks free for a booking of this slot. */
@@ -101,9 +108,15 @@ function emptyHalf(cfg: Settings): HalfCapacity {
 
 export async function capacityForRange(
   startDate: string,
-  endDate: string
+  endDate: string,
+  /**
+   * Pass the settings when you already have them. React `cache` dedupes
+   * `getSettings` across a page render but not inside a Server Action, so on
+   * the booking path this is what actually keeps it to one read.
+   */
+  known?: Settings
 ): Promise<Map<string, DayCapacity>> {
-  const cfg = await getSettings();
+  const cfg = known ?? (await getSettings());
   const rows = await db
     .select({
       id: bookings.id,
@@ -134,6 +147,7 @@ export async function capacityForRange(
   const map = new Map<string, DayCapacity>();
   const deskTaken = new Map<string, Record<Half, Set<number>>>();
   for (let d = startDate; d <= endDate; d = addDays(d, 1)) {
+    const taken: Record<Half, Set<number>> = { am: new Set(), pm: new Set() };
     map.set(d, {
       date: d,
       am: emptyHalf(cfg),
@@ -144,8 +158,9 @@ export async function capacityForRange(
       waitlistCount: 0,
       closed: isWeekend(d) || isHoliday(d),
       people: [],
+      deskTaken: taken,
     });
-    deskTaken.set(d, { am: new Set(), pm: new Set() });
+    deskTaken.set(d, taken);
   }
   for (const r of rows) {
     const day = map.get(r.date);
@@ -206,8 +221,11 @@ export async function capacityForRange(
   return map;
 }
 
-export async function capacityForDay(date: string): Promise<DayCapacity> {
-  const map = await capacityForRange(date, date);
+export async function capacityForDay(
+  date: string,
+  known?: Settings
+): Promise<DayCapacity> {
+  const map = await capacityForRange(date, date, known);
   return map.get(date)!;
 }
 
@@ -254,9 +272,11 @@ async function assignDeskNumber(
   deskCount: number,
   slot: Slot,
   requested?: number,
-  excludeBookingId?: string
+  excludeBookingId?: string,
+  /** Reuse occupancy the caller already fetched (see DayCapacity.deskTaken). */
+  known?: Record<Half, Set<number>>
 ): Promise<{ ok: true; n: number | null } | { ok: false; error: string }> {
-  const sets = await deskTakenSets(date, excludeBookingId);
+  const sets = known ?? (await deskTakenSets(date, excludeBookingId));
   const conflicts = (n: number) => halves(slot).some((h) => sets[h].has(n));
 
   if (requested) {
@@ -316,9 +336,13 @@ export async function bookDay(
     deskNumber?: number; // request a specific desk
     seatType?: "desk" | "flex"; // request a seat kind (flex = lunch table)
     slot?: Slot; // full day (default), morning or afternoon
+    /** Saves a re-select when the caller already holds the user row. */
+    user?: { email: string; name: string };
+    /** Saves a re-read when the caller already has the settings. */
+    cfg?: Settings;
   } = {}
 ): Promise<BookResult> {
-  const cfg = await getSettings();
+  const cfg = opts.cfg ?? (await getSettings());
   const source = opts.source ?? "self";
   const slot = opts.slot ?? "day";
 
@@ -366,7 +390,7 @@ export async function bookDay(
     }
   }
 
-  const cap = await capacityForDay(date);
+  const cap = await capacityForDay(date, cfg);
   const desksLeft = desksLeftFor(cap, slot);
   const flexLeft = flexLeftFor(cap, slot);
   const wantsFlex = opts.seatType === "flex";
@@ -398,7 +422,9 @@ export async function bookDay(
       date,
       cfg.desk_count,
       slot,
-      opts.deskNumber
+      opts.deskNumber,
+      undefined,
+      cap.deskTaken // already fetched by capacityForDay above
     );
     if (!assigned.ok) return { ok: false, error: assigned.error };
     deskNumber = assigned.n;
@@ -445,8 +471,22 @@ export async function bookDay(
     .returning();
 
   if (opts.sendConfirmation !== false && source === "self") {
-    const [user] = await db.select().from(users).where(eq(users.id, userId));
-    if (user) await sendBookingConfirmation(user.email, user.name, booking);
+    // Handing off to Resend takes a few hundred milliseconds, and the member
+    // is standing there waiting to see their desk number. Confirm first, mail
+    // after — the lookup goes with it when the caller didn't supply the user.
+    await afterResponse(async () => {
+      const recipient =
+        opts.user ??
+        (await db.select().from(users).where(eq(users.id, userId)))[0];
+      if (recipient) {
+        await sendBookingConfirmation(
+          recipient.email,
+          recipient.name,
+          booking,
+          cfg
+        );
+      }
+    });
   }
 
   return { ok: true, booking, seatType };
@@ -480,9 +520,10 @@ export function describeWhen(booking: Booking, cfg: Settings): string {
 async function sendBookingConfirmation(
   email: string,
   name: string,
-  booking: Booking
+  booking: Booking,
+  known?: Settings
 ): Promise<void> {
-  const cfg = await getSettings();
+  const cfg = known ?? (await getSettings());
   const slot = asSlot(booking.slot);
   const flexNote =
     booking.seatType === "flex"

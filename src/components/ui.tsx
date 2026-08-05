@@ -72,6 +72,43 @@ export function Icon({
   return <i aria-hidden className={`ti ti-${name} ${className}`} />;
 }
 
+/**
+ * In-button progress. The design system bans decorative animation, but this
+ * is the opposite of decoration: several actions here wait on the database
+ * and then a re-render, and without it a tap looks like nothing happened.
+ */
+export function Spinner({ className = "" }: { className?: string }) {
+  return <Icon name="loader-2" className={`animate-spin ${className}`} />;
+}
+
+/**
+ * Confirmation or error, placed next to whatever the member just pressed.
+ * `tone="error"` borrows the red feedback ramp; everything else is teal.
+ */
+export function Notice({
+  children,
+  tone = "ok",
+  className = "",
+}: {
+  children: React.ReactNode;
+  tone?: "ok" | "error";
+  className?: string;
+}) {
+  const tones = {
+    ok: "bg-teal-50 border-teal-200 text-teal-900",
+    error: "bg-red-50 border-red-200 text-red-700",
+  };
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={`border text-sm rounded-xl px-3 py-2 ${tones[tone]} ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function Avatar({ name, small }: { name: string; small?: boolean }) {
   const initials = name
     .split(/\s+/)

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { checkinAction, eventCheckinAction } from "@/actions/checkin";
-import { btnPrimary, Icon } from "@/components/ui";
+import { btnPrimary, Icon, Spinner } from "@/components/ui";
 
 export function CheckinButtons({ full }: { full: boolean }) {
   const router = useRouter();
@@ -22,7 +22,16 @@ export function CheckinButtons({ full }: { full: boolean }) {
           })
         }
       >
-        {pending ? "Checking in…" : full ? "Check in anyway" : "Check in (books today's desk)"}
+        {pending ? (
+          <>
+            <Spinner />
+            Checking in…
+          </>
+        ) : full ? (
+          "Check in anyway"
+        ) : (
+          "Check in (books today's desk)"
+        )}
       </button>
       {error && <p className="text-sm text-red-700 mt-2">{error}</p>}
     </div>
@@ -57,7 +66,7 @@ export function EventCheckinButtons({
           <button
             key={e.id}
             disabled={pending}
-            className="btn-key-subtle w-full border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-800 rounded-2xl px-4 py-3 text-sm font-medium cursor-pointer"
+            className="btn-key-subtle w-full border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-800 rounded-2xl px-4 py-3 text-sm font-medium cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
             onClick={() =>
               startTransition(async () => {
                 await eventCheckinAction(e.id);
@@ -65,6 +74,7 @@ export function EventCheckinButtons({
               })
             }
           >
+            {pending ? <Spinner /> : null}
             I&apos;m here for “{e.title}”
           </button>
         )

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db, bookings, users } from "@/db";
 import { and, eq, inArray } from "drizzle-orm";
-import { getCurrentUser, isActiveMember } from "@/lib/auth";
+import { getCurrentUser, isActiveMember, SessionUser } from "@/lib/auth";
 import {
   bookDay,
   cancelBooking,
@@ -16,7 +16,7 @@ import {
   BlockPreview,
 } from "@/lib/booking";
 import { Slot } from "@/lib/slots";
-import { getSettings } from "@/lib/settings";
+import { getSettings, Settings } from "@/lib/settings";
 
 export type BookActionState = {
   ok?: boolean;
@@ -32,11 +32,14 @@ export type BookActionState = {
 /**
  * Members who haven't completed the M&E profile are asked inline before the
  * booking completes — skippable profile_skip_limit times, then required.
+ *
+ * Takes the user the caller already has: `getCurrentUser` returns the whole
+ * row, so re-selecting it here was a wasted round-trip on every booking.
  */
-async function profileGate(userId: string): Promise<"ok" | "required" | "askable"> {
-  const cfg = await getSettings();
-  const [user] = await db.select().from(users).where(eq(users.id, userId));
-  if (!user) return "ok";
+function profileGate(
+  user: SessionUser,
+  cfg: Settings
+): "ok" | "required" | "askable" {
   if (user.causeArea) return "ok";
   return user.profileSkipCount >= cfg.profile_skip_limit ? "required" : "askable";
 }
@@ -53,7 +56,8 @@ export async function bookDateAction(
   const user = await getCurrentUser();
   if (!isActiveMember(user)) return { error: "You need to be logged in as a member." };
 
-  const gate = await profileGate(user!.id);
+  const cfg = await getSettings();
+  const gate = profileGate(user!, cfg);
   if (gate !== "ok" && !opts.skipProfile) {
     return { needsProfile: true, date };
   }
@@ -72,6 +76,8 @@ export async function bookDateAction(
     deskNumber: opts.deskNumber,
     seatType: opts.seatType,
     slot,
+    user: user!,
+    cfg,
   });
   revalidatePath("/book");
   revalidatePath("/");
