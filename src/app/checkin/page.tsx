@@ -4,7 +4,7 @@ import { db, checkins, events, eventAttendance, ensureMigrated } from "@/db";
 import { and, eq } from "drizzle-orm";
 import { todayAms, formatDayLong } from "@/lib/dates";
 import { capacityForDay, checkInUser } from "@/lib/booking";
-import { CheckinButtons } from "./checkin-buttons";
+import { CheckinButtons, EventCheckinButtons } from "./checkin-buttons";
 import { btnPrimary, btnSecondary, Icon } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -98,7 +98,7 @@ export default async function CheckinPage() {
       {todaysEvents.length > 0 && (
         <div className="mt-8 w-full">
           <p className="text-sm text-slate-500 mb-2">Here for an event?</p>
-          <CheckinButtons.Events
+          <EventCheckinButtons
             events={todaysEvents.map((e) => ({
               id: e.id,
               title: e.title,

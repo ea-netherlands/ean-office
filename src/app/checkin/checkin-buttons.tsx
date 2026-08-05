@@ -29,7 +29,13 @@ export function CheckinButtons({ full }: { full: boolean }) {
   );
 }
 
-CheckinButtons.Events = function EventButtons({
+/**
+ * A separate export, not a `CheckinButtons.Events` property: across the
+ * server/client boundary the server only holds a client *reference* to this
+ * module's exports, and reading a sub-component off that proxy yields
+ * undefined — which React reports as "Element type is invalid".
+ */
+export function EventCheckinButtons({
   events,
 }: {
   events: { id: string; title: string; done: boolean }[];
@@ -61,4 +67,4 @@ CheckinButtons.Events = function EventButtons({
       )}
     </div>
   );
-};
+}
