@@ -55,7 +55,9 @@ export const db: Db = new Proxy({} as Db, {
   },
 });
 
-// Run migrations once per process (PGlite dev convenience; prod runs npm run db:migrate)
+// Run migrations once per process. Production migrates itself too: this is
+// awaited at the top of the home page, getSettings and every token route, so
+// a deploy applies pending migrations on its first request.
 export async function ensureMigrated(): Promise<void> {
   if (!globalForDb.migrated) {
     globalForDb.migrated = (async () => {

@@ -301,6 +301,8 @@ export async function saveSettingsAction(
     "desk_count",
     "flex_count",
     "block_horizon_weeks",
+    "join_horizon_days",
+    "join_quick_days",
     "max_future_bookings",
     "noshow_threshold",
     "noshow_window_days",

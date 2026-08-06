@@ -1,9 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { db, users, ensureMigrated } from "@/db";
-import { sql } from "drizzle-orm";
+import { ensureMigrated } from "@/db";
 import { appUrl, createLoginToken, logout } from "@/lib/auth";
+import { findUserByEmail } from "@/lib/users";
 import { sendEmail, btn } from "@/lib/email";
 
 export type MagicLinkState = {
@@ -25,10 +25,9 @@ export async function requestMagicLink(
     return { error: "Enter a valid email address." };
   }
 
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(sql`lower(${users.email}) = ${email}`);
+  // Alias-aware: someone who signed up with a work address and typed their
+  // personal one still gets a link, provided the two have been merged.
+  const user = await findUserByEmail(email);
 
   // Don't reveal whether an address is known.
   if (!user || user.status === "declined") {

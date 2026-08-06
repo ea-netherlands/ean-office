@@ -1,11 +1,13 @@
 "use server";
 
 import { db, users, visitRequests, ensureMigrated } from "@/db";
-import { eq, sql, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
+import { findUserByEmail } from "@/lib/users";
 import { newId } from "@/lib/ids";
 import { sendEmail, link } from "@/lib/email";
 import { appUrl } from "@/lib/auth";
-import { formatDayLong } from "@/lib/dates";
+import { addDays, formatDayLong, isWorkingDay, isoWeekday, todayAms } from "@/lib/dates";
+import { getSettings } from "@/lib/settings";
 import { normaliseUrl } from "@/lib/url";
 import { resolveGender } from "@/lib/profile-options";
 import { EchoState, formValues } from "@/lib/form-values";
@@ -98,6 +100,28 @@ export async function submitJoinRequest(
   if (!requestedDate || !requestedArrival) {
     return fail("Please pick a day and an arrival time.", "requestedDate");
   }
+  // The date field lets people type anything, and until now nothing checked
+  // it — a request for a Sunday in 2031 would have gone straight to the queue.
+  const cfg = await getSettings();
+  const today = todayAms();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate) || requestedDate <= today) {
+    return fail("Please pick a day in the future.", "requestedDate");
+  }
+  if (requestedDate > addDays(today, cfg.join_horizon_days)) {
+    return fail(
+      `That's further ahead than we can plan for — pick a day before ${formatDayLong(addDays(today, cfg.join_horizon_days))}, and get in touch if you need something later.`,
+      "requestedDate"
+    );
+  }
+  if (!isWorkingDay(requestedDate) || !cfg.host_coverage_days.includes(isoWeekday(requestedDate))) {
+    return fail(
+      "First visits happen on days a host is around — pick one of the offered days.",
+      "requestedDate"
+    );
+  }
+  if (!cfg.arrival_slots.includes(requestedArrival)) {
+    return fail("Please pick one of the arrival times.", "requestedArrival");
+  }
   if (!causeArea || !roleCategory || !experienceLevel || !eaFunding) {
     return fail(
       "Please answer the profile questions — they're used only for aggregate reporting.",
@@ -111,10 +135,9 @@ export async function submitJoinRequest(
     );
   }
 
-  const [existing] = await db
-    .select()
-    .from(users)
-    .where(sql`lower(${users.email}) = ${email}`);
+  // Alias-aware, so someone who's already a member under another address
+  // isn't quietly given a second account.
+  const existing = await findUserByEmail(email);
 
   let userId: string;
   if (existing) {

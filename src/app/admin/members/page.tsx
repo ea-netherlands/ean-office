@@ -2,6 +2,7 @@ import { db, users } from "@/db";
 import { inArray, asc } from "drizzle-orm";
 import { Page, H1, Sub, Icon } from "@/components/ui";
 import { flaggedUsers } from "@/lib/noshow";
+import { aliasesByUser, findLikelyDuplicates } from "@/lib/users";
 import { todayAms } from "@/lib/dates";
 import { MembersClient, MemberRow } from "./members-client";
 
@@ -16,6 +17,14 @@ export default async function MembersPage() {
   const flagged = await flaggedUsers();
   const flaggedById = new Map(flagged.map((f) => [f.userId, f]));
   const today = todayAms();
+  const aliases = await aliasesByUser(all.map((u) => u.id));
+  // Same name, two addresses — the shape of "signed up again with my work
+  // email", which is otherwise only spotted when two of them show up in the
+  // same day's list.
+  const duplicates = findLikelyDuplicates(all).map(([a, b]) => ({
+    a: { id: a.id, name: a.name, email: a.email },
+    b: { id: b.id, name: b.name, email: b.email },
+  }));
 
   const rows: MemberRow[] = all.map((u) => ({
     id: u.id,
@@ -31,6 +40,7 @@ export default async function MembersPage() {
     hasProfile: !!u.causeArea,
     lastSeenAt: u.lastSeenAt ? u.lastSeenAt.toISOString().slice(0, 10) : null,
     source: u.source,
+    aliases: aliases.get(u.id) ?? [],
   }));
 
   const unclaimed = rows.filter((r) => r.status === "imported").length;
@@ -52,7 +62,7 @@ export default async function MembersPage() {
         <Icon name="download" />
         Download as CSV
       </a>
-      <MembersClient rows={rows} />
+      <MembersClient rows={rows} duplicates={duplicates} />
     </Page>
   );
 }

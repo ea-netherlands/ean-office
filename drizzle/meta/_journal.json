@@ -71,6 +71,13 @@
       "when": 1786025303047,
       "tag": "0009_event_cancellation",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786029994110,
+      "tag": "0010_user_email_aliases",
+      "breakpoints": true
     }
   ]
 }

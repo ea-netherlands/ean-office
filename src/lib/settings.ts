@@ -12,6 +12,10 @@ export type Settings = {
   pm_window: string;
   arrival_slots: string[]; // first-visit arrival options
   host_coverage_days: number[]; // ISO weekdays with host coverage, 1=Mon
+  // How far ahead a first visit can be requested. People plan trips to
+  // Amsterdam months out, and "no date that far ahead" reads as "don't come".
+  join_horizon_days: number;
+  join_quick_days: number; // days offered as one-tap chips before the date field
   block_horizon_weeks: number;
   block_max_share: number; // fraction of desks block bookings may hold per day
   max_future_bookings: number;
@@ -37,6 +41,8 @@ export const DEFAULT_SETTINGS: Settings = {
   pm_window: "12:30–19:00",
   arrival_slots: ["11:00", "13:00"],
   host_coverage_days: [1, 2, 3, 4], // Monday–Thursday
+  join_horizon_days: 180,
+  join_quick_days: 12,
   block_horizon_weeks: 12,
   block_max_share: 0.5,
   max_future_bookings: 12,

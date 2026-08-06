@@ -11,9 +11,15 @@ import { btnPrimary, inputCls, labelCls, Card, Icon } from "@/components/ui";
 export function JoinForm({
   days,
   arrivals,
+  firstDate,
+  lastDate,
+  coverageNames,
 }: {
   days: { date: string; label: string }[];
   arrivals: string[];
+  firstDate: string;
+  lastDate: string;
+  coverageNames: string;
 }) {
   const [state, action, pending] = useActionState<JoinState, FormData>(
     submitJoinRequest,
@@ -201,27 +207,42 @@ export function JoinForm({
         </p>
         <div className="grid grid-cols-3 gap-1.5">
           {days.map((d) => (
-            <label
+            <button
               key={d.date}
+              type="button"
+              onClick={() => setPickedDay(d.date)}
               className={`border rounded-xl px-2 py-2.5 text-center text-sm cursor-pointer ${
                 pickedDay === d.date
                   ? "border-teal-600 bg-teal-50 font-medium"
                   : "border-slate-200 bg-white hover:bg-slate-50"
               }`}
             >
-              <input
-                type="radio"
-                name="requestedDate"
-                value={d.date}
-                required
-                defaultChecked={str(v, "requestedDate") === d.date}
-                className="sr-only"
-                onChange={() => setPickedDay(d.date)}
-              />
               {d.label}
-            </label>
+            </button>
           ))}
         </div>
+        {/* Plenty of first-timers are planning a trip months out, so the list
+            of soon-ish days can't be the only way in. */}
+        <div>
+          <label className={labelCls} htmlFor="join-other-date">
+            Coming later than that? Pick any day
+          </label>
+          <input
+            id="join-other-date"
+            type="date"
+            min={firstDate}
+            max={lastDate}
+            value={days.some((d) => d.date === pickedDay) ? "" : pickedDay}
+            onChange={(e) => setPickedDay(e.target.value)}
+            className={bad("requestedDate")}
+          />
+          <p className="text-xs text-slate-400 mt-1">
+            A host is around on {coverageNames}, so first visits happen on
+            those days — up to {formatFriendly(lastDate)}.
+          </p>
+          <FieldError state={state} field="requestedDate" />
+        </div>
+        <input type="hidden" name="requestedDate" value={pickedDay} />
         <div>
           <label className={labelCls}>Arrival time *</label>
           <div className="flex gap-2">
@@ -283,6 +304,16 @@ export function JoinForm({
       </button>
     </form>
   );
+}
+
+/** "3 February 2027" — the far end of the window, in words. */
+function formatFriendly(date: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+  return `${d} ${months[m - 1]} ${y}`;
 }
 
 /** The same message the banner carries, next to the field that caused it. */

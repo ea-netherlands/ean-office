@@ -60,8 +60,17 @@ delivered. Create real admins with `npm run admin:add -- "Name" email`.
   that day that the space is theirs again (`events.displaced_user_ids`, set
   when the day was cleared). Deleting is still available, but only for events
   that have already happened.
+- **One person, two addresses** — people sign up again with their work email
+  and end up as two members with half a history each. `/admin/members` flags
+  same-name pairs and merges them: bookings, check-ins, event records and
+  profile answers move to the account you keep, same-day duplicates are
+  cancelled or dropped, and the losing address is kept in `user_emails` so it
+  still logs in. Every email lookup goes through `findUserByEmail`
+  (`src/lib/users.ts`), which is what makes an alias behave like the real
+  thing — don't query `users.email` directly.
 - **Settings** — everything configurable (desk count, coverage days, no-show
-  thresholds…) lives in the `settings` table, editable at `/admin/settings`.
+  thresholds, how far ahead a first visit can be requested…) lives in the
+  `settings` table, editable at `/admin/settings`.
 
 ## Environment
 

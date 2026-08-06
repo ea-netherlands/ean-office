@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { db, users, events, eventGuests } from "@/db";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
+import { findUserByEmail } from "@/lib/users";
 import { newId } from "@/lib/ids";
 import { sendEmail, link } from "@/lib/email";
 import { appUrl, getCurrentUser, isAdmin } from "@/lib/auth";
@@ -57,10 +58,7 @@ export async function requestEventGuestAction(
     return fail("Please read and accept the office guidelines.", "guidelines");
   }
 
-  const [existing] = await db
-    .select()
-    .from(users)
-    .where(sql`lower(${users.email}) = ${email}`);
+  const existing = await findUserByEmail(email);
 
   let userId: string;
   if (existing) {

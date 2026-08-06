@@ -93,6 +93,33 @@ export const users = pgTable(
   (t) => [uniqueIndex("users_email_unique").on(sql`lower(${t.email})`)]
 );
 
+/**
+ * Extra addresses that reach the same person. People sign up with a work
+ * address and later log in with their personal one (or the reverse), and end
+ * up as two members with half their history each. Merging two accounts keeps
+ * the address that loses as an alias here, so either one still logs them in
+ * and nobody has to remember which they used.
+ */
+export const userEmails = pgTable(
+  "user_emails",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    source: text("source", { enum: ["merge", "admin"] })
+      .notNull()
+      .default("merge"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  // Same case-insensitive uniqueness as users.email. The two tables can't
+  // share one constraint, so lookups check both — see lib/users.ts.
+  (t) => [uniqueIndex("user_emails_unique").on(sql`lower(${t.email})`)]
+);
+
 // ---------- auth ----------
 
 export const loginTokens = pgTable("login_tokens", {

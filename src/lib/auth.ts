@@ -2,8 +2,9 @@ import { cookies } from "next/headers";
 import { cache } from "react";
 import { createHash, randomBytes } from "crypto";
 import { db, ensureMigrated, loginTokens, sessions, users } from "@/db";
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import { newId } from "./ids";
+import { findUserByEmail } from "./users";
 
 const SESSION_COOKIE = "ean_session";
 const SESSION_DAYS = 90;
@@ -52,10 +53,9 @@ export async function consumeLoginToken(
       )
     );
   if (!token) return null;
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(sql`lower(${users.email}) = ${token.email}`);
+  // The address on the token may since have become an alias of another
+  // account (a merge), so resolve it rather than matching users.email.
+  const user = await findUserByEmail(token.email);
   if (!user) return null;
   await db
     .update(loginTokens)

@@ -11,7 +11,16 @@ import {
   addMemberAction,
   AdminActionState,
 } from "@/actions/admin";
-import { Badge, Card, btnPrimary, btnSecondary, btnDanger, inputCls } from "@/components/ui";
+import {
+  Badge,
+  Card,
+  Notice,
+  btnPrimary,
+  btnSecondary,
+  btnDanger,
+  inputCls,
+} from "@/components/ui";
+import { MergePanel, MergeCandidate } from "@/components/merge-panel";
 import { formatDayLong } from "@/lib/dates";
 
 export type MemberRow = {
@@ -28,11 +37,24 @@ export type MemberRow = {
   hasProfile: boolean;
   lastSeenAt: string | null;
   source: string;
+  /** Other addresses that log in to this same account, from past merges. */
+  aliases: string[];
+};
+
+export type DuplicatePair = {
+  a: MergeCandidate;
+  b: MergeCandidate;
 };
 
 type StatusFilter = "all" | "active" | "trial" | "imported" | "inactive";
 
-export function MembersClient({ rows }: { rows: MemberRow[] }) {
+export function MembersClient({
+  rows,
+  duplicates,
+}: {
+  rows: MemberRow[];
+  duplicates: DuplicatePair[];
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -44,6 +66,8 @@ export function MembersClient({ rows }: { rows: MemberRow[] }) {
     addMemberAction,
     {}
   );
+  const [merging, setMerging] = useState<{ a?: string; b?: string } | null>(null);
+  const [mergeNote, setMergeNote] = useState<string | null>(null);
 
   const trialsToReview = rows.filter((r) => r.trialEnded);
 
@@ -98,6 +122,43 @@ export function MembersClient({ rows }: { rows: MemberRow[] }) {
         </Card>
       )}
 
+      {duplicates.length > 0 && !merging && (
+        <Card className="border-teal-300 bg-teal-50/50">
+          <h2 className="mb-1">Possibly the same person twice</h2>
+          <p className="text-sm text-slate-600 mb-3">
+            Same name, different addresses — usually someone who signed up
+            again with their work email. Merging keeps both addresses working.
+          </p>
+          <ul className="space-y-2">
+            {duplicates.map((d) => (
+              <li
+                key={`${d.a.id}:${d.b.id}`}
+                className="flex items-center justify-between gap-2 flex-wrap text-sm"
+              >
+                <span>
+                  <strong>{d.a.name}</strong> — {d.a.email} and {d.b.email}
+                </span>
+                <SmallBtn onClick={() => setMerging({ a: d.a.id, b: d.b.id })}>
+                  Merge these
+                </SmallBtn>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      {mergeNote && <Notice>{mergeNote}</Notice>}
+
+      {merging && (
+        <MergePanel
+          people={rows.map((r) => ({ id: r.id, name: r.name, email: r.email }))}
+          initialA={merging.a}
+          initialB={merging.b}
+          onClose={() => setMerging(null)}
+          onDone={setMergeNote}
+        />
+      )}
+
       {error && (
         <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
           {error}
@@ -127,6 +188,12 @@ export function MembersClient({ rows }: { rows: MemberRow[] }) {
             {visible.length} of {rows.length}
           </span>
         </div>
+        <button
+          className={btnSecondary}
+          onClick={() => setMerging(merging ? null : {})}
+        >
+          {merging ? "Close merge" : "Merge accounts"}
+        </button>
         <button className={btnSecondary} onClick={() => setShowAdd((v) => !v)}>
           + Add member manually
         </button>
@@ -165,6 +232,15 @@ export function MembersClient({ rows }: { rows: MemberRow[] }) {
                 <span className="text-sm">
                   <span className="font-medium">{r.name}</span>{" "}
                   <span className="text-slate-400">{r.email}</span>
+                  {r.aliases.length > 0 && (
+                    <span
+                      className="text-slate-400"
+                      title={`Also logs in with ${r.aliases.join(", ")}`}
+                    >
+                      {" "}
+                      + {r.aliases.join(", ")}
+                    </span>
+                  )}
                 </span>
                 <span className="flex gap-1.5 items-center flex-wrap justify-end">
                   {r.role === "admin" && <Badge tone="indigo">admin</Badge>}

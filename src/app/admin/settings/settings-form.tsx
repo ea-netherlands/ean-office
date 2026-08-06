@@ -85,7 +85,21 @@ export function SettingsForm({ cfg }: { cfg: Settings }) {
             label="'Waiting on them' expiry (days)"
             value={cfg.request_expiry_days}
           />
+          <Num
+            name="join_horizon_days"
+            label="How far ahead a first visit can be booked (days)"
+            value={cfg.join_horizon_days}
+          />
+          <Num
+            name="join_quick_days"
+            label="Days offered as one-tap options"
+            value={cfg.join_quick_days}
+          />
         </div>
+        <p className="text-xs text-slate-400">
+          The one-tap options cover the next few weeks; beyond that people
+          pick a date, and the same coverage rules apply either way.
+        </p>
         <Num name="trial_months" label="Trial length (months)" value={cfg.trial_months} />
       </Card>
 
