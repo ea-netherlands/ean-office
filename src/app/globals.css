@@ -110,6 +110,11 @@ h3 {
   border-right: 1px dashed var(--color-slate-300);
 }
 
+/* The same motif turned on its side, for dividing a card into two offers. */
+@utility rule-dashed-y {
+  border-top: 1px dashed var(--color-slate-300);
+}
+
 /* Native controls default to the browser's own accent (Chrome blue).
    EA Teal is the only accent hue, so claim them. */
 input[type="checkbox"],

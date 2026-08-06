@@ -27,6 +27,7 @@ export function ProfileForm({
   skipsLeft?: number;
   initial?: {
     causeArea?: string | null;
+    causeAreaOther?: string | null;
     roleCategory?: string | null;
     experienceLevel?: string | null;
     eaFunding?: string | null;
@@ -74,6 +75,7 @@ export function ProfileFields({
 }: {
   initial?: {
     causeArea?: string | null;
+    causeAreaOther?: string | null;
     roleCategory?: string | null;
     experienceLevel?: string | null;
     eaFunding?: string | null;
@@ -114,6 +116,7 @@ export function ProfileFields({
           <input
             name="causeAreaOther"
             placeholder="Tell us more (optional)"
+            defaultValue={initial?.causeAreaOther || ""}
             className={`${inputCls} mt-2`}
           />
         )}

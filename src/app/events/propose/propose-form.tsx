@@ -1,8 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { proposeEventAction, ProposeState } from "@/actions/propose-event";
+import { str } from "@/lib/form-values";
+import { useFormDraft } from "@/components/form-draft";
 import { Card, btnPrimary, btnSecondary, inputCls, labelCls, Icon } from "@/components/ui";
 import { AvailabilityCalendar, Availability } from "./availability-calendar";
 import { EVENING_START_MIN, EVENING_END_MAX, needsEveningWindow } from "@/lib/event-hours";
@@ -22,9 +24,16 @@ export function ProposeForm({ availability }: { availability: Availability[] }) 
     proposeEventAction,
     {}
   );
-  const [date, setDate] = useState("");
-  const [type, setType] = useState<string>("reading_group");
+  const v = state.values;
+  const attempt = state.attempt ?? 0;
+  const { ref, clear } = useFormDraft("propose-event", attempt);
+  const [date, setDate] = useState(str(v, "date"));
+  const [type, setType] = useState<string>(str(v, "type") || "reading_group");
   const evening = needsEveningWindow(type);
+
+  useEffect(() => {
+    if (state.ok) clear();
+  }, [state.ok, clear]);
 
   if (state.ok) {
     return (
@@ -32,8 +41,8 @@ export function ProposeForm({ availability }: { availability: Availability[] }) 
         <Icon name="circle-check" className="text-5xl text-teal-600 mb-3" />
         <h2 className="text-xl">Sent to the team</h2>
         <p className="text-slate-500 mt-2 max-w-sm mx-auto">
-          An admin will confirm or come back to you with questions. Once it's
-          confirmed you&apos;ll get an email and it&apos;ll show on the office
+          An admin will confirm or come back to you with questions. Once
+          it&apos;s confirmed you&apos;ll get an email and it&apos;ll show on the office
           calendar.
         </p>
         <Link href="/" className={`${btnSecondary} mt-5`}>
@@ -44,13 +53,14 @@ export function ProposeForm({ availability }: { availability: Availability[] }) 
   }
 
   return (
-    <form action={action} className="space-y-4">
+    <form key={attempt} ref={ref} action={action} className="space-y-4">
       <Card className="space-y-4">
         <div>
           <label className={labelCls}>What is it? *</label>
           <input
             name="title"
             required
+            defaultValue={str(v, "title")}
             placeholder="e.g. Biosecurity reading group"
             className={inputCls}
           />
@@ -91,6 +101,7 @@ export function ProposeForm({ availability }: { availability: Availability[] }) 
             <input
               name="startsAt"
               type="time"
+              defaultValue={str(v, "startsAt")}
               min={evening ? EVENING_START_MIN : undefined}
               max={evening ? EVENING_END_MAX : undefined}
               className={inputCls}
@@ -101,6 +112,7 @@ export function ProposeForm({ availability }: { availability: Availability[] }) 
             <input
               name="endsAt"
               type="time"
+              defaultValue={str(v, "endsAt")}
               min={evening ? EVENING_START_MIN : undefined}
               max={evening ? EVENING_END_MAX : undefined}
               className={inputCls}
@@ -119,6 +131,7 @@ export function ProposeForm({ availability }: { availability: Availability[] }) 
             name="expectedAttendance"
             type="number"
             min={1}
+            defaultValue={str(v, "expectedAttendance")}
             className={inputCls}
             placeholder="10"
           />
@@ -128,6 +141,7 @@ export function ProposeForm({ availability }: { availability: Availability[] }) 
           <textarea
             name="proposalNote"
             rows={3}
+            defaultValue={str(v, "proposalNote")}
             className={inputCls}
             placeholder="What it's for, whether you need the TV or the lounge, anything you'd like help with."
           />

@@ -2,7 +2,9 @@ import { db, events } from "@/db";
 import { eq } from "drizzle-orm";
 import { newId } from "./ids";
 import { getSettings } from "./settings";
-import { TZ } from "./dates";
+import { TZ, todayAms } from "./dates";
+import { isCoworkingDay } from "./coworking";
+import { absorbExistingBookings } from "./coworking-guests";
 
 // Sync events from the public Luma calendar ICS feed. Luma stays the events
 // platform (promotion, RSVPs); the app only mirrors title/date/time so
@@ -157,19 +159,29 @@ export async function syncLuma(): Promise<{
         updated++;
       }
     } else {
-      await db.insert(events).values({
-        id: newId("ev"),
-        title: ev.title,
-        date,
-        startsAt,
-        endsAt,
-        type: guessType(ev.title),
-        organiser: "ean",
-        source: "luma",
-        externalId: ev.uid,
-        url: ev.url,
-      });
+      const type = guessType(ev.title);
+      const [inserted] = await db
+        .insert(events)
+        .values({
+          id: newId("ev"),
+          title: ev.title,
+          date,
+          startsAt,
+          endsAt,
+          type,
+          organiser: "ean",
+          source: "luma",
+          externalId: ev.uid,
+          url: ev.url,
+        })
+        .returning();
       created++;
+      // A synced co-working day closes its day to booking the moment it
+      // lands, so it owes the same courtesy as one an admin confirms: the
+      // people already booked keep their desks and hear about it.
+      if (isCoworkingDay(type) && date >= todayAms()) {
+        await absorbExistingBookings(inserted);
+      }
     }
   }
   return { ok: true, created, updated, total: parsed.length };

@@ -1,5 +1,6 @@
-import { db, bookings, bookingSeries, users, checkins } from "@/db";
+import { db, bookings, bookingSeries, users, checkins, events } from "@/db";
 import { and, eq, gte, lte, inArray, sql, asc } from "drizzle-orm";
+import { COWORKING_TYPE } from "./coworking";
 import { newId } from "./ids";
 import { getSettings, Settings } from "./settings";
 import {
@@ -229,6 +230,37 @@ export async function capacityForDay(
   return map.get(date)!;
 }
 
+// ---------- co-working days ----------
+
+/**
+ * Confirmed co-working days in a range. The office is closed to general
+ * booking on these: the organiser hands out the seats, so the calendar hiding
+ * the day isn't enough — the booking paths have to refuse it too.
+ */
+export async function coworkingDaysBetween(
+  startDate: string,
+  endDate: string
+): Promise<Map<string, { id: string; title: string }>> {
+  const rows = await db
+    .select({ id: events.id, date: events.date, title: events.title })
+    .from(events)
+    .where(
+      and(
+        gte(events.date, startDate),
+        lte(events.date, endDate),
+        eq(events.type, COWORKING_TYPE),
+        eq(events.status, "confirmed")
+      )
+    );
+  return new Map(rows.map((r) => [r.date, { id: r.id, title: r.title }]));
+}
+
+export async function coworkingDayOn(
+  date: string
+): Promise<{ id: string; title: string } | null> {
+  return (await coworkingDaysBetween(date, date)).get(date) ?? null;
+}
+
 // ---------- booking ----------
 
 /** Which desk numbers are held in each half of a day. */
@@ -349,6 +381,18 @@ export async function bookDay(
   if (date < todayAms()) return { ok: false, error: "That day has passed." };
   if (isWeekend(date)) return { ok: false, error: "The office is closed at weekends." };
   if (isHoliday(date)) return { ok: false, error: "That's a public holiday — the office is closed." };
+
+  // A co-working day belongs to its organiser. Walk-ins and admin seating
+  // (which is how approved guests get their desks) still go through.
+  if (source === "self" || source === "block") {
+    const coworking = await coworkingDayOn(date);
+    if (coworking) {
+      return {
+        ok: false,
+        error: `${coworking.title} has the whole office that day — ask the organiser for a spot instead.`,
+      };
+    }
+  }
 
   const existing = await db
     .select()
@@ -796,6 +840,7 @@ export type BlockPreview = {
   skippedBlockCap: string[];
   skippedExisting: string[];
   skippedHoliday: string[];
+  skippedCoworking: string[]; // taken over by a co-working day
   endDate: string; // horizon-clamped
 };
 
@@ -817,11 +862,13 @@ export async function previewBlockBooking(
     skippedBlockCap: [],
     skippedExisting: [],
     skippedHoliday: [],
+    skippedCoworking: [],
     endDate,
   };
   if (weekdays.length === 0 || endDate < start) return preview;
 
   const capMap = await capacityForRange(start, endDate);
+  const coworkingDays = await coworkingDaysBetween(start, endDate);
   const own = await db
     .select({ date: bookings.date, slot: bookings.slot })
     .from(bookings)
@@ -844,6 +891,10 @@ export async function previewBlockBooking(
     if (isWeekend(d)) continue;
     if (isHoliday(d)) {
       preview.skippedHoliday.push(d);
+      continue;
+    }
+    if (coworkingDays.has(d)) {
+      preview.skippedCoworking.push(d);
       continue;
     }
     if (ownDates.has(d)) {

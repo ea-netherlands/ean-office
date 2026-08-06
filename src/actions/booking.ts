@@ -185,7 +185,8 @@ export async function blockPreviewAction(
         preview.eligible.length +
         preview.skippedFull.length +
         preview.skippedBlockCap.length +
-        preview.skippedExisting.length,
+        preview.skippedExisting.length +
+        preview.skippedCoworking.length,
     },
   };
 }

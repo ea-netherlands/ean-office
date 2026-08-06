@@ -8,14 +8,47 @@ import { appUrl } from "@/lib/auth";
 import { formatDayLong } from "@/lib/dates";
 import { normaliseUrl } from "@/lib/url";
 import { resolveGender } from "@/lib/profile-options";
+import { EchoState, formValues } from "@/lib/form-values";
 
-export type JoinState = { ok?: boolean; error?: string };
+export type JoinState = EchoState & { ok?: boolean };
+
+/** Everything the form asks for, echoed back untouched when we reject it. */
+const FIELDS = [
+  "name",
+  "email",
+  "descriptor",
+  "profileUrl",
+  "about",
+  "expectedFrequency",
+  "accessibilityNotes",
+  "guidelines",
+  "requestedDate",
+  "requestedArrival",
+  "causeArea",
+  "causeAreaOther",
+  "roleCategory",
+  "experienceLevel",
+  "eaFunding",
+  "funders",
+  "gender",
+  "genderSelfDescribe",
+] as const;
 
 export async function submitJoinRequest(
   _prev: JoinState,
   formData: FormData
 ): Promise<JoinState> {
   await ensureMigrated();
+
+  // Hand every answer back with the error so nothing typed is ever lost.
+  const values = formValues(formData, FIELDS, ["funders"]);
+  const attempt = (_prev.attempt ?? 0) + 1;
+  const fail = (error: string, field?: string): JoinState => ({
+    error,
+    field,
+    values,
+    attempt,
+  });
 
   const name = String(formData.get("name") || "").trim();
   const email = String(formData.get("email") || "").toLowerCase().trim();
@@ -37,19 +70,45 @@ export async function submitJoinRequest(
   const funders = formData.getAll("funders").map(String);
   const gender = resolveGender(formData);
 
-  if (!name || !email.includes("@")) return { error: "Name and a valid email are required." };
-  if (!descriptor) return { error: "Please pick what best describes you." };
-  if (!profileUrl) return { error: "Please add a link — LinkedIn, a personal site, or an EA Forum profile." };
+  if (!name) return fail("Please add your name.", "name");
+  if (!email.includes("@")) return fail("That email doesn't look right.", "email");
+  if (!descriptor) return fail("Please pick what best describes you.", "descriptor");
+  if (!profileUrl) {
+    return fail(
+      "Please add a link — LinkedIn, a personal site, an EA Forum profile, or a shared PDF of your CV.",
+      "profileUrl"
+    );
+  }
   const normalisedUrl = normaliseUrl(profileUrl);
   if (!normalisedUrl) {
-    return { error: "That link doesn't look right — check it's a full web address." };
+    return fail(
+      "That doesn't look like a web address — paste the whole thing, like linkedin.com/in/yourname.",
+      "profileUrl"
+    );
   }
-  if (!about) return { error: "Please tell us a little about what you're working on." };
-  if (!expectedFrequency) return { error: "Please pick how often you expect to come." };
-  if (!guidelines) return { error: "Please read and accept the office guidelines." };
-  if (!requestedDate || !requestedArrival) return { error: "Please pick an arrival slot." };
+  if (!about) {
+    return fail("Please tell us a little about what you're working on.", "about");
+  }
+  if (!expectedFrequency) {
+    return fail("Please pick how often you expect to come.", "expectedFrequency");
+  }
+  if (!guidelines) {
+    return fail("Please read and accept the office guidelines.", "guidelines");
+  }
+  if (!requestedDate || !requestedArrival) {
+    return fail("Please pick a day and an arrival time.", "requestedDate");
+  }
   if (!causeArea || !roleCategory || !experienceLevel || !eaFunding) {
-    return { error: "Please answer the profile questions — they're used only for aggregate reporting." };
+    return fail(
+      "Please answer the profile questions — they're used only for aggregate reporting.",
+      !causeArea
+        ? "causeArea"
+        : !roleCategory
+          ? "roleCategory"
+          : !experienceLevel
+            ? "experienceLevel"
+            : "eaFunding"
+    );
   }
 
   const [existing] = await db
@@ -60,14 +119,20 @@ export async function submitJoinRequest(
   let userId: string;
   if (existing) {
     if (existing.status === "trial" || existing.status === "active") {
-      return { error: "That email already belongs to a member — just log in and book a day." };
+      return fail(
+        "That email already belongs to a member — just log in and book a day.",
+        "email"
+      );
     }
     const openRequests = await db
       .select()
       .from(visitRequests)
       .where(eq(visitRequests.userId, existing.id));
     if (openRequests.some((r) => r.status === "pending" || r.status === "awaiting_reply")) {
-      return { error: "You already have a request in — we'll get back to you within one working day." };
+      return fail(
+        "You already have a request in — we'll get back to you within one working day.",
+        "email"
+      );
     }
     userId = existing.id;
   } else {

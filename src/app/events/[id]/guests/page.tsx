@@ -1,10 +1,14 @@
 import { redirect, notFound } from "next/navigation";
-import { db, events, eventGuests, users } from "@/db";
-import { eq, desc } from "drizzle-orm";
-import { getCurrentUser, isAdmin } from "@/lib/auth";
+import { db, events, eventGuests, users, bookings } from "@/db";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import { getCurrentUser, isAdmin, appUrl } from "@/lib/auth";
 import { Nav } from "@/components/nav";
 import { Page, H1, Sub } from "@/components/ui";
-import { formatDayLong } from "@/lib/dates";
+import { formatDayLong, todayAms } from "@/lib/dates";
+import { describeSeat } from "@/lib/booking";
+import { asSlot, SLOT_LABEL } from "@/lib/slots";
+import { coworkingSpots } from "@/lib/coworking-guests";
+import { isCoworkingDay } from "@/lib/coworking";
 import { GuestsClient, GuestRow } from "./guests-client";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +35,34 @@ export default async function EventGuestsPage({
     .where(eq(eventGuests.eventId, id))
     .orderBy(desc(eventGuests.createdAt));
 
+  // Which of them actually hold a desk that day — an approval that couldn't
+  // find a seat shouldn't look the same as one that did.
+  const seats = new Map<string, string>();
+  if (rows.length > 0) {
+    const held = await db
+      .select()
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.date, event.date),
+          eq(bookings.status, "booked"),
+          inArray(
+            bookings.userId,
+            rows.map((r) => r.u.id)
+          )
+        )
+      );
+    // Two people can hold the same desk across a half-day handover, so the
+    // hours belong in the label or the list reads like a double-booking.
+    for (const b of held) {
+      const slot = asSlot(b.slot);
+      seats.set(
+        b.userId,
+        slot === "day" ? describeSeat(b) : `${describeSeat(b)} (${SLOT_LABEL[slot]})`
+      );
+    }
+  }
+
   const guests: GuestRow[] = rows.map((r) => ({
     id: r.g.id,
     name: r.u.name,
@@ -38,7 +70,12 @@ export default async function EventGuestsPage({
     status: r.g.status,
     accessibilityNotes: r.g.accessibilityNotes,
     createdAt: r.g.createdAt.toISOString(),
+    seat: seats.get(r.u.id) ?? null,
+    /** They'd booked the day before it became a co-working day. */
+    wasAlreadyBooked: r.g.decidedBy === "already_booked",
   }));
+
+  const spots = await coworkingSpots(event.date);
 
   return (
     <>
@@ -46,10 +83,18 @@ export default async function EventGuestsPage({
       <Page>
         <H1>{event.title}</H1>
         <Sub>
-          {formatDayLong(event.date)} · requests to join — approve who&apos;s
-          coming, decline the rest.
+          {formatDayLong(event.date)}
+          {event.startsAt
+            ? ` · ${event.startsAt}${event.endsAt ? `–${event.endsAt}` : ""}`
+            : ""}{" "}
+          · you decide who&apos;s in.
         </Sub>
-        <GuestsClient guests={guests} />
+        <GuestsClient
+          guests={guests}
+          spots={spots}
+          shareUrl={`${appUrl()}/events/${event.id}/rsvp`}
+          open={isCoworkingDay(event.type) && event.status === "confirmed" && event.date >= todayAms()}
+        />
       </Page>
     </>
   );

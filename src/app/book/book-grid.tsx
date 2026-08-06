@@ -51,7 +51,15 @@ export type DayInfo = {
   /** Up to two: a member may hold a morning and an afternoon separately. */
   mine: MyBooking[];
   blockCapReached: boolean;
-  themedEvent: { id: string; title: string } | null;
+  /** A co-working day: the office is closed to general booking that day. */
+  themedEvent: {
+    id: string;
+    title: string;
+    startsAt: string | null;
+    endsAt: string | null;
+    spotsLeft: number;
+    spotsTotal: number;
+  } | null;
 };
 
 const SLOT_ORDER: Slot[] = ["day", "am", "pm"];
@@ -447,7 +455,9 @@ function DayCell({
   }
 
   const label = closedForEvent
-    ? "Closed"
+    ? booked.length > 0
+      ? "You're in"
+      : "Co-work"
     : allDayYours
       ? "You're in"
       : booked.length > 0
@@ -535,23 +545,55 @@ function DayPanel({
   onCancel: (booking: MyBooking, all: boolean) => void;
 }) {
   if (day.closed && day.themedEvent) {
+    const event = day.themedEvent;
+    // Someone who booked before the day was taken over keeps their desk, and
+    // the panel has to say so — "closed" on a day you're booked reads as a
+    // cancellation.
+    const yours = day.mine.find((b) => b.status === "booked");
     return (
       <div className="mt-4 bg-white border border-slate-200 rounded-xl p-4">
         <h3>{formatDayLong(day.date)}</h3>
         <p className="text-sm text-teal-700 mt-0.5">
           <Icon name="target-arrow" className="mr-1" />
-          {day.themedEvent.title}
+          {event.title}
+          {event.startsAt
+            ? ` · ${event.startsAt}${event.endsAt ? `–${event.endsAt}` : ""}`
+            : ""}
         </p>
-        <p className="text-sm text-slate-500 mt-2">
-          The office is closed to general booking today — an organiser is
-          running this one and only confirmed guests get a desk.
-        </p>
-        <Link
-          href={`/events/${day.themedEvent.id}/rsvp`}
-          className={`${btnPrimary} mt-3 inline-flex`}
-        >
-          Ask to join
-        </Link>
+        {yours ? (
+          <>
+            <p className="text-sm text-slate-600 mt-2">
+              A co-working day — the office is closed to general booking, but{" "}
+              <strong>you already have a seat</strong>
+              {yours.slot === "day" ? "" : ` for the ${SLOT_LABEL[yours.slot]}`}
+              , so come as planned.
+            </p>
+            <button
+              onClick={() => onCancel(yours, false)}
+              disabled={pending}
+              className={`${btnSecondary} mt-3`}
+            >
+              {busy === "cancel" ? <Spinner /> : null} Cancel my seat
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-slate-600 mt-2">
+              A co-working day — the whole office works on this together, so
+              general booking is closed and the organiser decides who&apos;s
+              in.{" "}
+              {event.spotsLeft > 0
+                ? `${event.spotsLeft} of ${event.spotsTotal} spots free.`
+                : `All ${event.spotsTotal} spots are taken, but you can still ask.`}
+            </p>
+            <Link
+              href={`/events/${event.id}/rsvp`}
+              className={`${btnPrimary} mt-3 inline-flex`}
+            >
+              Ask to join
+            </Link>
+          </>
+        )}
       </div>
     );
   }
@@ -856,6 +898,8 @@ function BlockForm({ horizonWeeks }: { horizonWeeks: number }) {
               ` ${state.preview.skippedExisting.length} already booked by you.`}
             {state.preview.skippedHoliday.length > 0 &&
               ` ${state.preview.skippedHoliday.length} public holiday${state.preview.skippedHoliday.length === 1 ? "" : "s"} skipped.`}
+            {state.preview.skippedCoworking.length > 0 &&
+              ` ${state.preview.skippedCoworking.length} skipped — a co-working day has the whole office. You can ask those organisers for a spot from the calendar.`}
           </p>
           <button
             className={btnPrimary}

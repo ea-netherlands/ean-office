@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { requestEventGuestAction, GuestRequestState } from "@/actions/event-guest";
+import { str } from "@/lib/form-values";
+import { useFormDraft } from "@/components/form-draft";
 import { Card, btnPrimary, inputCls, labelCls, Icon } from "@/components/ui";
 
 export function RsvpForm({
@@ -17,6 +19,13 @@ export function RsvpForm({
     requestEventGuestAction.bind(null, eventId),
     {}
   );
+  const v = state.values;
+  const attempt = state.attempt ?? 0;
+  const { ref, clear } = useFormDraft(`guest:${eventId}`, attempt);
+
+  useEffect(() => {
+    if (state.ok) clear();
+  }, [state.ok, clear]);
 
   if (state.ok) {
     return (
@@ -31,15 +40,17 @@ export function RsvpForm({
     );
   }
 
+  // Re-keyed on a rejected submit so the echoed answers land — see the note
+  // in lib/form-values.
   return (
-    <form action={action} className="space-y-4">
+    <form key={attempt} ref={ref} action={action} className="space-y-4">
       <Card className="space-y-4">
         <div>
           <label className={labelCls}>Name *</label>
           <input
             name="name"
             required
-            defaultValue={defaultName}
+            defaultValue={str(v, "name") || defaultName}
             className={inputCls}
             autoComplete="name"
           />
@@ -50,7 +61,7 @@ export function RsvpForm({
             name="email"
             type="email"
             required
-            defaultValue={defaultEmail}
+            defaultValue={str(v, "email") || defaultEmail}
             className={inputCls}
             autoComplete="email"
           />
@@ -60,12 +71,19 @@ export function RsvpForm({
           <textarea
             name="accessibilityNotes"
             rows={2}
+            defaultValue={str(v, "accessibilityNotes")}
             className={inputCls}
             placeholder="Accessibility needs, dietary things at lunch — anything."
           />
         </div>
         <label className="flex items-start gap-2 text-sm text-slate-700">
-          <input type="checkbox" name="guidelines" required className="mt-0.5" />
+          <input
+            type="checkbox"
+            name="guidelines"
+            required
+            defaultChecked={str(v, "guidelines") === "on"}
+            className="mt-0.5"
+          />
           <span>
             I&apos;ve read the{" "}
             <a

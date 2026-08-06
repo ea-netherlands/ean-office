@@ -36,6 +36,20 @@ delivered. Create real admins with `npm run admin:add -- "Name" email`.
   escalation ladder, expires stale requests, sends the Monday digest, and
   purges check-ins past the GDPR retention window. Idempotent. Protect it
   with `CRON_SECRET` in production.
+- **Co-working days** — a member proposes one at `/coworking/propose`; an
+  admin confirms it in the events queue. A confirmed one takes the whole
+  office for that working day: general booking is refused (calendar, repeat
+  bookings and `bookDay` alike), and the organiser curates the guest list at
+  `/events/<id>/guests` from requests sent to `/events/<id>/rsvp`, which
+  anyone can use without an account. Approving a guest books them a desk.
+  People who had already booked that day are the admin's call at confirm
+  time: **keep** (the default — they keep their desks, join the guest list as
+  approved, and get an email saying what's happening) or **clear** (their
+  bookings are cancelled, nothing is promoted off the waitlist, and each
+  person gets one apology naming the day and linking both the calendar and
+  the organiser's join link). Clearing can't be undone from the app. They're
+  `events` rows of type `themed_coworking`, so the funder reports already
+  count them.
 - **Settings** — everything configurable (desk count, coverage days, no-show
   thresholds…) lives in the `settings` table, editable at `/admin/settings`.
 

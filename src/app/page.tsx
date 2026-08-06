@@ -2,10 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { Nav } from "@/components/nav";
-import { Page, H1, Sub, Card, Badge, btnPrimary, btnSecondary } from "@/components/ui";
+import { Page, H1, Sub, Card, Badge, Icon, btnPrimary, btnSecondary } from "@/components/ui";
 import { PeopleList } from "@/components/people";
 import { capacityForDay } from "@/lib/booking";
-import { db, checkins, events, eventAttendance, ensureMigrated } from "@/db";
+import { isCoworkingDay } from "@/lib/coworking";
+import { db, checkins, events, eventAttendance, eventGuests, ensureMigrated } from "@/db";
 import { and, eq, gte, lte, asc } from "drizzle-orm";
 import { addDays, formatDayLong, todayAms, formatDay } from "@/lib/dates";
 import { TodayActions, RsvpButton } from "./today-actions";
@@ -72,8 +73,23 @@ export default async function HomePage() {
         .where(and(eq(eventAttendance.userId, user.id), eq(eventAttendance.source, "rsvp")))
     ).map((r) => r.eventId)
   );
+  // Co-working days are curated, not RSVP'd — this is where each one stands
+  // for the person looking at it.
+  const myGuestStatus = new Map(
+    (
+      await db
+        .select()
+        .from(eventGuests)
+        .where(eq(eventGuests.userId, user.id))
+    ).map((g) => [g.eventId, g.status])
+  );
 
   const others = cap.people.filter((p) => p.id !== user.id);
+  // A co-working day owns the whole office, so today's card has to lead with
+  // it rather than offering a desk that isn't going to exist.
+  const coworkingToday = upcomingEvents.find(
+    (e) => e.date === today && isCoworkingDay(e.type)
+  );
 
   return (
     <>
@@ -88,6 +104,40 @@ export default async function HomePage() {
               The office is closed today (weekend or public holiday). See you
               next working day!
             </p>
+          ) : coworkingToday ? (
+            <>
+              <p className="text-sm text-teal-700 mb-2">
+                <Icon name="target-arrow" className="mr-1" />
+                {coworkingToday.title}
+                {coworkingToday.startsAt
+                  ? ` · ${coworkingToday.startsAt}${coworkingToday.endsAt ? `–${coworkingToday.endsAt}` : ""}`
+                  : ""}
+              </p>
+              {myBooking ? (
+                <TodayActions
+                  booked
+                  checkedIn={!!myCheckin}
+                  seatType={myBooking.seatType}
+                  deskNumber={myBooking.deskNumber ?? undefined}
+                  slot={myBooking.slot}
+                  full={cap.full}
+                />
+              ) : (
+                <>
+                  <p className="text-slate-600 text-sm">
+                    A co-working day has the office today, so there&apos;s no
+                    general desk booking. Still want to come? Ask the
+                    organiser — they answer quickly.
+                  </p>
+                  <Link
+                    href={`/events/${coworkingToday.id}/rsvp`}
+                    className={`${btnPrimary} mt-3 inline-flex`}
+                  >
+                    Ask to join
+                  </Link>
+                </>
+              )}
+            </>
           ) : (
             <TodayActions
               booked={!!myBooking}
@@ -135,14 +185,26 @@ export default async function HomePage() {
           </Card>
         )}
 
-        <Card className="mb-4 flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-sm text-slate-600">
-            Got something you&apos;d like to run here? Reading groups, talks,
-            socials — the office is yours outside office hours.
-          </p>
-          <Link href="/events/propose" className={btnSecondary}>
-            Propose an event
-          </Link>
+        <Card className="mb-4 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm text-slate-600">
+              Got something you&apos;d like to run here? Reading groups, talks,
+              socials — the office is yours outside office hours.
+            </p>
+            <Link href="/events/propose" className={btnSecondary}>
+              Propose an event
+            </Link>
+          </div>
+          <div className="rule-dashed-y" />
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm text-slate-600">
+              Or take the whole office for a day — a cause area, a sprint, a
+              visiting team. You pick who comes.
+            </p>
+            <Link href="/coworking/propose" className={btnSecondary}>
+              Organise a co-working day
+            </Link>
+          </div>
         </Card>
 
         {upcomingEvents.length > 0 && (
@@ -154,9 +216,12 @@ export default async function HomePage() {
                   <div>
                     <p className="font-medium text-sm">
                       {e.title}{" "}
-                      {e.type === "themed_coworking" && (
-                        <Badge tone="indigo">themed coworking day</Badge>
-                      )}
+                      {/* Most of these are called "<something> co-working
+                          day" already — don't say it twice. */}
+                      {isCoworkingDay(e.type) &&
+                        !/co-?working/i.test(e.title) && (
+                          <Badge tone="indigo">co-working day</Badge>
+                        )}
                     </p>
                     <p className="text-xs text-slate-500">
                       {formatDay(e.date)}
@@ -164,7 +229,12 @@ export default async function HomePage() {
                       {e.endsAt ? `–${e.endsAt}` : ""}
                     </p>
                   </div>
-                  {e.url ? (
+                  {isCoworkingDay(e.type) ? (
+                    <CoworkingLink
+                      eventId={e.id}
+                      status={myGuestStatus.get(e.id)}
+                    />
+                  ) : e.url ? (
                     <a
                       href={e.url}
                       target="_blank"
@@ -183,5 +253,35 @@ export default async function HomePage() {
         )}
       </Page>
     </>
+  );
+}
+
+/** Where a member stands on a co-working day: in, waiting, or free to ask. */
+function CoworkingLink({
+  eventId,
+  status,
+}: {
+  eventId: string;
+  status?: string;
+}) {
+  const label =
+    status === "approved"
+      ? "You're in"
+      : status === "pending"
+        ? "Asked"
+        : status === "declined"
+          ? "Full"
+          : "Ask to join";
+  return (
+    <Link
+      href={`/events/${eventId}/rsvp`}
+      className={`text-xs rounded-full px-3 py-1 whitespace-nowrap border ${
+        status === "approved"
+          ? "border-teal-300 bg-teal-50 text-teal-800"
+          : "border-slate-300 hover:bg-slate-50"
+      }`}
+    >
+      {label}
+    </Link>
   );
 }

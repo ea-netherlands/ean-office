@@ -13,7 +13,15 @@ import {
   AdminActionState,
 } from "@/actions/admin";
 import { CAUSE_AREAS } from "@/lib/profile-options";
-import { Badge, Card, btnPrimary, btnSecondary, inputCls, labelCls } from "@/components/ui";
+import {
+  Badge,
+  Card,
+  btnPrimary,
+  btnSecondary,
+  btnDanger,
+  inputCls,
+  labelCls,
+} from "@/components/ui";
 import { formatDay } from "@/lib/dates";
 import { EVENING_START_MIN, EVENING_END_MAX, needsEveningWindow } from "@/lib/event-hours";
 
@@ -39,6 +47,10 @@ export type EventRow = {
   proposedBy: string | null;
   proposedByEmail: string | null;
   questionAskedAt: string | null;
+  /** Co-working days only: what confirming would sit on top of. */
+  bookedThatDay: number;
+  guestsPending: number;
+  guestsApproved: number;
 };
 
 const EVENT_TYPES = [
@@ -55,12 +67,14 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [newType, setNewType] = useState<string>("talk");
+  const [notice, setNotice] = useState<string | null>(null);
   const newEvening = needsEveningWindow(newType);
   const [state, action, pending] = useActionState<AdminActionState, FormData>(
     async (prev, fd) => {
       const res = await createEventAction(prev, fd);
       if (res.ok) {
         setShowForm(false);
+        setNotice(res.note ?? null);
         router.refresh();
       }
       return res;
@@ -78,6 +92,7 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
         <button className={btnSecondary} onClick={() => setShowForm((v) => !v)}>
           {showForm ? "Close" : "+ Add event manually"}
         </button>
+        {notice && <span className="text-sm text-slate-600">{notice}</span>}
       </div>
 
       {showForm && (
@@ -126,12 +141,21 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
                 className={inputCls}
               />
             </div>
-            {newEvening && (
+            {newEvening ? (
               <p className="text-xs text-slate-400 sm:col-span-2">
                 Evening events run {EVENING_START_MIN}–{EVENING_END_MAX} — the
-                alarm activates at {EVENING_END_MAX}. Themed coworking days run
+                alarm activates at {EVENING_END_MAX}. Co-working days run
                 during office hours and are exempt.
               </p>
+            ) : (
+              <label className="sm:col-span-2 flex items-start gap-2 text-xs text-slate-600">
+                <input type="checkbox" name="clearBookings" className="mt-0.5" />
+                <span>
+                  Clear the day: cancel any bookings already made for that date
+                  and email those people an apology. Leave this off and they
+                  keep their desks and join the guest list.
+                </span>
+              </label>
             )}
             <div>
               <label className={labelCls}>Cause area</label>
@@ -174,7 +198,7 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
           </p>
           <ul className="divide-y divide-teal-200/60">
             {proposals.map((e) => (
-              <ProposalItem key={e.id} e={e} />
+              <ProposalItem key={e.id} e={e} onNotice={setNotice} />
             ))}
           </ul>
         </Card>
@@ -223,16 +247,28 @@ function SyncButton() {
   );
 }
 
-function ProposalItem({ e }: { e: EventRow }) {
+function ProposalItem({
+  e,
+  onNotice,
+}: {
+  e: EventRow;
+  /** Deciding removes this card, so its own feedback would vanish with it. */
+  onNotice: (note: string | null) => void;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [asking, setAsking] = useState(false);
   const [question, setQuestion] = useState("");
   const [note, setNote] = useState<string | null>(null);
+  const coworking = !needsEveningWindow(e.type);
 
-  function decide(decision: "confirmed" | "declined") {
+  function decide(
+    decision: "confirmed" | "declined",
+    existingBookings: "keep" | "clear" = "keep"
+  ) {
     startTransition(async () => {
-      await decideEventAction(e.id, decision);
+      const res = await decideEventAction(e.id, decision, existingBookings);
+      onNotice(res.note ?? res.error ?? null);
       router.refresh();
     });
   }
@@ -240,9 +276,18 @@ function ProposalItem({ e }: { e: EventRow }) {
   return (
     <li className="py-3">
       <p className="text-sm font-medium">
-        {e.title} <Badge tone="teal">proposed</Badge>
+        {e.title}{" "}
+        <Badge tone="teal">{coworking ? "co-working day proposed" : "proposed"}</Badge>
         {e.questionAskedAt && <Badge>waiting on them</Badge>}
       </p>
+      {coworking && (
+        <p className="text-xs text-slate-600 mt-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5">
+          Confirming closes {formatDay(e.date)} to general desk booking.{" "}
+          {e.bookedThatDay === 0
+            ? "Nobody has booked that day yet."
+            : `${e.bookedThatDay} ${e.bookedThatDay === 1 ? "person has" : "people have"} already booked it — choose below whether they keep their desks or the day is cleared for the organiser.`}
+        </p>
+      )}
       <p className="text-xs text-slate-500 mt-0.5">
         {formatDay(e.date)}
         {e.startsAt ? ` \u00b7 ${e.startsAt}${e.endsAt ? `\u2013${e.endsAt}` : ""}` : ""}
@@ -303,8 +348,31 @@ function ProposalItem({ e }: { e: EventRow }) {
       ) : (
         <div className="mt-3 flex gap-2 flex-wrap">
           <button className={btnPrimary} disabled={pending} onClick={() => decide("confirmed")}>
-            {pending ? "Working\u2026" : "Confirm"}
+            {pending
+              ? "Working\u2026"
+              : coworking && e.bookedThatDay > 0
+                ? "Confirm \u2014 they keep their desks"
+                : "Confirm"}
           </button>
+          {/* Taking the day back is a real decision with real emails, so it's
+              its own button rather than a default. */}
+          {coworking && e.bookedThatDay > 0 && (
+            <button
+              className={btnDanger}
+              disabled={pending}
+              onClick={() => {
+                if (
+                  confirm(
+                    `Cancel ${e.bookedThatDay} ${e.bookedThatDay === 1 ? "person's booking" : "people's bookings"} on ${formatDay(e.date)} and email them an apology?\n\nThey'll be told the office isn't available that day because of "${e.title}", and pointed at the calendar to rebook. This can't be undone from here.`
+                  )
+                ) {
+                  decide("confirmed", "clear");
+                }
+              }}
+            >
+              Confirm and clear the day
+            </button>
+          )}
           <button className={btnSecondary} onClick={() => setAsking(true)}>
             Ask a question
           </button>
@@ -377,6 +445,15 @@ function EventItem({ e }: { e: EventRow }) {
           </p>
         </div>
       </div>
+      {!needsEveningWindow(e.type) && !e.past && (
+        <p className="text-xs text-slate-500 mt-1">
+          Closed to general booking ·{" "}
+          <a href={`/events/${e.id}/guests`} className="text-teal-700 underline">
+            {e.guestsApproved} approved
+            {e.guestsPending > 0 ? `, ${e.guestsPending} waiting` : ""}
+          </a>
+        </p>
+      )}
       {e.past && (
         <div className="mt-2 flex gap-2 items-center">
           <input

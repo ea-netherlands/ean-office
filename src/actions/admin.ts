@@ -22,6 +22,11 @@ import { clearAllNoShows } from "@/lib/noshow";
 import { buildIcs } from "@/lib/ics";
 import { bookDay } from "@/lib/booking";
 import { validateEventHours } from "@/lib/event-hours";
+import { isCoworkingDay, validateCoworkingDay } from "@/lib/coworking";
+import {
+  absorbExistingBookings,
+  clearDayForCoworking,
+} from "@/lib/coworking-guests";
 
 async function requireAdmin() {
   const user = await getCurrentUser();
@@ -29,7 +34,12 @@ async function requireAdmin() {
   return user;
 }
 
-export type AdminActionState = { ok?: boolean; error?: string };
+export type AdminActionState = {
+  ok?: boolean;
+  error?: string;
+  /** Something worth telling the admin about what the action just did. */
+  note?: string;
+};
 
 // ---------- approval queue ----------
 
@@ -345,20 +355,51 @@ export async function createEventAction(
   if (!title || !date) return { error: "Title and date are required." };
   const hoursError = validateEventHours(type, startsAt, endsAt);
   if (hoursError) return { error: hoursError };
-  await db.insert(events).values({
-    id: newId("ev"),
-    title,
-    date,
-    startsAt,
-    endsAt,
-    type: type as typeof events.$inferInsert.type,
-    causeArea: String(formData.get("causeArea") || "") || null,
-    organiser: (String(formData.get("organiser") || "ean") as "ean" | "hosted"),
-    expectedAttendance: Number(formData.get("expectedAttendance")) || null,
-    createdBy: admin.id,
-  });
+  const coworking = isCoworkingDay(type);
+  if (coworking) {
+    const dayError = validateCoworkingDay(date, startsAt, endsAt, todayAms());
+    // Past dates are allowed here — admins backfill events that happened.
+    if (dayError && !dayError.includes("passed")) return { error: dayError };
+  }
+  const [event] = await db
+    .insert(events)
+    .values({
+      id: newId("ev"),
+      title,
+      date,
+      startsAt,
+      endsAt,
+      type: type as typeof events.$inferInsert.type,
+      causeArea: String(formData.get("causeArea") || "") || null,
+      organiser: (String(formData.get("organiser") || "ean") as "ean" | "hosted"),
+      expectedAttendance: Number(formData.get("expectedAttendance")) || null,
+      createdBy: admin.id,
+    })
+    .returning();
+
+  // Created confirmed, so it closes the day right away — same choice about
+  // people already booked as when confirming a member's proposal.
+  let absorbed = 0;
+  let cleared = 0;
+  if (coworking && date >= todayAms()) {
+    if (formData.get("clearBookings") === "on") {
+      ({ cleared } = await clearDayForCoworking(event));
+    } else {
+      absorbed = await absorbExistingBookings(event);
+    }
+  }
   revalidatePath("/admin/events");
-  return { ok: true };
+  revalidatePath("/book");
+  revalidatePath("/");
+  return {
+    ok: true,
+    note:
+      cleared > 0
+        ? `${cleared === 1 ? "1 booking was" : `${cleared} bookings were`} cancelled for that day and those people have had an apology by email.`
+        : absorbed > 0
+          ? `${absorbed === 1 ? "One person who had" : `${absorbed} people who had`} already booked that day keep their desks and have been emailed.`
+          : undefined,
+  };
 }
 
 export async function setHeadcountAction(
@@ -383,26 +424,57 @@ export async function deleteEventAction(eventId: string): Promise<AdminActionSta
 
 export async function decideEventAction(
   eventId: string,
-  decision: "confirmed" | "declined"
+  decision: "confirmed" | "declined",
+  /**
+   * Co-working days only. Confirming closes the day to general booking, and
+   * the admin decides what that means for people who already booked it:
+   * `keep` leaves their desks alone and brings them along, `clear` cancels
+   * their bookings and sends an apology. Never chosen for them.
+   */
+  existingBookings: "keep" | "clear" = "keep"
 ): Promise<AdminActionState> {
   await requireAdmin();
   const [event] = await db.select().from(events).where(eq(events.id, eventId));
   if (!event) return { error: "Event not found." };
   await db.update(events).set({ status: decision }).where(eq(events.id, eventId));
 
+  const coworking = isCoworkingDay(event.type);
+  let absorbed = 0;
+  let cleared = 0;
+  if (coworking && decision === "confirmed" && event.date >= todayAms()) {
+    if (existingBookings === "clear") {
+      ({ cleared } = await clearDayForCoworking(event));
+    } else {
+      absorbed = await absorbExistingBookings(event);
+    }
+  }
+
   if (event.createdBy) {
     const [proposer] = await db.select().from(users).where(eq(users.id, event.createdBy));
     if (proposer) {
+      const shareLink = `${appUrl()}/events/${event.id}/rsvp`;
       await sendEmail({
         to: proposer.email,
         subject:
           decision === "confirmed"
-            ? `Your event is confirmed: ${event.title}`
-            : `About your event proposal: ${event.title}`,
+            ? coworking
+              ? `Your co-working day is confirmed: ${event.title}`
+              : `Your event is confirmed: ${event.title}`
+            : coworking
+              ? `About your co-working day: ${event.title}`
+              : `About your event proposal: ${event.title}`,
         kind: decision === "confirmed" ? "event_confirmed" : "event_declined",
         html:
           decision === "confirmed"
-            ? `<p>Hi ${proposer.name},</p>
+            ? coworking
+              ? `<p>Hi ${proposer.name},</p>
+<p>Your co-working day <strong>${event.title}</strong> on ${formatDayLong(event.date)} is confirmed. The office is closed to general desk booking that day, and the day is on the calendar for everyone to see.</p>
+<p><strong>Share this link</strong> with anyone you'd like there — members and people who've never been alike:<br>${link(shareLink, shareLink)}</p>
+<p>Requests land in ${link(`${appUrl()}/events/${event.id}/guests`, "your guest list")}, where you approve or decline each one. Approving gives that person a desk straight away.</p>
+${absorbed > 0 ? `<p>${absorbed === 1 ? "One person had" : `${absorbed} people had`} already booked that day. They keep their desks, they're on your guest list as approved, and we've emailed them to say what's happening.</p>` : ""}
+${cleared > 0 ? `<p>${cleared === 1 ? "One booking that day was" : `${cleared} bookings that day were`} cancelled to free the space, and we've apologised to the people affected and pointed them at your link in case they'd like to come.</p>` : ""}
+<p>Thanks for organising it!</p>`
+              : `<p>Hi ${proposer.name},</p>
 <p>Your event <strong>${event.title}</strong> on ${formatDayLong(event.date)} is confirmed — it's on the office calendar now.</p>
 <p>Before the day, run through the ${link("https://tinyurl.com/checklist-office-events", "event checklist")}. Two things people forget: the alarm is active from 22:00, and the connecting doors close at 18:00.</p>
 <p>Thanks for organising it!</p>`
@@ -412,8 +484,19 @@ export async function decideEventAction(
     }
   }
   revalidatePath("/admin/events");
+  revalidatePath("/book");
   revalidatePath("/");
-  return { ok: true };
+  return {
+    ok: true,
+    note:
+      coworking && decision === "confirmed"
+        ? cleared > 0
+          ? `Confirmed and cleared — ${cleared === 1 ? "1 booking was" : `${cleared} bookings were`} cancelled and those people have had an apology by email.`
+          : absorbed > 0
+            ? `Confirmed — the day is closed to general booking. ${absorbed === 1 ? "One person who had" : `${absorbed} people who had`} already booked keep their desks and have been emailed.`
+            : "Confirmed — the day is closed to general booking."
+        : undefined,
+  };
 }
 
 /**

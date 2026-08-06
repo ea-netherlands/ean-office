@@ -8,6 +8,7 @@ import { getSettings } from "@/lib/settings";
 import { db, bookings, events } from "@/db";
 import { and, eq, gte, lte, inArray } from "drizzle-orm";
 import { todayAms, monthName, isoWeekday, addDays } from "@/lib/dates";
+import { coworkingSpotCount, isCoworkingDay } from "@/lib/coworking";
 import { BookGrid, DayInfo } from "./book-grid";
 
 export const dynamic = "force-dynamic";
@@ -60,10 +61,32 @@ export default async function BookPage({
         eq(events.status, "confirmed")
       )
     );
+  // Co-working days close their whole day to general booking; the panel needs
+  // the hours and how much of the room is left so it can say more than "shut".
+  const spotsTotal = coworkingSpotCount(cfg);
   const themedByDate = new Map(
     monthEvents
-      .filter((e) => e.type === "themed_coworking")
-      .map((e) => [e.date, { id: e.id, title: e.title }])
+      .filter((e) => isCoworkingDay(e.type))
+      .map((e) => {
+        const cap = capMap.get(e.date);
+        const taken = cap
+          ? Math.max(
+              cap.am.desksBooked + cap.am.flexBooked,
+              cap.pm.desksBooked + cap.pm.flexBooked
+            )
+          : 0;
+        return [
+          e.date,
+          {
+            id: e.id,
+            title: e.title,
+            startsAt: e.startsAt,
+            endsAt: e.endsAt,
+            spotsTotal,
+            spotsLeft: Math.max(0, spotsTotal - taken),
+          },
+        ] as const;
+      })
   );
 
   const blockCap = Math.floor(cfg.desk_count * cfg.block_max_share);

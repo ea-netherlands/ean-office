@@ -8,8 +8,19 @@ import { newId } from "@/lib/ids";
 import { sendEmail, link } from "@/lib/email";
 import { formatDayLong, todayAms } from "@/lib/dates";
 import { validateEventHours } from "@/lib/event-hours";
+import { EchoState, formValues } from "@/lib/form-values";
 
-export type ProposeState = { ok?: boolean; error?: string };
+export type ProposeState = EchoState & { ok?: boolean };
+
+const FIELDS = [
+  "title",
+  "date",
+  "startsAt",
+  "endsAt",
+  "type",
+  "expectedAttendance",
+  "proposalNote",
+] as const;
 
 /**
  * Members can propose an event at the office; it lands in the admin queue
@@ -20,9 +31,18 @@ export async function proposeEventAction(
   _prev: ProposeState,
   formData: FormData
 ): Promise<ProposeState> {
+  const values = formValues(formData, FIELDS);
+  const attempt = (_prev.attempt ?? 0) + 1;
+  const fail = (error: string, field?: string): ProposeState => ({
+    error,
+    field,
+    values,
+    attempt,
+  });
+
   const user = await getCurrentUser();
   if (!isActiveMember(user)) {
-    return { error: "You need to be logged in as a member to propose an event." };
+    return fail("You need to be logged in as a member to propose an event.");
   }
 
   const title = String(formData.get("title") || "").trim();
@@ -33,11 +53,11 @@ export async function proposeEventAction(
   const expected = Number(formData.get("expectedAttendance"));
   const note = String(formData.get("proposalNote") || "").trim().slice(0, 1000);
 
-  if (!title) return { error: "Give your event a name." };
-  if (!date) return { error: "Pick a date." };
-  if (date < todayAms()) return { error: "That date has already passed." };
+  if (!title) return fail("Give your event a name.", "title");
+  if (!date) return fail("Pick a date.", "date");
+  if (date < todayAms()) return fail("That date has already passed.", "date");
   const hoursError = validateEventHours(type, startsAt, endsAt);
-  if (hoursError) return { error: hoursError };
+  if (hoursError) return fail(hoursError, "startsAt");
 
   await db.insert(events).values({
     id: newId("ev"),

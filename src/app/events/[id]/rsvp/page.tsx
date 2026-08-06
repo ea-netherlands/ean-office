@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation";
-import { db, events, eventGuests } from "@/db";
+import { db, events, eventGuests, bookings } from "@/db";
 import { eq, and } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { Nav } from "@/components/nav";
 import { Page, H1, Sub, Card, Icon } from "@/components/ui";
 import { formatDayLong, todayAms } from "@/lib/dates";
+import { describeSeat } from "@/lib/booking";
+import { coworkingSpots } from "@/lib/coworking-guests";
 import { RsvpForm } from "./rsvp-form";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +47,20 @@ export default async function EventRsvpPage({
         )[0]
       : undefined;
 
+    const spots = await coworkingSpots(event.date);
+    const [seat] = user
+      ? await db
+          .select()
+          .from(bookings)
+          .where(
+            and(
+              eq(bookings.userId, user.id),
+              eq(bookings.date, event.date),
+              eq(bookings.status, "booked")
+            )
+          )
+      : [];
+
     if (mine) {
       body = (
         <Card className="text-center py-8">
@@ -65,15 +81,24 @@ export default async function EventRsvpPage({
                 ? "The organiser wasn't able to fit you in this time."
                 : "Request sent — the organiser will get back to you."}
           </p>
+          {mine.status === "approved" && seat && (
+            <p className="text-sm text-slate-500 mt-1">
+              You&apos;ve got {describeSeat(seat)}. Scan the QR code by the
+              door when you arrive.
+            </p>
+          )}
         </Card>
       );
     } else {
       body = (
         <>
           <p className="text-sm text-slate-600 mb-4">
-            The office is closed to general desk booking that day — this is
-            how you ask the organiser for a spot. Open to anyone, first time
-            or not.
+            A co-working day: the whole office works on this together, so the
+            day is closed to general desk booking and the organiser decides
+            who&apos;s in. Open to anyone, first time or not —{" "}
+            {spots.left > 0
+              ? `${spots.left} of ${spots.total} spots are still free.`
+              : `all ${spots.total} spots are taken, but you can still ask.`}
           </p>
           <RsvpForm eventId={id} defaultName={user?.name} defaultEmail={user?.email} />
         </>
