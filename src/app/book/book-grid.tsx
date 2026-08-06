@@ -475,14 +475,18 @@ function DayCell({
         <>
           <span className="text-[10px] leading-tight mt-0.5">{label}</span>
           {d.themedEvent && <Icon name="target-arrow" className="text-[10px] text-teal-700" />}
+          {/* Two initials, not three: five columns on a 375px screen leaves
+              ~51px inside a cell, and three avatars plus the counter needed
+              65 — the overflow clipped the "+7" that says how many are
+              actually coming, which is the more useful half. */}
           {!closedForEvent && d.people.length > 0 && (
-            <span className="flex -space-x-1 mt-auto">
-              {d.people.slice(0, 3).map((p) => (
+            <span className="flex -space-x-1 mt-auto max-w-full">
+              {d.people.slice(0, 2).map((p) => (
                 <Avatar key={p.id} name={p.name} small />
               ))}
-              {d.people.length > 3 && (
-                <span className="text-[9px] self-center pl-1.5">
-                  +{d.people.length - 3}
+              {d.people.length > 2 && (
+                <span className="text-[9px] self-center pl-1">
+                  +{d.people.length - 2}
                 </span>
               )}
             </span>
