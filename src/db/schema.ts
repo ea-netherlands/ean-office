@@ -300,9 +300,26 @@ export const events = pgTable("events", {
     .default("manual"),
   // Members can propose events; admins confirm. Only confirmed events show to
   // members and count towards the funder-facing event figures.
-  status: text("status", { enum: ["proposed", "confirmed", "declined"] })
+  //
+  // `cancelled` is called off after it was confirmed, by an admin or by the
+  // organiser. Kept rather than deleted: an event that vanishes takes its
+  // history with it, and a reporting period shouldn't quietly change shape
+  // after the fact. Excluded from the funder counts all the same.
+  status: text("status", {
+    enum: ["proposed", "confirmed", "declined", "cancelled"],
+  })
     .notNull()
     .default("confirmed"),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  cancelledBy: text("cancelled_by"),
+  cancelReason: text("cancel_reason"),
+  /**
+   * Who lost a booking when a co-working day cleared the office (see
+   * lib/coworking-guests.ts). Recorded so that calling the day off can tell
+   * exactly those people the space is theirs again — no way to tell them
+   * apart from ordinary cancellations otherwise.
+   */
+  displacedUserIds: text("displaced_user_ids").array(),
   proposalNote: text("proposal_note"),
   questionAskedAt: timestamp("question_asked_at", { withTimezone: true }),
   externalId: text("external_id").unique(), // Luma UID for sync upserts

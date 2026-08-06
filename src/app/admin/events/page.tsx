@@ -76,6 +76,10 @@ export default async function EventsPage() {
       proposedBy: e.createdBy ? proposerNames.get(e.createdBy)?.name ?? null : null,
       proposedByEmail: e.createdBy ? proposerNames.get(e.createdBy)?.email ?? null : null,
       questionAskedAt: e.questionAskedAt ? amsDate(e.questionAskedAt) : null,
+      cancelReason: e.cancelReason,
+      cancelledByName: e.cancelledBy
+        ? proposerNames.get(e.cancelledBy)?.name ?? null
+        : null,
       checkins: forEvent.filter((a) => a.source === "checkin").length,
       manual: forEvent.filter((a) => a.source === "manual").length,
       rsvps: forEvent.filter((a) => a.source === "rsvp").length,

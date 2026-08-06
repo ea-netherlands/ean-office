@@ -4,7 +4,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { getCurrentUser, isAdmin, appUrl } from "@/lib/auth";
 import { Nav } from "@/components/nav";
 import { Page, H1, Sub } from "@/components/ui";
-import { formatDayLong, todayAms } from "@/lib/dates";
+import { formatDay, formatDayLong, todayAms } from "@/lib/dates";
 import { describeSeat } from "@/lib/booking";
 import { asSlot, SLOT_LABEL } from "@/lib/slots";
 import { coworkingSpots } from "@/lib/coworking-guests";
@@ -94,6 +94,14 @@ export default async function EventGuestsPage({
           spots={spots}
           shareUrl={`${appUrl()}/events/${event.id}/rsvp`}
           open={isCoworkingDay(event.type) && event.status === "confirmed" && event.date >= todayAms()}
+          event={{
+            id: event.id,
+            title: event.title,
+            dateLabel: formatDay(event.date),
+            coworking: isCoworkingDay(event.type),
+            cancellable: event.status === "confirmed" && event.date >= todayAms(),
+            cancelledReason: event.status === "cancelled" ? event.cancelReason : null,
+          }}
         />
       </Page>
     </>

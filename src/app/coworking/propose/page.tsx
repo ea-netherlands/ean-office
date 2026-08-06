@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { and, gte, lte, ne } from "drizzle-orm";
+import { and, gte, inArray, lte } from "drizzle-orm";
 import { getCurrentUser, isActiveMember } from "@/lib/auth";
 import { Nav } from "@/components/nav";
 import { Page, H1, Sub } from "@/components/ui";
@@ -34,7 +34,14 @@ async function getDays(): Promise<CoworkingDayInfo[]> {
       status: events.status,
     })
     .from(events)
-    .where(and(gte(events.date, from), lte(events.date, to), ne(events.status, "declined")));
+    // Declined and cancelled events don't block a date.
+    .where(
+      and(
+        gte(events.date, from),
+        lte(events.date, to),
+        inArray(events.status, ["proposed", "confirmed"])
+      )
+    );
 
   const capMap = await capacityForRange(from, to, cfg);
   const total = coworkingSpotCount(cfg);

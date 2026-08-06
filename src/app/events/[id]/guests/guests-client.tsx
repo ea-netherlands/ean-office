@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { decideGuestAction } from "@/actions/event-guest";
-import { Badge, Card, Icon, btnPrimary, btnSecondary } from "@/components/ui";
+import { CancelEventButton } from "@/components/cancel-event-button";
+import { Badge, Card, Icon, Notice, btnPrimary, btnSecondary } from "@/components/ui";
 
 export type GuestRow = {
   id: string;
@@ -16,22 +17,43 @@ export type GuestRow = {
   wasAlreadyBooked: boolean;
 };
 
+export type GuestsEvent = {
+  id: string;
+  title: string;
+  dateLabel: string;
+  coworking: boolean;
+  cancellable: boolean;
+  cancelledReason: string | null;
+};
+
 export function GuestsClient({
   guests,
   spots,
   shareUrl,
   open,
+  event,
 }: {
   guests: GuestRow[];
   spots: { total: number; taken: number; left: number };
   shareUrl: string;
   open: boolean;
+  event: GuestsEvent;
 }) {
+  const [notice, setNotice] = useState<string | null>(null);
   const pending = guests.filter((g) => g.status === "pending");
   const decided = guests.filter((g) => g.status !== "pending");
+  const live = guests.filter((g) => g.status !== "declined").length;
 
   return (
     <div className="space-y-4">
+      {notice && <Notice className="mb-1">{notice}</Notice>}
+      {event.cancelledReason !== null && (
+        <Notice tone="error">
+          This one has been called off — nobody is expected, and the day is
+          open for normal desk booking again.
+          {event.cancelledReason ? ` “${event.cancelledReason}”` : ""}
+        </Notice>
+      )}
       <Card className="space-y-3">
         <div className="flex items-baseline justify-between gap-3 flex-wrap">
           <h2>
@@ -55,6 +77,26 @@ export function GuestsClient({
         </div>
         {open && <ShareLink url={shareUrl} />}
       </Card>
+
+      {/* Plans change, and the organiser is usually the first to know. */}
+      {event.cancellable && (
+        <Card className="space-y-2">
+          <p className="text-sm text-slate-600">
+            Can&apos;t go ahead? Call it off here — everyone who signed up gets
+            an email, the desks go back, and the day reopens for normal
+            booking.
+          </p>
+          <CancelEventButton
+            eventId={event.id}
+            title={event.title}
+            date={event.dateLabel}
+            coworking={event.coworking}
+            signedUp={live}
+            label={event.coworking ? "Cancel this co-working day" : "Cancel this event"}
+            onDone={setNotice}
+          />
+        </Card>
+      )}
 
       {guests.length === 0 ? (
         <p className="text-slate-500 text-sm">

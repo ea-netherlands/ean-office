@@ -1,7 +1,7 @@
 // Database side of co-working days: who has a spot, who keeps the one they
 // already had, and how an approved guest actually gets a desk.
 
-import { db, bookings, eventGuests, users } from "@/db";
+import { db, bookings, eventGuests, events, users } from "@/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { newId } from "./ids";
 import { getSettings, Settings } from "./settings";
@@ -168,6 +168,15 @@ export async function clearDayForCoworking(event: {
 <p>We know that's annoying when you'd already planned around it — apologies. Every other day is unaffected: ${link(`${appUrl()}/book`, "pick another one from the calendar")}.</p>
 <p>If the day itself is up your street, you're very welcome to come to it — ${link(askToJoin, "ask the organiser for a spot")}.</p>`,
     });
+  }
+
+  // Remember exactly who was moved off, so that calling the day off later can
+  // tell them the space is theirs again.
+  if (byUser.size > 0) {
+    await db
+      .update(events)
+      .set({ displacedUserIds: [...byUser.keys()] })
+      .where(eq(events.id, event.id));
   }
 
   // Whoever's left holding a desk (the organiser) belongs on the guest list.

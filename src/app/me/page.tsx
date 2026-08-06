@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { Nav } from "@/components/nav";
 import { Page, H1, Sub, Card, Badge, Icon } from "@/components/ui";
-import { db, bookings, events, eventGuests } from "@/db";
+import { db, bookings, events, eventGuests, eventAttendance } from "@/db";
+import { CancelEventButton } from "@/components/cancel-event-button";
 import { and, eq, gte, inArray, asc } from "drizzle-orm";
 import { todayAms, formatDay, formatDayLong } from "@/lib/dates";
 import { COWORKING_TYPE } from "@/lib/coworking";
@@ -28,20 +29,47 @@ export default async function MePage() {
     )
     .orderBy(asc(bookings.date));
 
-  // Co-working days they're running, and ones they've asked to join. The
-  // organiser's guest list is otherwise only reachable from an email.
+  // Anything they're running — co-working days and evening events alike.
+  // Without this the only route to your own event is a link in an email, and
+  // there'd be nowhere to call one off from.
   const organising = await db
     .select()
     .from(events)
     .where(
       and(
         eq(events.createdBy, user.id),
-        eq(events.type, COWORKING_TYPE),
         gte(events.date, todayAms()),
         inArray(events.status, ["proposed", "confirmed"])
       )
     )
     .orderBy(asc(events.date));
+  // How many people would need telling if they called one off.
+  const organisingIds = organising.map((e) => e.id);
+  const signups = new Map<string, number>();
+  if (organisingIds.length > 0) {
+    const bump = (id: string) => signups.set(id, (signups.get(id) ?? 0) + 1);
+    for (const g of await db
+      .select({ eventId: eventGuests.eventId })
+      .from(eventGuests)
+      .where(
+        and(
+          inArray(eventGuests.eventId, organisingIds),
+          inArray(eventGuests.status, ["pending", "approved"])
+        )
+      ))
+      bump(g.eventId);
+    for (const r of await db
+      .select({ eventId: eventAttendance.eventId })
+      .from(eventAttendance)
+      .where(
+        and(
+          inArray(eventAttendance.eventId, organisingIds),
+          eq(eventAttendance.source, "rsvp")
+        )
+      ))
+      bump(r.eventId);
+  }
+
   const joining = (
     await db
       .select({ g: eventGuests, e: events })
@@ -74,31 +102,20 @@ export default async function MePage() {
           )}
         </Sub>
         {(organising.length > 0 || joining.length > 0) && (
-          <Card className="mb-4 space-y-2">
-            <h2>Co-working days</h2>
+          <Card className="mb-4 space-y-3">
+            <h2>What you&apos;re running</h2>
             {organising.map((e) => (
-              <div
+              <OrganiserRow
                 key={e.id}
-                className="flex items-center justify-between gap-3 flex-wrap text-sm"
-              >
-                <span>
-                  <Icon name="target-arrow" className="mr-1 text-teal-700" />
-                  {e.title} · {formatDay(e.date)}{" "}
-                  {e.status === "proposed" ? (
-                    <Badge>awaiting confirmation</Badge>
-                  ) : (
-                    <Badge tone="teal">yours to run</Badge>
-                  )}
-                </span>
-                {e.status === "confirmed" && (
-                  <Link
-                    href={`/events/${e.id}/guests`}
-                    className="text-teal-700 underline"
-                  >
-                    Manage guests
-                  </Link>
-                )}
-              </div>
+                event={{
+                  id: e.id,
+                  title: e.title,
+                  dateLabel: formatDay(e.date),
+                  status: e.status,
+                  coworking: e.type === COWORKING_TYPE,
+                  signedUp: signups.get(e.id) ?? 0,
+                }}
+              />
             ))}
             {joining.map(({ g, e }) => (
               <div
@@ -154,5 +171,57 @@ export default async function MePage() {
         />
       </Page>
     </>
+  );
+}
+
+/**
+ * One thing the member is running. Confirmed ones can be called off from
+ * here — the organiser shouldn't have to find an admin to do it.
+ */
+function OrganiserRow({
+  event,
+}: {
+  event: {
+    id: string;
+    title: string;
+    dateLabel: string;
+    status: string;
+    coworking: boolean;
+    signedUp: number;
+  };
+}) {
+  return (
+    <div className="text-sm border-b border-slate-100 last:border-0 pb-3 last:pb-0">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <span>
+          {event.coworking && (
+            <Icon name="target-arrow" className="mr-1 text-teal-700" />
+          )}
+          {event.title} · {event.dateLabel}{" "}
+          {event.status === "proposed" ? (
+            <Badge>awaiting confirmation</Badge>
+          ) : (
+            <Badge tone="teal">yours to run</Badge>
+          )}
+        </span>
+        {event.status === "confirmed" && event.coworking && (
+          <Link href={`/events/${event.id}/guests`} className="text-teal-700 underline">
+            Manage guests
+          </Link>
+        )}
+      </div>
+      {event.status === "confirmed" && (
+        <div className="mt-2">
+          <CancelEventButton
+            eventId={event.id}
+            title={event.title}
+            date={event.dateLabel}
+            coworking={event.coworking}
+            signedUp={event.signedUp}
+            label="Cancel it"
+          />
+        </div>
+      )}
+    </div>
   );
 }

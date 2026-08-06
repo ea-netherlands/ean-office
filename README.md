@@ -50,6 +50,16 @@ delivered. Create real admins with `npm run admin:add -- "Name" email`.
   the organiser's join link). Clearing can't be undone from the app. They're
   `events` rows of type `themed_coworking`, so the funder reports already
   count them.
+- **Cancelling an event** — any confirmed event, evening or co-working, can be
+  called off by an admin (`/admin/events`) or by its organiser (`/me`, or
+  their guest list). The row stays as `status = "cancelled"` with a reason
+  rather than being deleted, so the funder counts — which only ever include
+  `confirmed` — don't change shape retroactively. Cancelling emails everyone
+  who signed up, releases the desks that were handed to approved guests,
+  reopens the day for booking, and tells anyone whose booking was cleared for
+  that day that the space is theirs again (`events.displaced_user_ids`, set
+  when the day was cleared). Deleting is still available, but only for events
+  that have already happened.
 - **Settings** — everything configurable (desk count, coverage days, no-show
   thresholds…) lives in the `settings` table, editable at `/admin/settings`.
 

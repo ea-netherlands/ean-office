@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { and, gte, lte, ne } from "drizzle-orm";
+import { and, gte, inArray, lte } from "drizzle-orm";
 import { getCurrentUser, isActiveMember } from "@/lib/auth";
 import { Nav } from "@/components/nav";
 import { Page, H1, Sub } from "@/components/ui";
@@ -23,7 +23,14 @@ async function getAvailability(): Promise<Availability[]> {
       status: events.status,
     })
     .from(events)
-    .where(and(gte(events.date, from), lte(events.date, to), ne(events.status, "declined")));
+    // Declined and cancelled events aren't in anyone's way.
+    .where(
+      and(
+        gte(events.date, from),
+        lte(events.date, to),
+        inArray(events.status, ["proposed", "confirmed"])
+      )
+    );
 
   // Proposed events stay invisible to other members until an admin confirms
   // them, so we only ever surface a generic "pending" marker for those dates

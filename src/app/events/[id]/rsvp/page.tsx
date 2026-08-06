@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db, events, eventGuests, bookings } from "@/db";
 import { eq, and } from "drizzle-orm";
@@ -23,7 +24,24 @@ export default async function EventRsvpPage({
   const user = await getCurrentUser();
 
   let body: React.ReactNode;
-  if (event.type !== "themed_coworking" || event.status !== "confirmed") {
+  if (event.status === "cancelled") {
+    body = (
+      <Card className="text-center py-8">
+        <Icon name="calendar-off" className="text-4xl text-slate-400 mb-2" />
+        <p className="text-slate-600">
+          This one has been called off — sorry.
+          {event.cancelReason ? ` ${event.cancelReason}` : ""}
+        </p>
+        <p className="text-sm text-slate-500 mt-2">
+          The office is open as usual that day, so you can{" "}
+          <Link href="/book" className="text-teal-700 underline">
+            book a desk
+          </Link>{" "}
+          instead.
+        </p>
+      </Card>
+    );
+  } else if (event.type !== "themed_coworking" || event.status !== "confirmed") {
     body = (
       <Card className="text-center py-8">
         <Icon name="calendar-off" className="text-4xl text-slate-400 mb-2" />

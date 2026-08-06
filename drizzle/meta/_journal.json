@@ -64,6 +64,13 @@
       "when": 1785933789829,
       "tag": "0008_half_day_slots",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786025303047,
+      "tag": "0009_event_cancellation",
+      "breakpoints": true
     }
   ]
 }

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui";
 import { formatDay } from "@/lib/dates";
 import { EVENING_START_MIN, EVENING_END_MAX, needsEveningWindow } from "@/lib/event-hours";
+import { CancelEventButton } from "@/components/cancel-event-button";
 
 export type EventRow = {
   id: string;
@@ -47,6 +48,8 @@ export type EventRow = {
   proposedBy: string | null;
   proposedByEmail: string | null;
   questionAskedAt: string | null;
+  cancelReason: string | null;
+  cancelledByName: string | null;
   /** Co-working days only: what confirming would sit on top of. */
   bookedThatDay: number;
   guestsPending: number;
@@ -210,7 +213,7 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
         ) : (
           <ul className="divide-y divide-slate-100">
             {confirmed.map((e) => (
-              <EventItem key={e.id} e={e} />
+              <EventItem key={e.id} e={e} onNotice={setNotice} />
             ))}
           </ul>
         )}
@@ -386,11 +389,19 @@ function ProposalItem({
   );
 }
 
-function EventItem({ e }: { e: EventRow }) {
+function EventItem({
+  e,
+  onNotice,
+}: {
+  e: EventRow;
+  onNotice: (note: string | null) => void;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [headcount, setHeadcount] = useState(e.headcount?.toString() ?? "");
   const counted = Math.max(e.checkins + e.manual, e.headcount ?? 0);
+  const coworking = !needsEveningWindow(e.type);
+  const cancelled = e.status === "cancelled";
 
   function onTypeChange(type: string) {
     startTransition(async () => {
@@ -404,10 +415,19 @@ function EventItem({ e }: { e: EventRow }) {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <p className="text-sm font-medium">
-            {e.title}{" "}
+            <span className={cancelled ? "line-through text-slate-400" : ""}>
+              {e.title}
+            </span>{" "}
+            {cancelled && <Badge tone="red">cancelled</Badge>}
             {e.source === "luma" && <Badge tone="teal">luma</Badge>}
             {e.organiser === "hosted" && <Badge>hosted</Badge>}
           </p>
+          {cancelled && (
+            <p className="text-xs text-slate-500 mt-0.5">
+              {e.cancelledByName ? `Called off by ${e.cancelledByName}` : "Called off"}
+              {e.cancelReason ? ` — ${e.cancelReason}` : ""}
+            </p>
+          )}
           <p className="text-xs text-slate-400 flex items-center gap-1.5 flex-wrap mt-0.5">
             {formatDay(e.date)}
             {e.startsAt ? ` · ${e.startsAt}${e.endsAt ? `–${e.endsAt}` : ""}` : ""}
@@ -445,7 +465,7 @@ function EventItem({ e }: { e: EventRow }) {
           </p>
         </div>
       </div>
-      {!needsEveningWindow(e.type) && !e.past && (
+      {coworking && !e.past && !cancelled && (
         <p className="text-xs text-slate-500 mt-1">
           Closed to general booking ·{" "}
           <a href={`/events/${e.id}/guests`} className="text-teal-700 underline">
@@ -453,6 +473,21 @@ function EventItem({ e }: { e: EventRow }) {
             {e.guestsPending > 0 ? `, ${e.guestsPending} waiting` : ""}
           </a>
         </p>
+      )}
+      {/* Calling it off is for events still to come; past ones get deleted
+          below once they've been counted. */}
+      {!e.past && !cancelled && (
+        <div className="mt-2">
+          <CancelEventButton
+            eventId={e.id}
+            title={e.title}
+            date={formatDay(e.date)}
+            coworking={coworking}
+            signedUp={e.guestsPending + e.guestsApproved + e.rsvps}
+            label={coworking ? "Cancel this co-working day" : "Cancel this event"}
+            onDone={onNotice}
+          />
+        </div>
       )}
       {e.past && (
         <div className="mt-2 flex gap-2 items-center">
