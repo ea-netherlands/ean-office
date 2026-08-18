@@ -194,7 +194,19 @@ export async function setMemberStatusAction(
   status: "trial" | "active" | "inactive"
 ): Promise<AdminActionState> {
   await requireAdmin();
+  const [user] = await db.select().from(users).where(eq(users.id, userId));
+  if (!user) return { error: "User not found." };
+
   await db.update(users).set({ status }).where(eq(users.id, userId));
+
+  // Promoting someone mid-trial is the same decision as "Admit" in the queue,
+  // and it's the only route available for a trial whose day hasn't passed —
+  // so it tells them too. Reactivating an inactive or previously declined
+  // member is a different decision, and stays quiet.
+  if (status === "active" && user.status === "trial") {
+    await sendAdmittedEmail(user);
+  }
+
   revalidatePath("/admin/members");
   return { ok: true };
 }
@@ -222,6 +234,23 @@ export async function setMemberRoleAction(
 }
 
 /**
+ * The "you're a member now" note. Shared by both routes an admin can take —
+ * "Admit" in the trial queue and "Mark active" on the member row — so it
+ * can't matter which button they reach for.
+ */
+async function sendAdmittedEmail(user: { name: string; email: string }): Promise<void> {
+  await sendEmail({
+    to: user.email,
+    subject: "You're in — the office is yours to book",
+    kind: "trial_admitted",
+    html: `<p>Hi ${user.name},</p>
+<p>Thanks for coming by. We'd love to have you as a member, so you can book desks from now on — ${link(`${appUrl()}/book`, "the booking page")} is open to you. Log in with this address; there's no password.</p>
+<p>Worth knowing: book the days you mean to come, and cancel if plans change — the space is small and a held desk nobody uses is a desk someone else needed. Check in with the QR code by the door when you arrive.</p>
+<p>See you soon!<br>The EA Netherlands team</p>`,
+  });
+}
+
+/**
  * After a trial day, an admin admits (full member) or declines them. Both the
  * acknowledgement and the approval email promise a follow-up, so both
  * outcomes send one — being declined by silence is the worst version of this.
@@ -240,15 +269,7 @@ export async function resolveTrialAction(
     .where(eq(users.id, userId));
 
   if (outcome === "admit") {
-    await sendEmail({
-      to: user.email,
-      subject: "You're in — the office is yours to book",
-      kind: "trial_admitted",
-      html: `<p>Hi ${user.name},</p>
-<p>Thanks for coming by. We'd love to have you as a member, so you can book desks from now on — ${link(`${appUrl()}/book`, "the booking page")} is open to you. Log in with this address; there's no password.</p>
-<p>Worth knowing: book the days you mean to come, and cancel if plans change — the space is small and a held desk nobody uses is a desk someone else needed. Check in with the QR code by the door when you arrive.</p>
-<p>See you soon!<br>The EA Netherlands team</p>`,
-    });
+    await sendAdmittedEmail(user);
   } else {
     await sendEmail({
       to: user.email,
