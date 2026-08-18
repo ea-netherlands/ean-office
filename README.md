@@ -89,7 +89,26 @@ Copy `.env.example` to `.env.local`:
 | `EMAIL_FROM` | optional | Sender address |
 | `CRON_SECRET` | prod | Guards `/api/cron/daily` |
 
-## Deploying (Vercel + Neon, both free tier)
+## Hosting
+
+Everything runs on free tiers, so the app costs €0/month at this scale.
+
+| Piece | Where | Notes |
+|---|---|---|
+| Code | GitHub (org `ea-netherlands`, private repo `ean-office`) | Push to `main`, Vercel redeploys automatically |
+| App + daily cron | Vercel | `vercel.json` registers `/api/cron/daily` at 06:00 UTC; served at `office.effectiefaltruisme.nl` (CNAME → `cname.vercel-dns.com`), with a `*.vercel.app` fallback URL |
+| Database | Neon (Postgres, Frankfurt region) | `DATABASE_URL` env var; PGlite locally instead |
+| Email | Resend | `RESEND_API_KEY`; domain `effectiefaltruisme.nl` verified via DNS records; logs to `/admin/emails` when unset |
+| DNS | wherever effectiefaltruisme.nl is managed | one CNAME record for the `office` subdomain |
+
+Logs and cron history live in the Vercel dashboard (project → Logs / Settings
+→ Cron Jobs). Neon has point-in-time restore for backups.
+
+First time setting this up? See **[GOING-LIVE.md](GOING-LIVE.md)** — a full,
+no-experience-assumed walkthrough of creating the four accounts and wiring
+them together.
+
+## Deploying (once hosting is set up)
 
 1. Create a Neon project, set `DATABASE_URL`.
 2. Run migrations once: `DATABASE_URL=... npx tsx -e "import('./src/db/index.ts').then(m=>m.ensureMigrated())"`.
