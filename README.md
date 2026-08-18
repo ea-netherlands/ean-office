@@ -5,6 +5,10 @@ a lunch table. Replaces the Airtable form, the email approval chain, and the
 shared Google Sheet. Styled with the EAN design system (EA Teal + Slate,
 Sentient + Atkinson Hyperlegible Next).
 
+Running a coworking space somewhere else? See **[ADAPTING.md](ADAPTING.md)**
+— what's configurable, what's Amsterdam-shaped, and what you'll want to cut.
+MIT licensed, so fork it freely.
+
 ## Quick start
 
 ```bash
@@ -109,3 +113,7 @@ Copy `.env.example` to `.env.local`:
   dependency for software that must survive unmaintained months.
 - **Cancel/retro email links land on a one-tap confirm page** rather than
   acting on GET, so email scanners that prefetch links can't cancel bookings.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE).
