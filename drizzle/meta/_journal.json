@@ -78,6 +78,13 @@
       "when": 1786029994110,
       "tag": "0010_user_email_aliases",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786060800000,
+      "tag": "0011_trial_single_day",
+      "breakpoints": true
     }
   ]
 }

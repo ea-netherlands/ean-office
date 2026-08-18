@@ -26,7 +26,6 @@ export type Settings = {
   request_expiry_days: number; // "awaiting reply" auto-expiry
   profile_skip_limit: number; // skips allowed before M&E profile is required
   checkin_retention_months: number; // GDPR purge horizon
-  trial_months: number;
   office_address: string;
   luma_ics_url: string; // public ICS feed of the EAN Luma calendar
   info_public_md: string; // /info content everyone can see (markdown)
@@ -53,7 +52,6 @@ export const DEFAULT_SETTINGS: Settings = {
   request_expiry_days: 14,
   profile_skip_limit: 2,
   checkin_retention_months: 24,
-  trial_months: 3,
   office_address:
     "HNK Houthavens, Van Diemenstraat 92, 1013 CN Amsterdam (ground floor — ask for 'Effectief Altruïsme Nederland', or walk towards the elevators, turn right, go through the connecting doors, and it's the first office on the left with the EA logos)",
   // Real value is set in the database via /admin/settings — never in source.

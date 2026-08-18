@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   setMemberStatusAction,
   setMemberRoleAction,
-  endTrialAction,
+  resolveTrialAction,
   clearNoShowsAction,
   deleteUserAction,
   addMemberAction,
@@ -29,7 +29,7 @@ export type MemberRow = {
   email: string;
   role: string;
   status: string;
-  trialEndsAt: string | null;
+  trialDate: string | null;
   trialEnded: boolean;
   noShowCount: number;
   noShowEmailed: boolean;
@@ -91,10 +91,10 @@ export function MembersClient({
     <div className="space-y-4">
       {trialsToReview.length > 0 && (
         <Card className="border-orange-300 bg-orange-50">
-          <h2 className="mb-2">Trials to review</h2>
+          <h2 className="mb-2">Trial visits awaiting a decision</h2>
           <p className="text-sm text-slate-600 mb-3">
-            These trials have ended — confirm them as regular members, extend,
-            or end. (Members see no difference; this is EAN&apos;s own tracking.)
+            Their trial day has passed — admit them as a full member or
+            decline. They can&apos;t book any further days until you decide.
           </p>
           <ul className="space-y-2">
             {trialsToReview.map((r) => (
@@ -102,18 +102,25 @@ export function MembersClient({
                 <span className="text-sm font-medium">
                   {r.name}{" "}
                   <span className="text-slate-400 font-normal">
-                    trial ended {r.trialEndsAt && formatDayLong(r.trialEndsAt)}
+                    visited {r.trialDate && formatDayLong(r.trialDate)}
                   </span>
                 </span>
                 <span className="flex gap-1.5">
-                  <SmallBtn onClick={() => run(() => endTrialAction(r.id, "convert"))}>
-                    Confirm member
+                  <SmallBtn onClick={() => run(() => resolveTrialAction(r.id, "admit"))}>
+                    Admit
                   </SmallBtn>
-                  <SmallBtn onClick={() => run(() => endTrialAction(r.id, "extend"))}>
-                    Extend 30d
-                  </SmallBtn>
-                  <SmallBtn danger onClick={() => run(() => endTrialAction(r.id, "end"))}>
-                    End
+                  <SmallBtn
+                    danger
+                    onClick={() => {
+                      if (
+                        confirm(
+                          `Decline ${r.name}? They'll get an email, and they won't be able to log in again unless you mark them active.`
+                        )
+                      )
+                        run(() => resolveTrialAction(r.id, "decline"));
+                    }}
+                  >
+                    Decline
                   </SmallBtn>
                 </span>
               </li>
@@ -183,6 +190,7 @@ export function MembersClient({
             <option value="trial">Trial</option>
             <option value="imported">Imported, not claimed</option>
             <option value="inactive">Inactive</option>
+            <option value="declined">Declined</option>
           </select>
           <span className="text-xs text-slate-400">
             {visible.length} of {rows.length}
@@ -252,7 +260,9 @@ export function MembersClient({
                           ? "teal"
                           : r.status === "imported"
                             ? "amber"
-                            : "stone"
+                            : r.status === "declined"
+                              ? "red"
+                              : "stone"
                     }
                   >
                     {r.status === "imported" ? "not yet claimed" : r.status}

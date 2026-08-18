@@ -97,10 +97,25 @@ export default async function MePage() {
         <H1>Your bookings</H1>
         <Sub>
           {user.name} · {user.email}
-          {user.status === "trial" && user.trialEndsAt && (
-            <> · <Badge tone="teal">trial until {formatDayLong(user.trialEndsAt)}</Badge></>
+          {user.status === "trial" && user.trialDate && (
+            <>
+              {" "}
+              ·{" "}
+              <Badge tone="teal">
+                {user.trialDate <= todayAms()
+                  ? "trial visit — awaiting decision"
+                  : `trial visit ${formatDayLong(user.trialDate)}`}
+              </Badge>
+            </>
           )}
         </Sub>
+        {user.status === "trial" && user.trialDate && (
+          <p className="text-sm text-slate-500 mt-1 max-w-prose">
+            {user.trialDate <= todayAms()
+              ? "The team's deciding whether to confirm you as a full member — you'll be able to book further days once they do."
+              : `Come along on ${formatDayLong(user.trialDate)} to see if the space is a fit. The team will confirm you as a full member afterwards.`}
+          </p>
+        )}
         {(organising.length > 0 || joining.length > 0) && (
           <Card className="mb-4 space-y-3">
             <h2>What you&apos;re running</h2>

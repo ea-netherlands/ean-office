@@ -271,10 +271,10 @@ export async function mergeUsers(
           (STATUS_RANK[merge.status] ?? 0) > (STATUS_RANK[keep.status] ?? 0)
             ? merge.status
             : keep.status,
-        trialEndsAt:
-          !keep.trialEndsAt || (merge.trialEndsAt && merge.trialEndsAt > keep.trialEndsAt)
-            ? merge.trialEndsAt ?? keep.trialEndsAt
-            : keep.trialEndsAt,
+        trialDate:
+          !keep.trialDate || (merge.trialDate && merge.trialDate > keep.trialDate)
+            ? merge.trialDate ?? keep.trialDate
+            : keep.trialDate,
         createdAt: earliest(keep.createdAt, merge.createdAt) ?? keep.createdAt,
         lastSeenAt: latest(keep.lastSeenAt, merge.lastSeenAt),
         claimedAt: earliest(keep.claimedAt, merge.claimedAt),

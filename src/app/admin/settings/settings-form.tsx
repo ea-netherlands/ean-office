@@ -100,7 +100,6 @@ export function SettingsForm({ cfg }: { cfg: Settings }) {
           The one-tap options cover the next few weeks; beyond that people
           pick a date, and the same coverage rules apply either way.
         </p>
-        <Num name="trial_months" label="Trial length (months)" value={cfg.trial_months} />
       </Card>
 
       <Card className="space-y-3">

@@ -148,7 +148,7 @@ export async function getReport(from: string, to: string): Promise<Report> {
       u.approvedAt.toISOString().slice(0, 10) <= to
   ).length;
   const trialsEndedUsers = allUsers.filter(
-    (u) => u.trialEndsAt && u.trialEndsAt >= from && u.trialEndsAt <= pastTo
+    (u) => u.trialDate && u.trialDate >= from && u.trialDate <= pastTo
   );
   const trialsConverted = trialsEndedUsers.filter(
     (u) => u.status === "active"

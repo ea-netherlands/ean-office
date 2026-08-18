@@ -34,7 +34,10 @@ export const users = pgTable(
     })
       .notNull()
       .default("pending"),
-    trialEndsAt: date("trial_ends_at"),
+    // The single day their trial visit happened (or is booked for). Trial
+    // ends the same day it starts — the admin then admits or declines them.
+    trialDate: date("trial_date"),
+    trialReminderSentAt: timestamp("trial_reminder_sent_at", { withTimezone: true }),
 
     // provenance — where this row came from, and (for bulk imports) whether
     // they've claimed the account yet. "imported" rows are silent and

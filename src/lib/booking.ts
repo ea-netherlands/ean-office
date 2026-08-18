@@ -392,6 +392,19 @@ export async function bookDay(
         error: `${coworking.title} has the whole office that day — ask the organiser for a spot instead.`,
       };
     }
+
+    // Trial members get exactly the one day approved for their visit — no
+    // self-service booking beyond it until an admin admits them.
+    const [trialUser] = await db
+      .select({ status: users.status })
+      .from(users)
+      .where(eq(users.id, userId));
+    if (trialUser?.status === "trial") {
+      return {
+        ok: false,
+        error: "You're here on a trial visit — full booking opens up once you're admitted as a member.",
+      };
+    }
   }
 
   const existing = await db

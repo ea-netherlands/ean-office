@@ -143,14 +143,40 @@ ${releaseNote}
   }
   result.staleReminded = stale.length;
 
+  // 5b. Trial visits whose day has passed but nobody's admitted or declined
+  // them yet — same daily-nag cadence as stale requests, since a trial
+  // member can't book anything further until this is resolved.
+  const trialMembers = await db.select().from(users).where(eq(users.status, "trial"));
+  const trialsToDecide = trialMembers.filter(
+    (u) =>
+      u.trialDate &&
+      u.trialDate <= today &&
+      (!u.trialReminderSentAt || Date.now() - u.trialReminderSentAt.getTime() > 24 * 60 * 60 * 1000)
+  );
+  if (trialsToDecide.length > 0 && isWorkingDay(today)) {
+    const list = trialsToDecide
+      .map((u) => `<li><strong>${u.name}</strong> — visited ${formatDayLong(u.trialDate!)}</li>`)
+      .join("");
+    for (const admin of admins) {
+      await sendEmail({
+        to: admin.email,
+        subject: `${trialsToDecide.length} trial visit${trialsToDecide.length === 1 ? "" : "s"} waiting on a decision`,
+        kind: "admin_trial_decisions",
+        html: `<p>These trial visits have happened — admit or decline them at ${link(`${appUrl()}/admin/members`, "/admin/members")}:</p>
+<ul>${list}</ul>`,
+      });
+    }
+    for (const u of trialsToDecide) {
+      await db.update(users).set({ trialReminderSentAt: new Date() }).where(eq(users.id, u.id));
+    }
+  }
+  result.trialsToDecide = trialsToDecide.length;
+
   // 6. Weekly admin digest on Mondays.
   if (isoWeekday(today) === 1) {
     const weekReport = await getReport(addDays(today, -7), addDays(today, -1));
     const flagged = await flaggedUsers();
-    const trialsEnding = await db.select().from(users).where(eq(users.status, "trial"));
-    const endingSoon = trialsEnding.filter(
-      (u) => u.trialEndsAt && u.trialEndsAt <= addDays(today, 14)
-    );
+    const awaitingDecision = trialMembers.filter((u) => u.trialDate && u.trialDate <= today);
     for (const admin of admins) {
       await sendEmail({
         to: admin.email,
@@ -163,7 +189,7 @@ ${releaseNote}
 <li>Check-in rate: <strong>${Math.round(weekReport.checkinRate * 100)}%</strong> (target ${Math.round(cfg.checkin_rate_target * 100)}%${weekReport.checkinRate < cfg.checkin_rate_target ? " — below target, fix it in the room: a reminder at lunch, a bigger sticker" : ""})</li>
 <li>Open visit requests: <strong>${pending.length}</strong>${stale.length > 0 ? ` (${stale.length} stale)` : ""}</li>
 ${flagged.length > 0 ? `<li>No-show flags needing a human conversation: <strong>${flagged.map((f) => f.name).join(", ")}</strong></li>` : ""}
-${endingSoon.length > 0 ? `<li>Trials ending within two weeks: <strong>${endingSoon.map((u) => u.name).join(", ")}</strong></li>` : ""}
+${awaitingDecision.length > 0 ? `<li>Trial visits awaiting a decision: <strong>${awaitingDecision.map((u) => u.name).join(", ")}</strong></li>` : ""}
 </ul>
 <p>${link(`${appUrl()}/admin/reports`, "Full reports")}</p>`,
       });

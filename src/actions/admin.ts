@@ -16,7 +16,7 @@ import { eq } from "drizzle-orm";
 import { getCurrentUser, appUrl } from "@/lib/auth";
 import { newId } from "@/lib/ids";
 import { sendEmail, link } from "@/lib/email";
-import { addDays, formatDayLong, todayAms } from "@/lib/dates";
+import { formatDayLong, todayAms } from "@/lib/dates";
 import { getSettings, setSetting, Settings } from "@/lib/settings";
 import { clearAllNoShows } from "@/lib/noshow";
 import { buildIcs } from "@/lib/ics";
@@ -51,9 +51,6 @@ export async function approveRequestAction(requestId: string): Promise<AdminActi
   const [user] = await db.select().from(users).where(eq(users.id, req.userId));
   if (!user) return { error: "User not found." };
 
-  const trialEnds = new Date();
-  trialEnds.setMonth(trialEnds.getMonth() + cfg.trial_months);
-
   await db
     .update(visitRequests)
     .set({ status: "approved", decidedBy: admin.id, decidedAt: new Date() })
@@ -63,7 +60,7 @@ export async function approveRequestAction(requestId: string): Promise<AdminActi
     .set({
       role: "member",
       status: "trial",
-      trialEndsAt: trialEnds.toISOString().slice(0, 10),
+      trialDate: req.requestedDate,
       approvedAt: new Date(),
       approvedBy: admin.id,
     })
@@ -80,12 +77,12 @@ export async function approveRequestAction(requestId: string): Promise<AdminActi
 
   await sendEmail({
     to: user.email,
-    subject: `You're in — see you ${formatDayLong(req.requestedDate)}`,
+    subject: `Your trial visit is confirmed — see you ${formatDayLong(req.requestedDate)}`,
     kind: "request_approved",
     html: `<p>Hi ${user.name},</p>
-<p>Great news — you're welcome at the office on <strong>${formatDayLong(req.requestedDate)}</strong>. Come at <strong>${req.requestedArrival}</strong> and someone will be there to show you around.</p>
+<p>Great news — you're invited for a trial visit at the office on <strong>${formatDayLong(req.requestedDate)}</strong>. Come at <strong>${req.requestedArrival}</strong> and someone will be there to show you around.</p>
 <p>Practical bits — address, getting in, lunch, wifi: ${link(`${appUrl()}/info`, "office info page")}. The wifi password is on posters up in the office.</p>
-<p>After your visit you can book desks any time at ${link(`${appUrl()}/book`, "the booking page")} — just log in with this email address.</p>
+<p>This one day is on us to see if the space is a good fit. Afterwards, someone from the team will follow up to confirm you as a full member — until then you won't be able to book any further days.</p>
 <p>See you soon!<br>The EA Netherlands team</p>`,
   });
 
@@ -224,27 +221,46 @@ export async function setMemberRoleAction(
   return { ok: true };
 }
 
-export async function endTrialAction(
+/**
+ * After a trial day, an admin admits (full member) or declines them. Both the
+ * acknowledgement and the approval email promise a follow-up, so both
+ * outcomes send one — being declined by silence is the worst version of this.
+ */
+export async function resolveTrialAction(
   userId: string,
-  outcome: "convert" | "extend" | "end"
+  outcome: "admit" | "decline"
 ): Promise<AdminActionState> {
   await requireAdmin();
-  const cfg = await getSettings();
-  if (outcome === "convert") {
-    await db
-      .update(users)
-      .set({ status: "active" })
-      .where(eq(users.id, userId));
-  } else if (outcome === "extend") {
-    const [user] = await db.select().from(users).where(eq(users.id, userId));
-    const base = user?.trialEndsAt && user.trialEndsAt > todayAms() ? user.trialEndsAt : todayAms();
-    await db
-      .update(users)
-      .set({ trialEndsAt: addDays(base, 30) })
-      .where(eq(users.id, userId));
+  const [user] = await db.select().from(users).where(eq(users.id, userId));
+  if (!user) return { error: "User not found." };
+
+  await db
+    .update(users)
+    .set({ status: outcome === "admit" ? "active" : "declined" })
+    .where(eq(users.id, userId));
+
+  if (outcome === "admit") {
+    await sendEmail({
+      to: user.email,
+      subject: "You're in — the office is yours to book",
+      kind: "trial_admitted",
+      html: `<p>Hi ${user.name},</p>
+<p>Thanks for coming by. We'd love to have you as a member, so you can book desks from now on — ${link(`${appUrl()}/book`, "the booking page")} is open to you. Log in with this address; there's no password.</p>
+<p>Worth knowing: book the days you mean to come, and cancel if plans change — the space is small and a held desk nobody uses is a desk someone else needed. Check in with the QR code by the door when you arrive.</p>
+<p>See you soon!<br>The EA Netherlands team</p>`,
+    });
   } else {
-    await db.update(users).set({ status: "inactive" }).where(eq(users.id, userId));
+    await sendEmail({
+      to: user.email,
+      subject: "About your visit to the office",
+      kind: "trial_declined",
+      html: `<p>Hi ${user.name},</p>
+<p>Thanks for coming to try the office, and for the time you gave it. We're not able to offer you a spot as a member right now — the space is small and we have to be selective about capacity.</p>
+<p>This isn't a judgement on your work, and we'd encourage you to stay involved: EA Netherlands runs regular public events, and the ${link("https://effectiefaltruisme.nl", "community")} is very much open to you.</p>
+<p>Warm regards,<br>The EA Netherlands team</p>`,
+    });
   }
+
   revalidatePath("/admin/members");
   return { ok: true };
 }
@@ -310,7 +326,6 @@ export async function saveSettingsAction(
     "request_expiry_days",
     "profile_skip_limit",
     "checkin_retention_months",
-    "trial_months",
   ];
   for (const key of numeric) {
     const v = num(key);

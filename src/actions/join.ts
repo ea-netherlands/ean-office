@@ -203,6 +203,7 @@ export async function submitJoinRequest(
     kind: "request_ack",
     html: `<p>Hi ${name},</p>
 <p>Thanks for your interest in the EA Netherlands office! We've received your request to visit on <strong>${formatDayLong(requestedDate)}</strong> at ${requestedArrival}.</p>
+<p>Just so it's clear up front: that first visit works as a trial day. Come see if the space is a good fit, and afterwards the team will confirm whether to welcome you as a full member — you won't be able to book further days until then.</p>
 <p>This message is automatic — but a real person reads every request. One of the team will look at yours <strong>within one working day</strong> and you'll get an email either way once they have.</p>
 <p>In the meantime: ${link(`${appUrl()}/info`, "practical info about the office")}.</p>`,
   });

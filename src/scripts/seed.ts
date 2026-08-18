@@ -154,8 +154,10 @@ async function main() {
       email: `${name.toLowerCase().replace(/[^a-z]+/g, ".")}@example.org`,
       role: "member",
       status: isTrial ? "trial" : "active",
-      trialEndsAt: isTrial
-        ? addDays(today, 90 - approvedDaysAgo)
+      // Most trial visits are in the past (awaiting a decision); a couple
+      // are still upcoming, to exercise both states in the admin UI.
+      trialDate: isTrial
+        ? addDays(today, chance(0.7) ? -Math.floor(rand() * 10) : 1 + Math.floor(rand() * 5))
         : null,
       descriptor: pick([
         "Works at an EA-aligned org",

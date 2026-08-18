@@ -12,7 +12,9 @@ export default async function MembersPage() {
   const all = await db
     .select()
     .from(users)
-    .where(inArray(users.status, ["trial", "active", "inactive", "imported"]))
+    // "declined" is here so a decision can be seen and undone — a declined
+    // person is otherwise invisible to admins and silently locked out of login.
+    .where(inArray(users.status, ["trial", "active", "inactive", "imported", "declined"]))
     .orderBy(asc(users.name));
   const flagged = await flaggedUsers();
   const flaggedById = new Map(flagged.map((f) => [f.userId, f]));
@@ -32,8 +34,8 @@ export default async function MembersPage() {
     email: u.email,
     role: u.role,
     status: u.status,
-    trialEndsAt: u.trialEndsAt,
-    trialEnded: u.status === "trial" && !!u.trialEndsAt && u.trialEndsAt <= today,
+    trialDate: u.trialDate,
+    trialEnded: u.status === "trial" && !!u.trialDate && u.trialDate <= today,
     noShowCount: flaggedById.get(u.id)?.count ?? 0,
     noShowEmailed: !!flaggedById.get(u.id)?.emailedAt,
     noShowOptOut: u.noshowEmailOptOut,
