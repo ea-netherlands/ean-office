@@ -20,7 +20,7 @@ import { formatDayLong, todayAms } from "@/lib/dates";
 import { getSettings, setSetting, Settings } from "@/lib/settings";
 import { clearAllNoShows } from "@/lib/noshow";
 import { buildIcs } from "@/lib/ics";
-import { bookDay } from "@/lib/booking";
+import { bookDay, coworkingDayOn } from "@/lib/booking";
 import { validateEventHours } from "@/lib/event-hours";
 import { isCoworkingDay, validateCoworkingDay } from "@/lib/coworking";
 import {
@@ -50,6 +50,15 @@ export async function approveRequestAction(requestId: string): Promise<AdminActi
   if (!req) return { error: "Request not found." };
   const [user] = await db.select().from(users).where(eq(users.id, req.userId));
   if (!user) return { error: "User not found." };
+
+  if (req.requestedDate >= todayAms()) {
+    const coworking = await coworkingDayOn(req.requestedDate);
+    if (coworking) {
+      return {
+        error: `${formatDayLong(req.requestedDate)} is already booked as a co-working day ("${coworking.title}") — ask ${user.name} to pick a different date before approving.`,
+      };
+    }
+  }
 
   await db
     .update(visitRequests)

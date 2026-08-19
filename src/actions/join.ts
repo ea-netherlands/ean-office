@@ -8,6 +8,7 @@ import { sendEmail, link } from "@/lib/email";
 import { appUrl } from "@/lib/auth";
 import { addDays, formatDayLong, isWorkingDay, isoWeekday, todayAms } from "@/lib/dates";
 import { getSettings } from "@/lib/settings";
+import { coworkingDayOn } from "@/lib/booking";
 import { normaliseUrl } from "@/lib/url";
 import { resolveGender } from "@/lib/profile-options";
 import { EchoState, formValues } from "@/lib/form-values";
@@ -121,6 +122,13 @@ export async function submitJoinRequest(
   }
   if (!cfg.arrival_slots.includes(requestedArrival)) {
     return fail("Please pick one of the arrival times.", "requestedArrival");
+  }
+  const coworking = await coworkingDayOn(requestedDate);
+  if (coworking) {
+    return fail(
+      `${formatDayLong(requestedDate)} has the whole office out for "${coworking.title}" — please pick a different day.`,
+      "requestedDate"
+    );
   }
   if (!causeArea || !roleCategory || !experienceLevel || !eaFunding) {
     return fail(

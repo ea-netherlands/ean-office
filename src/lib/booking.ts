@@ -382,17 +382,17 @@ export async function bookDay(
   if (isWeekend(date)) return { ok: false, error: "The office is closed at weekends." };
   if (isHoliday(date)) return { ok: false, error: "That's a public holiday — the office is closed." };
 
-  // A co-working day belongs to its organiser. Walk-ins and admin seating
-  // (which is how approved guests get their desks) still go through.
-  if (source === "self" || source === "block") {
-    const coworking = await coworkingDayOn(date);
-    if (coworking) {
-      return {
-        ok: false,
-        error: `${coworking.title} has the whole office that day — ask the organiser for a spot instead.`,
-      };
-    }
+  // A co-working day belongs to its organiser — no desk booking of any kind,
+  // including admin-seated trial visits, can land on that date.
+  const coworking = await coworkingDayOn(date);
+  if (coworking) {
+    return {
+      ok: false,
+      error: `${coworking.title} has the whole office that day — ask the organiser for a spot instead.`,
+    };
+  }
 
+  if (source === "self" || source === "block") {
     // Trial members get exactly the one day approved for their visit — no
     // self-service booking beyond it until an admin admits them.
     const [trialUser] = await db
