@@ -128,6 +128,15 @@ export function Avatar({ name, small }: { name: string; small?: boolean }) {
   );
 }
 
+/**
+ * Status chip. This is the website's `subtle` badge variant: a tinted surface,
+ * the matching foreground, and an 8px radius (`radius-input`/Chakra `l2`).
+ *
+ * These used to be white pills with a tinted ring and the halo shadow — but
+ * that treatment is the design system's *section eyebrow*, a once-per-section
+ * label that introduces a heading. Wearing it on every inline status made the
+ * eyebrow mean nothing. See `Eyebrow` below for the real thing.
+ */
 export function Badge({
   children,
   tone = "stone",
@@ -135,19 +144,31 @@ export function Badge({
   children: React.ReactNode;
   tone?: "stone" | "green" | "amber" | "red" | "teal" | "indigo";
 }) {
-  // Brand eyebrow-style pills: white surface, tinted ring + text, soft halo.
   const tones: Record<string, string> = {
     stone: "bg-slate-100 text-slate-700 border-slate-200",
-    green: "bg-white text-green-600 border-green-500/40 badge-halo",
-    amber: "bg-white text-orange-600 border-orange-500/40 badge-halo",
-    red: "bg-white text-red-600 border-red-500/40 badge-halo",
-    teal: "bg-white text-teal-600 border-teal-200 badge-halo",
+    green: "bg-green-50 text-green-600 border-green-500/20",
+    amber: "bg-orange-50 text-orange-600 border-orange-500/20",
+    red: "bg-red-50 text-red-600 border-red-500/20",
+    teal: "bg-teal-50 text-teal-700 border-teal-200",
     indigo: "bg-teal-100 text-teal-800 border-teal-200",
   };
   return (
     <span
-      className={`inline-block px-2 py-0.5 rounded-full border text-xs font-medium ${tones[tone]}`}
+      className={`inline-block px-2 py-0.5 rounded-lg border text-xs font-medium ${tones[tone]}`}
     >
+      {children}
+    </span>
+  );
+}
+
+/**
+ * Section eyebrow — the small white teal-ringed pill with the soft halo that
+ * sits above a section heading on the website (Chakra's `sectionBadge`, the
+ * default badge variant there). One per section, never inline.
+ */
+export function Eyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="badge-halo inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-white px-3 py-1.5 text-xs text-teal-600">
       {children}
     </span>
   );
@@ -155,9 +176,9 @@ export function Badge({
 
 // Buttons: 16px radius, sentence case, the signature pressable-key shadow.
 export const btnPrimary =
-  "btn-key inline-flex items-center justify-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-2xl px-4 py-2.5 text-sm disabled:opacity-50 cursor-pointer";
+  "btn-key inline-flex items-center justify-center gap-1.5 bg-teal-600 hover:bg-teal-600/90 text-white font-medium rounded-2xl px-4 py-2.5 text-sm disabled:opacity-50 cursor-pointer";
 export const btnSecondary =
-  "btn-key-subtle inline-flex items-center justify-center gap-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-medium rounded-2xl px-4 py-2.5 text-sm disabled:opacity-50 cursor-pointer";
+  "btn-key-subtle inline-flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-medium rounded-2xl px-4 py-2.5 text-sm disabled:opacity-50 cursor-pointer";
 export const btnDanger =
   "btn-key-subtle inline-flex items-center justify-center gap-1.5 bg-red-50 border border-red-200 hover:bg-red-100 text-red-600 font-medium rounded-2xl px-4 py-2.5 text-sm disabled:opacity-50 cursor-pointer";
 export const inputCls =

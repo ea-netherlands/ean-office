@@ -434,7 +434,7 @@ function DayCell({
   let bg = "bg-white hover:bg-slate-50";
   if (disabled) bg = "bg-slate-100 text-slate-300";
   else if (closedForEvent) bg = "bg-teal-50 text-teal-700 hover:bg-teal-100";
-  else if (allDayYours) bg = "bg-teal-600 text-white hover:bg-teal-700";
+  else if (allDayYours) bg = "bg-teal-600 text-white hover:bg-teal-600/90";
   else if (booked.length > 0) bg = "bg-teal-100 text-teal-900 hover:bg-teal-200";
   else if (waitlisted) bg = "bg-orange-100 hover:bg-orange-200";
   else if (d.full) bg = "bg-slate-200 hover:bg-slate-300";

@@ -31,7 +31,7 @@ export function NavLink({
       // 10px, which cut the Admin pill in half.
       className={`px-2 sm:px-2.5 py-1.5 rounded-2xl whitespace-nowrap transition-colors inline-flex items-center gap-1.5 ${
         accent
-          ? "btn-key bg-teal-600 hover:bg-teal-700 text-white font-medium"
+          ? "btn-key bg-teal-600 hover:bg-teal-600/90 text-white font-medium"
           : "text-slate-600 hover:bg-slate-100"
       }`}
     >
