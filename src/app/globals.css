@@ -22,9 +22,36 @@
   --color-teal-900: #062328;
   --color-teal-950: #031012;
 
-  --font-sans: "Atkinson Hyperlegible Next", -apple-system, BlinkMacSystemFont,
+  /* Override Tailwind's slate ramp with the website's slate ramp. Tailwind v4
+     ships slate in oklch, whose stops sit visibly darker and bluer than the
+     hexes the website's Chakra theme uses (`slate-200`, the border colour, is
+     ~#cad5e2 in v4 against the site's #e2e8f0) — so every border, dashed rule
+     and muted label in this app drifted off-brand. These are the site's exact
+     values.
+
+     One deliberate difference: the site's theme has `400` and `500`
+     transposed relative to every other slate ramp in existence (its `400` is
+     the *dark* #64748b). The set of colours is identical, so we keep the
+     conventional order here — `text-slate-500` renders #64748b, the same ink
+     as the site's `fg.subtle`, and `text-slate-600` renders its `fg.muted`.
+     Nothing is shared between the two codebases by class name, so this costs
+     nothing and avoids a footgun on every call site. */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
+
+  /* Self-hosted via next/font/local — see src/app/fonts.ts. */
+  --font-sans: var(--font-atkinson), -apple-system, BlinkMacSystemFont,
     "Segoe UI", Helvetica, Arial, sans-serif;
-  --font-serif: "Sentient", Georgia, "Times New Roman", serif;
+  --font-serif: var(--font-sentient), Georgia, "Times New Roman", serif;
 }
 
 :root {
@@ -49,8 +76,12 @@
   --badge-section-shadow: 0 0 0 4px rgba(3, 16, 18, 0.025);
 }
 
+/* White, like the website. The page used to sit on slate-50, which turned the
+   dashed container rules and the card borders into near-invisible edges and
+   read as a generic admin panel; on white the same components render exactly
+   as they do on effectiefaltruisme.nl. */
 body {
-  background: var(--color-slate-50);
+  background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
 }
