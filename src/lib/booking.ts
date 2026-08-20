@@ -854,6 +854,7 @@ export type BlockPreview = {
   skippedExisting: string[];
   skippedHoliday: string[];
   skippedCoworking: string[]; // taken over by a co-working day
+  startDate: string; // clamped — never earlier than tomorrow
   endDate: string; // horizon-clamped
 };
 
@@ -861,11 +862,16 @@ export async function previewBlockBooking(
   userId: string,
   weekdays: number[],
   until: string,
-  slot: Slot = "day"
+  slot: Slot = "day",
+  from?: string
 ): Promise<BlockPreview> {
   const cfg = await getSettings();
-  const start = addDays(todayAms(), 1);
+  // A block runs `from` → `until`. Both ends are clamped: never earlier than
+  // tomorrow, never past the horizon. Omitting `from` keeps the old behaviour
+  // of starting tomorrow, which is what a standing weekly booking wants.
+  const earliest = addDays(todayAms(), 1);
   const horizon = addDays(todayAms(), cfg.block_horizon_weeks * 7);
+  const start = from && from > earliest ? from : earliest;
   const endDate = until > horizon ? horizon : until;
   const blockCap = Math.floor(cfg.desk_count * cfg.block_max_share);
 
@@ -876,6 +882,7 @@ export async function previewBlockBooking(
     skippedExisting: [],
     skippedHoliday: [],
     skippedCoworking: [],
+    startDate: start,
     endDate,
   };
   if (weekdays.length === 0 || endDate < start) return preview;
@@ -933,9 +940,10 @@ export async function createBlockBooking(
   userId: string,
   weekdays: number[],
   until: string,
-  slot: Slot = "day"
+  slot: Slot = "day",
+  from?: string
 ): Promise<{ ok: boolean; booked: string[]; preview: BlockPreview; error?: string }> {
-  const preview = await previewBlockBooking(userId, weekdays, until, slot);
+  const preview = await previewBlockBooking(userId, weekdays, until, slot, from);
   if (preview.eligible.length === 0) {
     return { ok: false, booked: [], preview, error: "No bookable days in that range." };
   }

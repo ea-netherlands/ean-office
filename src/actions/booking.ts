@@ -171,13 +171,15 @@ export type BlockState = {
 export async function blockPreviewAction(
   weekdays: number[],
   until: string,
-  slot: Slot = "day"
+  slot: Slot = "day",
+  from?: string
 ): Promise<BlockState> {
   const user = await getCurrentUser();
   if (!isActiveMember(user)) return { error: "You need to be logged in as a member." };
   if (weekdays.length === 0) return { error: "Pick at least one weekday." };
   if (!until) return { error: "Pick an end date." };
-  const preview = await previewBlockBooking(user!.id, weekdays, until, slot);
+  if (from && from > until) return { error: "The start date is after the end date." };
+  const preview = await previewBlockBooking(user!.id, weekdays, until, slot, from);
   return {
     preview: {
       ...preview,
@@ -194,11 +196,13 @@ export async function blockPreviewAction(
 export async function blockCreateAction(
   weekdays: number[],
   until: string,
-  slot: Slot = "day"
+  slot: Slot = "day",
+  from?: string
 ): Promise<BlockState> {
   const user = await getCurrentUser();
   if (!isActiveMember(user)) return { error: "You need to be logged in as a member." };
-  const res = await createBlockBooking(user!.id, weekdays, until, slot);
+  if (from && from > until) return { error: "The start date is after the end date." };
+  const res = await createBlockBooking(user!.id, weekdays, until, slot, from);
   revalidatePath("/book");
   revalidatePath("/me");
   if (!res.ok) return { error: res.error };

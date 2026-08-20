@@ -807,6 +807,7 @@ function DayPanel({
 function BlockForm({ horizonWeeks }: { horizonWeeks: number }) {
   const [weekdays, setWeekdays] = useState<number[]>([]);
   const [slot, setSlot] = useState<Slot>("day");
+  const [from, setFrom] = useState("");
   const [until, setUntil] = useState("");
   const [state, setState] = useState<BlockState | null>(null);
   const [done, setDone] = useState<string[] | null>(null);
@@ -828,7 +829,8 @@ function BlockForm({ horizonWeeks }: { horizonWeeks: number }) {
     <div className="bg-white border border-slate-200 rounded-xl p-4 mb-3">
       <p className="text-sm text-slate-600 mb-3">
         Book the same weekday(s) every week — up to {horizonWeeks} weeks out.
-        Every day stays individually cancellable.
+        Leave <em>From</em> empty to start tomorrow, or set it to book a stretch
+        further ahead. Every day stays individually cancellable.
       </p>
       <div className="flex gap-1.5 mb-3">
         {[1, 2, 3, 4, 5].map((wd) => (
@@ -863,18 +865,34 @@ function BlockForm({ horizonWeeks }: { horizonWeeks: number }) {
           </button>
         ))}
       </div>
-      <label className="text-sm text-slate-600 flex items-center gap-2 mb-3">
-        Until
-        <input
-          type="date"
-          value={until}
-          onChange={(e) => {
-            setUntil(e.target.value);
-            reset();
-          }}
-          className={inputCls}
-        />
-      </label>
+      <div className="flex flex-wrap gap-3 mb-3">
+        <label className="text-sm text-slate-600 flex items-center gap-2">
+          From
+          <input
+            type="date"
+            value={from}
+            max={until || undefined}
+            onChange={(e) => {
+              setFrom(e.target.value);
+              reset();
+            }}
+            className={inputCls}
+          />
+        </label>
+        <label className="text-sm text-slate-600 flex items-center gap-2">
+          Until
+          <input
+            type="date"
+            value={until}
+            min={from || undefined}
+            onChange={(e) => {
+              setUntil(e.target.value);
+              reset();
+            }}
+            className={inputCls}
+          />
+        </label>
+      </div>
 
       {done ? (
         <p className="text-sm text-teal-800 bg-teal-50 border border-teal-200 rounded-xl px-3 py-2">
@@ -889,7 +907,9 @@ function BlockForm({ horizonWeeks }: { horizonWeeks: number }) {
           <p className="mb-2">
             This will book <strong>{state.preview.eligible.length}</strong> of{" "}
             {state.preview.total} matching days
-            {slot !== "day" && `, ${SLOT_LABEL[slot]}s only`}.
+            {slot !== "day" && `, ${SLOT_LABEL[slot]}s only`}, between{" "}
+            {formatDayLong(state.preview.startDate)} and{" "}
+            {formatDayLong(state.preview.endDate)}.
             {state.preview.skippedFull.length > 0 &&
               ` ${state.preview.skippedFull.length} skipped (full).`}
             {state.preview.skippedBlockCap.length > 0 &&
@@ -906,7 +926,12 @@ function BlockForm({ horizonWeeks }: { horizonWeeks: number }) {
             disabled={pending || state.preview.eligible.length === 0}
             onClick={() =>
               startTransition(async () => {
-                const res = await blockCreateAction(weekdays, until, slot);
+                const res = await blockCreateAction(
+                  weekdays,
+                  until,
+                  slot,
+                  from || undefined
+                );
                 // blockCreateAction revalidates /book, so the grid behind this
                 // form updates with the action response — no refresh needed.
                 if (res.error) setState({ error: res.error });
@@ -932,7 +957,9 @@ function BlockForm({ horizonWeeks }: { horizonWeeks: number }) {
           disabled={pending || weekdays.length === 0 || !until}
           onClick={() =>
             startTransition(async () => {
-              setState(await blockPreviewAction(weekdays, until, slot));
+              setState(
+                await blockPreviewAction(weekdays, until, slot, from || undefined)
+              );
             })
           }
         >
