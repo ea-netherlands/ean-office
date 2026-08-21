@@ -94,18 +94,12 @@ export async function createGuestRequest(
     };
   }
 
-  // A stretch of days is for one-off guests only — a first visit is a trial,
-  // and a trial is a single day by definition.
+  // Either kind may span days. A /join trial is one day because an unknown
+  // person gets one day to try the place; someone a member vouches for and an
+  // admin explicitly approves is a different case — a new colleague being
+  // onboarded in person needs their first week, not their first morning.
   const endDate = input.endDate?.trim() || undefined;
   if (endDate) {
-    if (input.visitType === "first_visit") {
-      return {
-        ok: false,
-        error:
-          "A first visit is a single trial day. Ask for one day, or mark this as a one-off visit if they're coming for a stretch.",
-        field: "endDate",
-      };
-    }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate) || endDate < input.date) {
       return { ok: false, error: "The last day is before the first.", field: "endDate" };
     }
@@ -125,9 +119,12 @@ export async function createGuestRequest(
     }
   }
 
-  // A first visit is a trial, so it inherits /join's co-working rule. A one-off
-  // guest is the host's own party and may come along to whatever's on.
-  if (input.visitType === "first_visit") {
+  // A first visit is a trial, so it inherits /join's co-working rule: don't
+  // let someone's introduction to the place be a day the office is given over
+  // to something else. Only worth refusing outright for a single day — across
+  // a range, a co-working day in the middle is simply skipped and named in the
+  // confirmation, which beats rejecting the whole week over one Tuesday.
+  if (input.visitType === "first_visit" && !endDate) {
     const coworking = await coworkingDayOn(input.date);
     if (coworking) {
       return {
@@ -230,7 +227,7 @@ export async function approveGuestRequest(
 
   // Re-check at decision time — the day may have become a co-working day
   // since the request went in. Same rule as approveRequestAction.
-  if (req.visitType === "first_visit") {
+  if (req.visitType === "first_visit" && !req.endDate) {
     const coworking = await coworkingDayOn(req.date);
     if (coworking) {
       return {
@@ -257,9 +254,11 @@ export async function approveGuestRequest(
     name: req.guestName,
     role: firstVisit ? ("member" as const) : ("visitor" as const),
     status: firstVisit ? ("trial" as const) : ("event_guest" as const),
-    ...(firstVisit
-      ? { trialDate: req.date, approvedAt: new Date(), approvedBy: admin.id }
-      : {}),
+    // trialDate is set after booking — it has to be the LAST day they're
+    // actually in, since it's what tells the team the trial is over and a
+    // decision is due. Deciding while someone is still mid-visit is worse
+    // than deciding a day late.
+    ...(firstVisit ? { approvedAt: new Date(), approvedBy: admin.id } : {}),
     guidelinesAcceptedAt: new Date(),
   };
   if (existing) {
@@ -295,6 +294,13 @@ export async function approveGuestRequest(
           ? "Couldn't seat them — the office is full that day."
           : "Couldn't seat them on any day in that range.",
     };
+  }
+
+  if (firstVisit) {
+    await db
+      .update(users)
+      .set({ trialDate: booked[booked.length - 1] })
+      .where(eq(users.id, guestId));
   }
 
   await db
@@ -350,7 +356,7 @@ ${firstVisit ? `<p>This works as a trial day: come and see whether the space is 
   return {
     ok: true,
     note: firstVisit
-      ? `${req.guestName} is booked and now on trial — admit or decline them after ${formatDayLong(req.date)}.`
+      ? `${req.guestName} is booked for ${booked.length} day${booked.length === 1 ? "" : "s"} and now on trial — admit or decline them after ${formatDayLong(booked[booked.length - 1])}.`
       : `${req.guestName} is booked in as a one-off guest for ${booked.length} day${booked.length === 1 ? "" : "s"}${skipped.length > 0 ? ` (${skipped.length} couldn't be fitted)` : ""}.`,
   };
 }

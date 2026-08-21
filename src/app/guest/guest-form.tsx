@@ -28,7 +28,7 @@ const VISIT_TYPES = [
     value: "first_visit",
     title: "Their first visit",
     blurb:
-      "You think they might want to use the office regularly. This counts as their trial day, and the team will follow up about membership afterwards.",
+      "You think they might want to use the office regularly. This counts as their trial, and the team will follow up about membership once it's over.",
   },
 ] as const;
 
@@ -43,7 +43,6 @@ export function GuestForm() {
   const [visitType, setVisitType] = useState(
     str(v, "visitType") || "one_off"
   );
-  // A trial is one day, so switching to "first visit" drops the range.
   const [multiDay, setMultiDay] = useState(Boolean(str(v, "endDate")));
 
   useEffect(() => {
@@ -116,10 +115,7 @@ export function GuestForm() {
                 name="visitType"
                 value={t.value}
                 checked={visitType === t.value}
-                onChange={() => {
-                  setVisitType(t.value);
-                  if (t.value === "first_visit") setMultiDay(false);
-                }}
+                onChange={() => setVisitType(t.value)}
                 className="sr-only"
               />
               <span className="font-medium block">{t.title}</span>
@@ -142,18 +138,16 @@ export function GuestForm() {
           autoFocus={state.field === "date"}
         />
 
-        {visitType === "one_off" && (
-          <label className="flex items-center gap-2 mt-3 text-sm text-slate-600 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={multiDay}
-              onChange={(e) => setMultiDay(e.target.checked)}
-            />
-            They&apos;re coming for several days
-          </label>
-        )}
+        <label className="flex items-center gap-2 mt-3 text-sm text-slate-600 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={multiDay}
+            onChange={(e) => setMultiDay(e.target.checked)}
+          />
+          They&apos;re coming for several days
+        </label>
 
-        {multiDay && visitType === "one_off" && (
+        {multiDay && (
           <>
             <label className={`${labelCls} mt-3`} htmlFor="endDate">
               Last day

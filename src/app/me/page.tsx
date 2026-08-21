@@ -29,6 +29,11 @@ export default async function MePage() {
     )
     .orderBy(asc(bookings.date));
 
+  // A trial can span days (a guest a member vouched for, onboarding in person),
+  // and trialDate is its LAST day — the point a decision is due. So "come along
+  // on…" has to name the first day they're actually in, not that one.
+  const trialStart = upcoming[0]?.date;
+
   // Anything they're running — co-working days and evening events alike.
   // Without this the only route to your own event is a link in an email, and
   // there'd be nowhere to call one off from.
@@ -104,7 +109,7 @@ export default async function MePage() {
               <Badge tone="teal">
                 {user.trialDate <= todayAms()
                   ? "trial visit — awaiting decision"
-                  : `trial visit ${formatDayLong(user.trialDate)}`}
+                  : `trial visit ${formatDayLong(trialStart ?? user.trialDate)}`}
               </Badge>
             </>
           )}
@@ -113,7 +118,7 @@ export default async function MePage() {
           <p className="text-sm text-slate-500 mt-1 max-w-prose">
             {user.trialDate <= todayAms()
               ? "The team's deciding whether to confirm you as a full member — you'll be able to book further days once they do."
-              : `Come along on ${formatDayLong(user.trialDate)} to see if the space is a fit. The team will confirm you as a full member afterwards.`}
+              : `Come along on ${formatDayLong(trialStart ?? user.trialDate)} to see if the space is a fit. The team will confirm you as a full member afterwards.`}
           </p>
         )}
         {(organising.length > 0 || joining.length > 0) && (
