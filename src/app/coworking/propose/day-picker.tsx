@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { formatDayLong, isoWeekday } from "@/lib/dates";
+import { formatDayLong, isoWeekday, monthName } from "@/lib/dates";
 import { Icon } from "@/components/ui";
 
 export type CoworkingDayInfo = {
@@ -19,6 +19,10 @@ const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri"];
  * Weekdays only, five to a row, each showing how many people have already
  * booked that day — the number that decides whether a day is a good one to
  * take over.
+ *
+ * The window runs months rather than weeks, so the rows are grouped under
+ * month headings and scroll inside a fixed height: the near dates stay the
+ * first thing you see, and next spring is a scroll away instead of absent.
  */
 export function DayPicker({
   days,
@@ -29,34 +33,50 @@ export function DayPicker({
   selected: string;
   onSelect: (date: string) => void;
 }) {
-  const weeks = useMemo(() => groupIntoWeeks(days), [days]);
+  const months = useMemo(() => groupIntoMonths(days), [days]);
+  const last = days.length > 0 ? days[days.length - 1].date : null;
 
   return (
     <div>
-      <div className="grid grid-cols-5 gap-1 text-center text-[10px] font-medium text-slate-400 mb-1">
-        {DOW.map((d) => (
-          <span key={d}>{d}</span>
-        ))}
+      <div className="border border-slate-200 rounded-xl overflow-hidden">
+        <div className="grid grid-cols-5 gap-1 text-center text-[10px] font-medium text-slate-400 px-1.5 py-1 border-b border-slate-200 bg-slate-50">
+          {DOW.map((d) => (
+            <span key={d}>{d}</span>
+          ))}
+        </div>
+        <div className="max-h-80 overflow-y-auto px-1.5 pb-1.5 space-y-2">
+          {months.map((month) => (
+            <div key={month.key} className="space-y-1">
+              <p className="pt-1.5 pb-1 text-[11px] font-medium text-slate-500 border-b border-dashed border-slate-200">
+                {month.label}
+              </p>
+              {month.weeks.map((week, i) => (
+                <div key={i} className="grid grid-cols-5 gap-1">
+                  {week.map((day, j) =>
+                    day ? (
+                      <DayCell
+                        key={day.date}
+                        day={day}
+                        selected={day.date === selected}
+                        onSelect={onSelect}
+                      />
+                    ) : (
+                      <span key={`gap-${i}-${j}`} />
+                    )
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
-      <div className="space-y-1">
-        {weeks.map((week, i) => (
-          <div key={i} className="grid grid-cols-5 gap-1">
-            {week.map((day, j) =>
-              day ? (
-                <DayCell
-                  key={day.date}
-                  day={day}
-                  selected={day.date === selected}
-                  onSelect={onSelect}
-                />
-              ) : (
-                <span key={`gap-${i}-${j}`} />
-              )
-            )}
-          </div>
-        ))}
-      </div>
-      <div className="flex flex-wrap gap-3 mt-3 text-[11px] text-slate-500">
+      {last && (
+        <p className="text-[11px] text-slate-500 mt-2">
+          Scroll for later months — the calendar runs to {formatDayLong(last)}.
+          Planning something beyond that? Email us and we&apos;ll pencil it in.
+        </p>
+      )}
+      <div className="flex flex-wrap gap-3 mt-2 text-[11px] text-slate-500">
         <Legend swatch="bg-white border border-slate-200" label="Quiet day" />
         <Legend swatch="bg-orange-100 border border-orange-200" label="Several desks booked" />
         <Legend swatch="bg-slate-200 border border-slate-300" label="Already taken" />
@@ -110,6 +130,37 @@ function DayCell({
       )}
     </button>
   );
+}
+
+type MonthBlock = {
+  key: string;
+  label: string;
+  weeks: (CoworkingDayInfo | null)[][];
+};
+
+/** Calendar months, each holding its own Mon–Fri rows. */
+function groupIntoMonths(days: CoworkingDayInfo[]): MonthBlock[] {
+  const blocks: MonthBlock[] = [];
+  for (const day of days) {
+    const key = day.date.slice(0, 7);
+    if (blocks.length === 0 || blocks[blocks.length - 1].key !== key) {
+      blocks.push({
+        key,
+        label: monthName(
+          parseInt(key.slice(0, 4), 10),
+          parseInt(key.slice(5, 7), 10)
+        ),
+        weeks: [],
+      });
+    }
+  }
+  // Split first, then lay each month out on its own, so a month starting on a
+  // Wednesday gets its two leading blanks instead of inheriting the previous
+  // month's row.
+  for (const block of blocks) {
+    block.weeks = groupIntoWeeks(days.filter((d) => d.date.startsWith(block.key)));
+  }
+  return blocks;
 }
 
 /** Mon–Fri rows, with blanks where a month or the lookahead starts mid-week. */

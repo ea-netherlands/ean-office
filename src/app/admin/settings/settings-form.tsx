@@ -120,7 +120,18 @@ export function SettingsForm({ cfg }: { cfg: Settings }) {
             label="Max future bookings per member"
             value={cfg.max_future_bookings}
           />
+          <Num
+            name="coworking_horizon_weeks"
+            label="Co-working day proposal horizon (weeks)"
+            value={cfg.coworking_horizon_weeks}
+          />
         </div>
+        <p className="text-xs text-slate-400">
+          The co-working horizon is how far out the propose form lets a member
+          pick a date. Visiting teams plan months ahead, so it is deliberately
+          longer than the repeat-booking horizon; admins can still create a
+          co-working day on any date from the events page.
+        </p>
       </Card>
 
       <Card className="space-y-3">

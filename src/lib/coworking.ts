@@ -7,7 +7,7 @@
 // what the funder reports already count. This module is the vocabulary; the
 // database side lives in lib/coworking-guests.ts.
 
-import { isWorkingDay } from "./dates";
+import { formatDayLong, isWorkingDay } from "./dates";
 import type { Settings } from "./settings";
 
 export const COWORKING_TYPE = "themed_coworking" as const;
@@ -31,15 +31,24 @@ export function coworkingSpotCount(cfg: Settings): number {
  * Everything that makes a proposed date impossible rather than merely
  * inconvenient. A clash with someone else's booking is not in here on
  * purpose: those people keep their desks, and the organiser is told.
+ *
+ * `horizon` is the last date a *member* may propose (the propose form's
+ * picker stops there). Admins creating a day from /admin/events pass nothing
+ * and stay unbounded — someone has to be able to pin down the visiting team
+ * that emailed about next spring.
  */
 export function validateCoworkingDay(
   date: string,
   startsAt: string | null,
   endsAt: string | null,
-  today: string
+  today: string,
+  horizon?: string | null
 ): string | null {
   if (!date) return "Pick a day.";
   if (date < today) return "That day has already passed.";
+  if (horizon && date > horizon) {
+    return `That's further ahead than the calendar goes — pick a day before ${formatDayLong(horizon)}, and email us if you're planning something later than that.`;
+  }
   if (!isWorkingDay(date)) {
     return "Co-working days run Monday to Friday, outside public holidays.";
   }

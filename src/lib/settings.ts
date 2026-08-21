@@ -17,6 +17,10 @@ export type Settings = {
   join_horizon_days: number;
   join_quick_days: number; // days offered as one-tap chips before the date field
   block_horizon_weeks: number;
+  // How far ahead a member may propose a co-working day. Visiting teams and
+  // retreat-style days get planned a season out, and a picker that stops at
+  // ten weeks reads as "not possible" rather than "ask us".
+  coworking_horizon_weeks: number;
   block_max_share: number; // fraction of desks block bookings may hold per day
   max_future_bookings: number;
   noshow_threshold: number;
@@ -43,6 +47,7 @@ export const DEFAULT_SETTINGS: Settings = {
   join_horizon_days: 180,
   join_quick_days: 12,
   block_horizon_weeks: 12,
+  coworking_horizon_weeks: 26,
   block_max_share: 0.5,
   max_future_bookings: 12,
   noshow_threshold: 3,

@@ -44,6 +44,7 @@ change those if you want a clean install to start right.
 | `join_horizon_days` | 180 | How far ahead a first visit can be requested |
 | `block_horizon_weeks` / `block_max_share` | 12 / 0.5 | Limits on recurring bookings |
 | `max_future_bookings` | 12 | Cap on self-made future bookings |
+| `coworking_horizon_weeks` | 26 | How far ahead a member may propose a co-working day (admins are unbounded) |
 | `noshow_threshold` / `noshow_window_days` | 3 / 60 | When the no-show ladder escalates |
 | `checkin_retention_months` | 24 | GDPR purge horizon for check-in rows |
 | `office_address` | HNK Houthavens… | Shown in emails and on `/info` |

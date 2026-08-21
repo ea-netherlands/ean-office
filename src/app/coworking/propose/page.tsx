@@ -14,17 +14,18 @@ import type { CoworkingDayInfo } from "./day-picker";
 
 export const dynamic = "force-dynamic";
 
-const LOOKAHEAD_WEEKS = 10;
-
 /**
  * Which working days are actually available, and what a co-working day would
  * displace: a day with six desks already booked is a different proposition
  * from an empty one, and the organiser should see that before picking.
+ *
+ * The window is `coworking_horizon_weeks` (admin-editable) — long enough that
+ * a visiting team's day next season is pickable rather than an email.
  */
 async function getDays(): Promise<CoworkingDayInfo[]> {
-  const from = todayAms();
-  const to = addDays(from, LOOKAHEAD_WEEKS * 7);
   const cfg = await getSettings();
+  const from = todayAms();
+  const to = addDays(from, cfg.coworking_horizon_weeks * 7);
 
   const upcoming = await db
     .select({

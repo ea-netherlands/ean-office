@@ -62,10 +62,16 @@ const MONTHS = [
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export const WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-/** "Tue 4 Aug" */
+/**
+ * "Tue 4 Aug", with the year appended when it isn't the current one: bookings
+ * and co-working days now reach months ahead, and "Mon 15 Feb" in an admin
+ * queue shouldn't be a guess about which February.
+ */
 export function formatDay(day: string): string {
   const d = parseDay(day);
-  return `${WEEKDAYS[isoWeekday(day) - 1]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()].slice(0, 3)}`;
+  const year = d.getUTCFullYear();
+  const suffix = year === parseInt(todayAms().slice(0, 4), 10) ? "" : ` ${year}`;
+  return `${WEEKDAYS[isoWeekday(day) - 1]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()].slice(0, 3)}${suffix}`;
 }
 
 /** "Tuesday 4 August 2026" */

@@ -6,8 +6,9 @@ import { and, eq, inArray } from "drizzle-orm";
 import { getCurrentUser, isActiveMember, appUrl } from "@/lib/auth";
 import { newId } from "@/lib/ids";
 import { sendEmail, link } from "@/lib/email";
-import { formatDayLong, todayAms } from "@/lib/dates";
+import { addDays, formatDayLong, todayAms } from "@/lib/dates";
 import { COWORKING_TYPE, validateCoworkingDay } from "@/lib/coworking";
+import { getSettings } from "@/lib/settings";
 import { bookedThatDay } from "@/lib/coworking-guests";
 import { EchoState, formValues } from "@/lib/form-values";
 
@@ -56,7 +57,15 @@ export async function proposeCoworkingDayAction(
   const note = String(formData.get("proposalNote") || "").trim().slice(0, 1000);
 
   if (!title) return fail("Give the day a name.", "title");
-  const dateError = validateCoworkingDay(date, startsAt, endsAt, todayAms());
+  const cfg = await getSettings();
+  const today = todayAms();
+  const dateError = validateCoworkingDay(
+    date,
+    startsAt,
+    endsAt,
+    today,
+    addDays(today, cfg.coworking_horizon_weeks * 7)
+  );
   if (dateError) return fail(dateError, dateError.includes("time") ? "startsAt" : "date");
 
   // Two co-working days on one date can't both happen — evening events on the
