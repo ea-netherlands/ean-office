@@ -186,7 +186,16 @@ export async function clearDayForCoworking(event: {
 
 export type SeatResult =
   | { ok: true; seat: string; already: boolean }
-  | { ok: false; error: string };
+  /** `full` lets the caller offer "free a seat first" only when that helps. */
+  | { ok: false; error: string; full?: boolean };
+
+/**
+ * Whether a refusal was "no room left" rather than "not that day at all".
+ * bookDay reports capacity in prose, so this is the one place that reads it.
+ */
+function capacityError(error: string): boolean {
+  return /\bfull\b|no desk is free/i.test(error);
+}
 
 /**
  * Give an approved guest an actual desk. Without this an approved guest is
@@ -216,11 +225,12 @@ export async function seatGuest(
   const res = await bookDay(userId, date, {
     source: "admin",
     sendConfirmation: false,
+    coworkingSeat: true,
     cfg,
   });
-  if (!res.ok) return { ok: false, error: res.error };
+  if (!res.ok) return { ok: false, error: res.error, full: capacityError(res.error) };
   if ("waitlisted" in res) {
-    return { ok: false, error: "The office is full that day." };
+    return { ok: false, error: "The office is full that day.", full: true };
   }
   return { ok: true, seat: describeSeat(res.booking), already: false };
 }

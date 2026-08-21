@@ -157,8 +157,13 @@ export async function decideGuestAction(
   if (decision === "approved" && event.date >= todayAms()) {
     const res = await seatGuest(guest.userId, event.date);
     if (!res.ok) {
+      // Freeing a seat only helps when a full room is what stopped us —
+      // pinning that advice to every failure sent organisers declining
+      // people over a day they couldn't have fixed by declining anyone.
       return {
-        error: `${res.error} Cancel or decline someone else first, then approve them.`,
+        error: res.full
+          ? `${res.error} Cancel or decline someone else first, then approve them.`
+          : res.error,
       };
     }
     seat = res.seat;

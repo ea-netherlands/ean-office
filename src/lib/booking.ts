@@ -372,6 +372,13 @@ export async function bookDay(
     user?: { email: string; name: string };
     /** Saves a re-read when the caller already has the settings. */
     cfg?: Settings;
+    /**
+     * Seating a guest the organiser has approved for a co-working day. This
+     * is the one booking allowed to land on a date that's closed to
+     * everything else — approving a guest *is* an admin booking on a closed
+     * day, so without it the curation flow can't hand out a single desk.
+     */
+    coworkingSeat?: boolean;
   } = {}
 ): Promise<BookResult> {
   const cfg = opts.cfg ?? (await getSettings());
@@ -382,9 +389,11 @@ export async function bookDay(
   if (isWeekend(date)) return { ok: false, error: "The office is closed at weekends." };
   if (isHoliday(date)) return { ok: false, error: "That's a public holiday — the office is closed." };
 
-  // A co-working day belongs to its organiser — no desk booking of any kind,
-  // including admin-seated trial visits, can land on that date.
-  const coworking = await coworkingDayOn(date);
+  // A co-working day belongs to its organiser: self-service bookings, repeats,
+  // admin-seated trial visits and a member's own guest all stay off it. The
+  // organiser's approved guests are the exception, and `seatGuest` is the only
+  // caller that says so.
+  const coworking = opts.coworkingSeat ? null : await coworkingDayOn(date);
   if (coworking) {
     return {
       ok: false,
