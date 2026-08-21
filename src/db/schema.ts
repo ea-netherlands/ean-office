@@ -176,6 +176,49 @@ export const visitRequests = pgTable("visit_requests", {
     .defaultNow(),
 });
 
+// ---------- guest booking requests ----------
+
+// A member asking for a desk for someone who has no account. Two flavours,
+// because "my colleague is joining me for the day" and "I'm introducing
+// someone who might join" need different endings: a one-off guest is seated
+// and that's that, a first visit becomes a trial and goes through the usual
+// admit/decline. The co-working-day exclusivity check applies to first visits
+// (same rule as /join) but not to one-offs, who are the host's own party.
+export const guestRequests = pgTable("guest_requests", {
+  id: text("id").primaryKey(),
+  hostUserId: text("host_user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  guestName: text("guest_name").notNull(),
+  guestEmail: text("guest_email").notNull(),
+  date: date("date").notNull(),
+  // Null for a single day. Set, and the request covers every working day from
+  // `date` to `end_date` — a new colleague's first week, say. Only one-off
+  // guests may span days: a first visit is a trial, and a trial is one day.
+  endDate: date("end_date"),
+  slot: text("slot", { enum: ["day", "am", "pm"] })
+    .notNull()
+    .default("day"),
+  visitType: text("visit_type", { enum: ["one_off", "first_visit"] })
+    .notNull()
+    .default("one_off"),
+  // Why this person, in the host's words — the whole point of the queue.
+  reason: text("reason").notNull(),
+  status: text("status", { enum: ["pending", "approved", "declined"] })
+    .notNull()
+    .default("pending"),
+  // The account we created (or matched) when approving.
+  guestUserId: text("guest_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  decidedBy: text("decided_by"),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  declineReason: text("decline_reason"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 // ---------- bookings ----------
 
 export const bookingSeries = pgTable("booking_series", {

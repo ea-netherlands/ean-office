@@ -294,12 +294,17 @@ export function BookGrid(props: {
         </Link>
       </div>
 
-      <button
-        onClick={() => setShowBlock((v) => !v)}
-        className={`${btnSecondary} w-full mb-3`}
-      >
-        Book repeating {showBlock ? "▴" : "▾"}
-      </button>
+      <div className="flex gap-2 mb-3">
+        <button
+          onClick={() => setShowBlock((v) => !v)}
+          className={`${btnSecondary} flex-1`}
+        >
+          Book repeating {showBlock ? "▴" : "▾"}
+        </button>
+        <Link href="/guest" className={`${btnSecondary} flex-1 text-center`}>
+          Bring someone
+        </Link>
+      </div>
       {showBlock && (
         <BlockForm horizonWeeks={props.horizonWeeks} />
       )}

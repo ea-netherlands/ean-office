@@ -1,0 +1,1 @@
+ALTER TABLE "guest_requests" ADD COLUMN "end_date" date;

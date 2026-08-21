@@ -1,8 +1,10 @@
-import { db, visitRequests, users } from "@/db";
+import { db, visitRequests, users, guestRequests } from "@/db";
 import { eq, inArray, desc } from "drizzle-orm";
 import { Page, H1, Sub } from "@/components/ui";
 import { todayAms, workingDaysBetween, amsDate } from "@/lib/dates";
+import { asSlot } from "@/lib/slots";
 import { RequestCard, RequestInfo } from "./request-card";
+import { GuestRequestCard, GuestRequestInfo } from "./guest-request-card";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +22,39 @@ export default async function RequestsPage() {
     .filter((r) => ["approved", "declined", "expired"].includes(r.req.status))
     .slice(0, 20);
 
+  // Members asking for a desk for someone with no account — a separate queue
+  // from first-visit requests, but the same one-working-day promise.
+  const guestRows = await db
+    .select({ req: guestRequests, host: users })
+    .from(guestRequests)
+    .innerJoin(users, eq(users.id, guestRequests.hostUserId))
+    .orderBy(desc(guestRequests.createdAt));
+  const guestOpen = guestRows.filter((r) => r.req.status === "pending");
+  const guestDecided = guestRows
+    .filter((r) => r.req.status !== "pending")
+    .slice(0, 10);
+
   const today = todayAms();
+
+  const toGuestInfo = (r: (typeof guestRows)[number]): GuestRequestInfo => ({
+    id: r.req.id,
+    status: r.req.status,
+    hostName: r.host.name,
+    hostEmail: r.host.email,
+    guestName: r.req.guestName,
+    guestEmail: r.req.guestEmail,
+    date: r.req.date,
+    endDate: r.req.endDate,
+    slot: asSlot(r.req.slot),
+    visitType: r.req.visitType,
+    reason: r.req.reason,
+    createdAt: r.req.createdAt.toISOString(),
+    stale:
+      r.req.status === "pending" &&
+      workingDaysBetween(amsDate(r.req.createdAt), today) >= 2,
+    declineReason: r.req.declineReason,
+  });
+
   const toInfo = (r: (typeof rows)[number]): RequestInfo => ({
     id: r.req.id,
     status: r.req.status,
@@ -58,6 +92,30 @@ export default async function RequestsPage() {
             <RequestCard key={r.req.id} req={toInfo(r)} />
           ))}
         </div>
+      )}
+
+      {guestOpen.length > 0 && (
+        <>
+          <h2 className="mt-8 mb-3 text-slate-500">
+            Guest requests — members bringing someone
+          </h2>
+          <div className="space-y-4">
+            {guestOpen.map((r) => (
+              <GuestRequestCard key={r.req.id} req={toGuestInfo(r)} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {guestDecided.length > 0 && (
+        <>
+          <h2 className="mt-8 mb-3 text-slate-500">Recent guest decisions</h2>
+          <div className="space-y-2">
+            {guestDecided.map((r) => (
+              <GuestRequestCard key={r.req.id} req={toGuestInfo(r)} compact />
+            ))}
+          </div>
+        </>
       )}
 
       {decided.length > 0 && (
