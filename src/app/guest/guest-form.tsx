@@ -16,6 +16,8 @@ import {
   inputCls,
   labelCls,
 } from "@/components/ui";
+import { Away } from "@/lib/away";
+import { AwayNotice } from "@/components/away-notice";
 
 const VISIT_TYPES = [
   {
@@ -32,7 +34,7 @@ const VISIT_TYPES = [
   },
 ] as const;
 
-export function GuestForm() {
+export function GuestForm({ away }: { away: Away | null }) {
   const [state, action, pending] = useActionState<GuestBookingState, FormData>(
     requestGuestBookingAction,
     {}
@@ -55,10 +57,17 @@ export function GuestForm() {
         <Icon name="circle-check" className="text-5xl text-teal-600 mb-3" />
         <h2 className="text-xl">Sent to the team</h2>
         <p className="text-slate-500 mt-2 max-w-md mx-auto">
-          Someone will look at it within one working day and you&apos;ll hear
-          either way. We won&apos;t contact your guest until it&apos;s approved,
-          so there&apos;s nothing awkward if the answer is no.
+          {away
+            ? "Someone will look at it when they're back and you'll hear either way."
+            : "Someone will look at it within one working day and you'll hear either way."}{" "}
+          We won&apos;t contact your guest until it&apos;s approved, so
+          there&apos;s nothing awkward if the answer is no.
         </p>
+        <AwayNotice
+          away={away}
+          when="after"
+          className="mt-4 max-w-md mx-auto text-left"
+        />
         <Link href="/book" className={`${btnSecondary} mt-5`}>
           Back to booking
         </Link>

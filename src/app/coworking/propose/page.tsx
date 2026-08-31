@@ -9,6 +9,8 @@ import { capacityForRange } from "@/lib/booking";
 import { getSettings } from "@/lib/settings";
 import { addDays, isWorkingDay, todayAms } from "@/lib/dates";
 import { COWORKING_TYPE, coworkingSpotCount } from "@/lib/coworking";
+import { adminsAway } from "@/lib/away";
+import { AwayNotice } from "@/components/away-notice";
 import { CoworkingForm } from "./coworking-form";
 import type { CoworkingDayInfo } from "./day-picker";
 
@@ -86,6 +88,7 @@ export default async function ProposeCoworkingDayPage() {
   if (!isActiveMember(user)) redirect("/");
 
   const days = await getDays();
+  const away = adminsAway((await getSettings()).admin_back_on);
 
   return (
     <>
@@ -97,7 +100,8 @@ export default async function ProposeCoworkingDayPage() {
           area, a sprint, a visiting team. It runs during office hours, and an
           admin confirms it before anyone else sees it.
         </Sub>
-        <CoworkingForm days={days} />
+        <AwayNotice away={away} className="mb-5" />
+        <CoworkingForm away={away} days={days} />
         <p className="text-sm text-slate-500 mt-6">
           Something in the evening instead — a reading group, a talk, a social?{" "}
           <Link href="/events/propose" className="text-teal-700 underline">

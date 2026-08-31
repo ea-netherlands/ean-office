@@ -384,6 +384,14 @@ export async function saveSettingsAction(
   await setSetting("office_address", String(formData.get("office_address") || ""));
   await setSetting("luma_ics_url", String(formData.get("luma_ics_url") || "").trim());
 
+  // Holiday mode. "" clears it; anything else has to be a real ISO date, or
+  // the notice would silently never appear and nobody would know why.
+  const backOn = String(formData.get("admin_back_on") || "").trim();
+  if (backOn && !/^\d{4}-\d{2}-\d{2}$/.test(backOn)) {
+    return { error: "The 'back on' date has to be a date, or empty if someone is around." };
+  }
+  await setSetting("admin_back_on", backOn);
+
   revalidatePath("/admin/settings");
   return { ok: true };
 }

@@ -3,6 +3,8 @@ import { getCurrentUser, isActiveMember } from "@/lib/auth";
 import { Nav } from "@/components/nav";
 import { Page, H1, Sub, Card, Badge } from "@/components/ui";
 import { getSettings, Settings } from "@/lib/settings";
+import { adminsAway } from "@/lib/away";
+import { AwayNotice } from "@/components/away-notice";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,7 @@ export default async function InfoPage() {
   const user = await getCurrentUser();
   const cfg = await getSettings();
   const member = isActiveMember(user);
+  const away = adminsAway(cfg.admin_back_on);
 
   return (
     <>
@@ -27,6 +30,11 @@ export default async function InfoPage() {
       <Page>
         <H1>Practical info</H1>
         <Sub>Everything you need for a day at the office.</Sub>
+        {/* The public copy here promises a reply within one working day, and
+            it is admin-edited markdown we should not rewrite from code — so
+            when nobody is around, say so above it rather than let the page
+            contradict itself. */}
+        <AwayNotice away={away} className="mb-4" />
         <div className="space-y-4">
           <Card>
             <InfoProse html={renderInfoMd(cfg.info_public_md, cfg)} />

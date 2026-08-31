@@ -10,6 +10,8 @@ import {
   todayAms,
   WEEKDAY_NAMES,
 } from "@/lib/dates";
+import { adminsAway } from "@/lib/away";
+import { AwayNotice } from "@/components/away-notice";
 import { JoinForm } from "./join-form";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function JoinPage() {
   const user = await getCurrentUser();
   const cfg = await getSettings();
+  const away = adminsAway(cfg.admin_back_on);
 
   // Only days with host coverage appear, and only future working days —
   // this is the entire fix for "someone has to be there at 09:00". The chips
@@ -45,12 +48,16 @@ export default async function JoinPage() {
       <Page>
         <H1>Request a first visit</H1>
         <Sub>
-          Tell us a little about yourself, pick a day, and we&apos;ll confirm
-          within one working day. That first visit is a trial day — come see
-          if it&apos;s a good fit, and we&apos;ll follow up afterwards about
-          joining properly.
+          Tell us a little about yourself, pick a day, and{" "}
+          {away
+            ? "we'll confirm once we're back"
+            : "we'll confirm within one working day"}
+          . That first visit is a trial day — come see if it&apos;s a good
+          fit, and we&apos;ll follow up afterwards about joining properly.
         </Sub>
+        <AwayNotice away={away} className="mb-5" />
         <JoinForm
+          away={away}
           days={slots}
           arrivals={cfg.arrival_slots}
           lastDate={horizon}

@@ -103,6 +103,28 @@ export function SettingsForm({ cfg }: { cfg: Settings }) {
       </Card>
 
       <Card className="space-y-3">
+        <h2>Holiday</h2>
+        <div>
+          <label className={labelCls}>Back on</label>
+          <input
+            type="date"
+            name="admin_back_on"
+            defaultValue={cfg.admin_back_on}
+            className={inputCls}
+          />
+          <p className="text-xs text-slate-400 mt-1">
+            Set this when nobody will be reading the queue for a while. First
+            visits, co-working proposals and guest requests can still be sent
+            — the forms, the confirmation screens and the acknowledgement
+            emails just say you&apos;re back on this date and that a request
+            probably won&apos;t be looked at before then. It switches itself
+            off on the day, so there&apos;s nothing to remember when you get
+            back. Leave it empty while someone is around.
+          </p>
+        </div>
+      </Card>
+
+      <Card className="space-y-3">
         <h2>Booking rules</h2>
         <div className="grid grid-cols-2 gap-3">
           <Num

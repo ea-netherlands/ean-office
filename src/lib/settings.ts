@@ -28,6 +28,10 @@ export type Settings = {
   noshow_email_cooldown_days: number;
   checkin_rate_target: number;
   request_expiry_days: number; // "awaiting reply" auto-expiry
+  // Holiday mode: ISO date of the first day an admin is reading the queue
+  // again, or "" when someone is around. Surfaced wherever a submission has
+  // to wait on a human; see src/lib/away.ts.
+  admin_back_on: string;
   profile_skip_limit: number; // skips allowed before M&E profile is required
   checkin_retention_months: number; // GDPR purge horizon
   office_address: string;
@@ -55,6 +59,7 @@ export const DEFAULT_SETTINGS: Settings = {
   noshow_email_cooldown_days: 60,
   checkin_rate_target: 0.8,
   request_expiry_days: 14,
+  admin_back_on: "",
   profile_skip_limit: 2,
   checkin_retention_months: 24,
   office_address:

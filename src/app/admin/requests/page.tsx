@@ -1,8 +1,11 @@
+import Link from "next/link";
 import { db, visitRequests, users, guestRequests } from "@/db";
 import { eq, inArray, desc } from "drizzle-orm";
-import { Page, H1, Sub } from "@/components/ui";
+import { Page, H1, Sub, Notice } from "@/components/ui";
 import { todayAms, workingDaysBetween, amsDate } from "@/lib/dates";
 import { asSlot } from "@/lib/slots";
+import { getSettings } from "@/lib/settings";
+import { adminsAway } from "@/lib/away";
 import { RequestCard, RequestInfo } from "./request-card";
 import { GuestRequestCard, GuestRequestInfo } from "./guest-request-card";
 
@@ -35,6 +38,7 @@ export default async function RequestsPage() {
     .slice(0, 10);
 
   const today = todayAms();
+  const away = adminsAway((await getSettings()).admin_back_on, today);
 
   const toGuestInfo = (r: (typeof guestRows)[number]): GuestRequestInfo => ({
     id: r.req.id,
@@ -82,6 +86,17 @@ export default async function RequestsPage() {
         Every open request should get a decision within one working day —
         cards turn amber after two.
       </Sub>
+      {away && (
+        <Notice className="mb-4">
+          Holiday mode is on: anyone sending a request is being told
+          you&apos;re back on {away.back} and that it probably won&apos;t be
+          looked at before then. It clears itself that morning — or{" "}
+          <Link href="/admin/settings" className="underline">
+            turn it off now
+          </Link>
+          .
+        </Notice>
+      )}
       {open.length === 0 ? (
         <p className="text-slate-500 bg-white border border-slate-200 rounded-xl p-6 text-center">
           Queue is empty.

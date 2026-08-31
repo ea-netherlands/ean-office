@@ -23,9 +23,17 @@ import {
   inputCls,
   labelCls,
 } from "@/components/ui";
+import { Away } from "@/lib/away";
+import { AwayNotice } from "@/components/away-notice";
 import { CoworkingDayInfo, DayPicker } from "./day-picker";
 
-export function CoworkingForm({ days }: { days: CoworkingDayInfo[] }) {
+export function CoworkingForm({
+  away,
+  days,
+}: {
+  away: Away | null;
+  days: CoworkingDayInfo[];
+}) {
   const [state, action, pending] = useActionState<CoworkingProposalState, FormData>(
     proposeCoworkingDayAction,
     {}
@@ -51,6 +59,11 @@ export function CoworkingForm({ days }: { days: CoworkingDayInfo[] }) {
           on the office calendar, and you get a link to share — everyone who
           wants to come asks you, and you decide who&apos;s in.
         </p>
+        <AwayNotice
+          away={away}
+          when="after"
+          className="mt-4 max-w-md mx-auto text-left"
+        />
         <Link href="/" className={`${btnSecondary} mt-5`}>
           Back to today
         </Link>

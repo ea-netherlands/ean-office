@@ -7,14 +7,18 @@ import { DESCRIPTORS, FREQUENCIES, GENDER_SELF_DESCRIBE } from "@/lib/profile-op
 import { list, str } from "@/lib/form-values";
 import { useFormDraft } from "@/components/form-draft";
 import { btnPrimary, inputCls, labelCls, Card, Icon } from "@/components/ui";
+import { Away } from "@/lib/away";
+import { AwayNotice } from "@/components/away-notice";
 
 export function JoinForm({
+  away,
   days,
   arrivals,
   firstDate,
   lastDate,
   coverageNames,
 }: {
+  away: Away | null;
   days: { date: string; label: string }[];
   arrivals: string[];
   firstDate: string;
@@ -53,10 +57,20 @@ export function JoinForm({
         <h2 className="text-xl">Request received!</h2>
         <p className="text-slate-500 mt-2 max-w-sm mx-auto">
           We&apos;ve sent you an automatic acknowledgement now. A real person
-          then reads your request — usually{" "}
-          <strong>within one working day</strong> — and you&apos;ll get an
-          email either way once they have.
+          then reads your request, and you&apos;ll get an email either way
+          once they have.
+          {!away && (
+            <>
+              {" "}
+              Usually <strong>within one working day</strong>.
+            </>
+          )}
         </p>
+        <AwayNotice
+          away={away}
+          when="after"
+          className="mt-4 max-w-sm mx-auto text-left"
+        />
       </Card>
     );
   }

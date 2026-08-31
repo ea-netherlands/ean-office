@@ -89,10 +89,18 @@ export function Notice({
   children,
   tone = "ok",
   className = "",
+  live = true,
 }: {
   children: React.ReactNode;
   tone?: "ok" | "error";
   className?: string;
+  /**
+   * Most notices here appear in response to something the person just did, so
+   * they announce themselves. Set `live={false}` for one that is simply part
+   * of the page on load — a live region that never changes is noise in a
+   * screen reader, not help.
+   */
+  live?: boolean;
 }) {
   const tones = {
     ok: "bg-teal-50 border-teal-200 text-teal-900",
@@ -100,8 +108,7 @@ export function Notice({
   };
   return (
     <div
-      role="status"
-      aria-live="polite"
+      {...(live ? { role: "status", "aria-live": "polite" as const } : {})}
       className={`border text-sm rounded-xl px-3 py-2 ${tones[tone]} ${className}`}
     >
       {children}

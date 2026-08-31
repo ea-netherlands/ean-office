@@ -8,6 +8,7 @@ import { sendEmail, link } from "@/lib/email";
 import { appUrl } from "@/lib/auth";
 import { addDays, formatDayLong, isWorkingDay, isoWeekday, todayAms } from "@/lib/dates";
 import { getSettings } from "@/lib/settings";
+import { adminsAway } from "@/lib/away";
 import { coworkingDayOn } from "@/lib/booking";
 import { normaliseUrl } from "@/lib/url";
 import { resolveGender } from "@/lib/profile-options";
@@ -105,6 +106,7 @@ export async function submitJoinRequest(
   // it — a request for a Sunday in 2031 would have gone straight to the queue.
   const cfg = await getSettings();
   const today = todayAms();
+  const away = adminsAway(cfg.admin_back_on, today);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate) || requestedDate <= today) {
     return fail("Please pick a day in the future.", "requestedDate");
   }
@@ -161,7 +163,9 @@ export async function submitJoinRequest(
       .where(eq(visitRequests.userId, existing.id));
     if (openRequests.some((r) => r.status === "pending" || r.status === "awaiting_reply")) {
       return fail(
-        "You already have a request in — we'll get back to you within one working day.",
+        away
+          ? `You already have a request in — we're back on ${away.back} and will get to it then.`
+          : "You already have a request in — we'll get back to you within one working day.",
         "email"
       );
     }
@@ -207,12 +211,18 @@ export async function submitJoinRequest(
 
   await sendEmail({
     to: email,
-    subject: "We got your request — you'll hear from us within one working day",
+    subject: away
+      ? `We got your request — we're back on ${away.back}`
+      : "We got your request — you'll hear from us within one working day",
     kind: "request_ack",
     html: `<p>Hi ${name},</p>
 <p>Thanks for your interest in the EA Netherlands office! We've received your request to visit on <strong>${formatDayLong(requestedDate)}</strong> at ${requestedArrival}.</p>
 <p>Just so it's clear up front: that first visit works as a trial day. Come see if the space is a good fit, and afterwards the team will confirm whether to welcome you as a full member — you won't be able to book further days until then.</p>
-<p>This message is automatic — but a real person reads every request. One of the team will look at yours <strong>within one working day</strong> and you'll get an email either way once they have.</p>
+${
+      away
+        ? `<p>This message is automatic — but a real person reads every request. We're back on <strong>${away.back}</strong>, so yours probably won't be looked at before then. You'll get an email either way once it has been, and your requested day is held in the queue in the meantime.</p>`
+        : `<p>This message is automatic — but a real person reads every request. One of the team will look at yours <strong>within one working day</strong> and you'll get an email either way once they have.</p>`
+    }
 <p>In the meantime: ${link(`${appUrl()}/info`, "practical info about the office")}.</p>`,
   });
 
