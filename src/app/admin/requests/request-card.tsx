@@ -14,6 +14,8 @@ import {
 } from "@/lib/profile-options";
 import { Badge, btnPrimary, btnSecondary, btnDanger, inputCls } from "@/components/ui";
 import { formatDayLong } from "@/lib/dates";
+import { PriorVisit } from "@/lib/visit-history";
+import { PriorVisitsNote } from "@/components/prior-visits";
 
 export type RequestInfo = {
   id: string;
@@ -30,6 +32,7 @@ export type RequestInfo = {
   createdAt: string;
   stale: boolean;
   declineReason: string | null;
+  priorVisits: PriorVisit[];
 };
 
 export function RequestCard({
@@ -116,6 +119,8 @@ export function RequestCard({
           <Field label="What they're working on" value={req.about} />
         </div>
       </dl>
+
+      <PriorVisitsNote visits={req.priorVisits} />
 
       {mode === "ask" && (
         <div className="mt-3 space-y-2">

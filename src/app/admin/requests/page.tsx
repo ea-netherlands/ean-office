@@ -6,6 +6,7 @@ import { todayAms, workingDaysBetween, amsDate } from "@/lib/dates";
 import { asSlot } from "@/lib/slots";
 import { getSettings } from "@/lib/settings";
 import { adminsAway } from "@/lib/away";
+import { findPriorVisits, PriorVisit } from "@/lib/visit-history";
 import { RequestCard, RequestInfo } from "./request-card";
 import { GuestRequestCard, GuestRequestInfo } from "./guest-request-card";
 
@@ -40,7 +41,10 @@ export default async function RequestsPage() {
   const today = todayAms();
   const away = adminsAway((await getSettings()).admin_back_on, today);
 
-  const toGuestInfo = (r: (typeof guestRows)[number]): GuestRequestInfo => ({
+  const toGuestInfo = (
+    r: (typeof guestRows)[number],
+    priorVisits: PriorVisit[] = []
+  ): GuestRequestInfo => ({
     id: r.req.id,
     status: r.req.status,
     hostName: r.host.name,
@@ -57,9 +61,13 @@ export default async function RequestsPage() {
       r.req.status === "pending" &&
       workingDaysBetween(amsDate(r.req.createdAt), today) >= 2,
     declineReason: r.req.declineReason,
+    priorVisits,
   });
 
-  const toInfo = (r: (typeof rows)[number]): RequestInfo => ({
+  const toInfo = (
+    r: (typeof rows)[number],
+    priorVisits: PriorVisit[] = []
+  ): RequestInfo => ({
     id: r.req.id,
     status: r.req.status,
     name: r.u.name,
@@ -77,7 +85,19 @@ export default async function RequestsPage() {
       r.req.status === "pending" &&
       workingDaysBetween(amsDate(r.req.createdAt), today) >= 2,
     declineReason: r.req.declineReason,
+    priorVisits,
   });
+
+  // Prior history only matters while a decision is still open — a decided
+  // card is shown compact and doesn't render it, so skip the lookup there.
+  const openInfo = await Promise.all(
+    open.map(async (r) => toInfo(r, await findPriorVisits(r.u.email, r.req.id)))
+  );
+  const guestOpenInfo = await Promise.all(
+    guestOpen.map(async (r) =>
+      toGuestInfo(r, await findPriorVisits(r.req.guestEmail, r.req.id))
+    )
+  );
 
   return (
     <Page wide>
@@ -103,20 +123,20 @@ export default async function RequestsPage() {
         </p>
       ) : (
         <div className="space-y-4">
-          {open.map((r) => (
-            <RequestCard key={r.req.id} req={toInfo(r)} />
+          {openInfo.map((info) => (
+            <RequestCard key={info.id} req={info} />
           ))}
         </div>
       )}
 
-      {guestOpen.length > 0 && (
+      {guestOpenInfo.length > 0 && (
         <>
           <h2 className="mt-8 mb-3 text-slate-500">
             Guest requests — members bringing someone
           </h2>
           <div className="space-y-4">
-            {guestOpen.map((r) => (
-              <GuestRequestCard key={r.req.id} req={toGuestInfo(r)} />
+            {guestOpenInfo.map((info) => (
+              <GuestRequestCard key={info.id} req={info} />
             ))}
           </div>
         </>

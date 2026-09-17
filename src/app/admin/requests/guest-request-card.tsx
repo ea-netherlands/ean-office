@@ -9,6 +9,8 @@ import {
 import { Badge, btnPrimary, btnSecondary, btnDanger, inputCls } from "@/components/ui";
 import { formatDayLong } from "@/lib/dates";
 import { SLOT_LABEL, type Slot } from "@/lib/slots";
+import { PriorVisit } from "@/lib/visit-history";
+import { PriorVisitsNote } from "@/components/prior-visits";
 
 export type GuestRequestInfo = {
   id: string;
@@ -25,6 +27,7 @@ export type GuestRequestInfo = {
   createdAt: string;
   stale: boolean;
   declineReason: string | null;
+  priorVisits: PriorVisit[];
 };
 
 export function GuestRequestCard({
@@ -101,7 +104,9 @@ export function GuestRequestCard({
         </p>
       )}
 
-      {error && <p className="text-sm text-red-700 mb-2">{error}</p>}
+      <PriorVisitsNote visits={req.priorVisits} />
+
+      {error && <p className="text-sm text-red-700 mb-2 mt-3">{error}</p>}
 
       {mode === "decline" ? (
         <div className="space-y-2">
