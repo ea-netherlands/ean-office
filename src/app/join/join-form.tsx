@@ -144,7 +144,8 @@ export function JoinForm({
         </div>
         <div>
           <label className={labelCls}>
-            What are you working on, and how did you come across us? *
+            Which of the criteria above fits you, what&apos;s the evidence,
+            and how did you come across us? *
           </label>
           <textarea
             name="about"
@@ -154,7 +155,8 @@ export function JoinForm({
             className={bad("about")}
           />
           <p className="text-xs text-slate-400 mt-1">
-            Two or three sentences is plenty.
+            A job, a project, a role, coursework — something concrete, not
+            just an interest. Two or three sentences is plenty.
           </p>
         </div>
         <div>

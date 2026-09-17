@@ -56,6 +56,36 @@ export default async function JoinPage() {
           fit, and we&apos;ll follow up afterwards about joining properly.
         </Sub>
         <AwayNotice away={away} className="mb-5" />
+
+        <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 mb-5 text-sm text-slate-700 space-y-2">
+          <p className="font-medium text-slate-900">
+            You&apos;re warmly welcome if at least one of these describes you:
+          </p>
+          <ul className="list-disc pl-5 space-y-0.5">
+            <li>You work in a high-impact job or project</li>
+            <li>
+              You&apos;re exploring or pursuing opportunities based on the{" "}
+              <a
+                href="https://www.centreforeffectivealtruism.org/core-principles"
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                principles that unite the EA community
+              </a>{" "}
+              — including starting something yourself
+            </li>
+            <li>You&apos;re a student directing your studies toward a high-impact career</li>
+            <li>You volunteer for an EA-aligned organisation</li>
+          </ul>
+          <p>
+            That covers a lot of ground on purpose. Researching global
+            health, upskilling in policy, planning your donations,
+            job-hunting in animal advocacy, running an EA project on the side
+            of your day job — all of it belongs here.
+          </p>
+        </div>
+
         <JoinForm
           away={away}
           days={slots}
