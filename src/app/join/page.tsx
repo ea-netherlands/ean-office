@@ -62,7 +62,27 @@ export default async function JoinPage() {
             You&apos;re warmly welcome if at least one of these describes you:
           </p>
           <ul className="list-disc pl-5 space-y-0.5">
-            <li>You work in a high-impact job or project</li>
+            <li>
+              You work in a high-impact job or project
+              <details className="mt-1">
+                <summary className="text-teal-700 font-medium cursor-pointer">
+                  What counts as high-impact?
+                </summary>
+                <p className="mt-1 text-slate-700">
+                  There&apos;s no strict definition, but as a guide: working
+                  at an organisation recommended by effectiveness-focused
+                  evaluators, or working on particularly pressing problems
+                  like AI safety, global health, or animal welfare from
+                  within government, academia, or some other form of
+                  organisation. But plenty of high-impact work doesn&apos;t
+                  fit those boxes — independent research, founding something
+                  new, or giving a significant share of your income all
+                  count too. If you&apos;re unsure whether your work
+                  qualifies, that usually means it&apos;s worth a
+                  conversation: sign up.
+                </p>
+              </details>
+            </li>
             <li>
               You&apos;re exploring or pursuing opportunities based on the{" "}
               <a
