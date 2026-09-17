@@ -351,6 +351,13 @@ export const events = pgTable("events", {
   date: date("date").notNull(),
   startsAt: text("starts_at"), // "18:00"
   endsAt: text("ends_at"),
+  // Where it happens, as the Luma feed states it. Kept because the feed is a
+  // national calendar: most of what's on it is in Utrecht, Rotterdam or
+  // someone's meetup.com page, and only the events at our address belong in an
+  // app about our room. Stored so a skipped or kept event can be explained
+  // later, and so a venue that moves off-site can be spotted. Null on events
+  // entered by hand — those are at the office by definition.
+  location: text("location"),
   type: text("type", {
     enum: [
       "talk",

@@ -118,9 +118,12 @@ Then, on the live site:
    password itself: the old one sat on a public Notion URL.
 4. **Admin → Info page** — read it through; it's pre-filled from the Notion
    content. The Notion page can then be archived.
-5. **Admin → Events → Sync from Luma** — pulls your calendar in. Walk the
-   past events once and set the right type on each (talk, social, themed
-   coworking day…), since that's what the events-per-month figures in
+5. **Admin → Events → Sync from Luma** — check **Office locations in the
+   feed** under Admin → Settings first, then sync. It brings in the events at
+   that address, lists the other addresses it left alone, and puts anything
+   it can't place into "Where were these?" for you to settle with a click.
+   Walk the past events once and set the right type on each (talk, social,
+   themed coworking day…), since that's what the events-per-month figures in
    Reports are built from.
 6. **Admin → QR** — print the stickers. One by the door, one on the lunch
    table, small ones on the desks.

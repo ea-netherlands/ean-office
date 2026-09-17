@@ -70,6 +70,7 @@ export default async function EventsPage() {
       expectedAttendance: e.expectedAttendance,
       headcount: e.headcount,
       source: e.source,
+      location: e.location,
       url: e.url,
       status: e.status,
       proposalNote: e.proposalNote,

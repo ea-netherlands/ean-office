@@ -36,6 +36,11 @@ export type Settings = {
   checkin_retention_months: number; // GDPR purge horizon
   office_address: string;
   luma_ics_url: string; // public ICS feed of the EAN Luma calendar
+  // The Luma calendar is national: Utrecht, Rotterdam, Tilburg and a good
+  // number of meetup.com links share it with us. A synced event is treated as
+  // ours only when its stated location contains one of these, one per line.
+  // Anything else is somebody else's room and never reaches this app.
+  luma_office_locations: string;
   info_public_md: string; // /info content everyone can see (markdown)
   info_members_md: string; // /info content shown only to logged-in members
 };
@@ -66,6 +71,28 @@ export const DEFAULT_SETTINGS: Settings = {
     "HNK Houthavens, Van Diemenstraat 92, 1013 CN Amsterdam (ground floor — ask for 'Effectief Altruïsme Nederland', or walk towards the elevators, turn right, go through the connecting doors, and it's the first office on the left with the EA logos)",
   // Real value is set in the database via /admin/settings — never in source.
   luma_ics_url: "https://api.lu.ma/ics/get?entity=calendar&id=cal-akaE66Y0BQlrCVY",
+  // Street and number only: the feed writes the venue a dozen ways ("Effective
+  // Altruism Netherlands, Van Diemenstraat 92…", "Van Diemenstraat 92…") and
+  // under three different postcodes.
+  //
+  // The lines after it are the same office written wrongly on pages nobody
+  // here can edit, which is the whole reason this is a list and not one
+  // address:
+  //   Van Diemenkade            the kade behind us, how the unconferences go in
+  //   effectiefaltruisme.nl/…   a co-working day that gives our page, not a place
+  //   Anthony Fokkerweg 1       HNK *Schinkel*, on the 9 Dec 2025 co-working
+  //                             day. James confirms it was held here at
+  //                             Houthavens; the page looks duplicated from an
+  //                             earlier Schinkel event, directions and all.
+  // Drop a line if one of these venues is ever genuinely used — each one
+  // makes its address count as ours, and on a co-working day that closes the
+  // office for the day.
+  luma_office_locations: [
+    "Van Diemenstraat 92",
+    "Van Diemenkade",
+    "effectiefaltruisme.nl/office",
+    "Anthony Fokkerweg 1",
+  ].join("\n"),
   info_public_md: `## Where
 
 {{office_address}}

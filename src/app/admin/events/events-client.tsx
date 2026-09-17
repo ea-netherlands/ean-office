@@ -39,6 +39,7 @@ export type EventRow = {
   expectedAttendance: number | null;
   headcount: number | null;
   source: string;
+  location: string | null;
   url: string | null;
   checkins: number;
   manual: number;
@@ -86,7 +87,13 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
     {}
   );
 
-  const proposals = rows.filter((r) => r.status === "proposed");
+  // Two different questions wear the same `proposed` status. A member's
+  // proposal asks "may this happen here?"; a synced event whose Luma page
+  // never said where it is asks only "was this here?". Same gate, different
+  // card, because answering them takes different information.
+  const allProposed = rows.filter((r) => r.status === "proposed");
+  const proposals = allProposed.filter((r) => r.source !== "luma");
+  const unplaced = allProposed.filter((r) => r.source === "luma");
   const confirmed = rows.filter((r) => r.status !== "proposed");
 
   return (
@@ -193,6 +200,23 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
         </Card>
       )}
 
+      {unplaced.length > 0 && (
+        <Card className="border-slate-300">
+          <h2 className="mb-1">Where were these?</h2>
+          <p className="text-sm text-slate-600 mb-3">
+            Luma doesn&apos;t say where {unplaced.length === 1 ? "this one is" : "these are"} — the
+            location on the page is a link rather than an address, so we
+            can&apos;t tell the office from a café. Until you say, {unplaced.length === 1 ? "it shows" : "they show"} to
+            nobody and {unplaced.length === 1 ? "counts" : "count"} in no report.
+          </p>
+          <ul className="divide-y divide-slate-200">
+            {unplaced.map((e) => (
+              <UnplacedItem key={e.id} e={e} onNotice={setNotice} />
+            ))}
+          </ul>
+        </Card>
+      )}
+
       {proposals.length > 0 && (
         <Card className="border-teal-300 bg-teal-50/50">
           <h2 className="mb-1">Member proposals</h2>
@@ -227,6 +251,10 @@ function SyncButton() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<string | null>(null);
+  const [movedAway, setMovedAway] = useState<
+    { id: string; title: string; date: string; location: string }[]
+  >([]);
+  const [skipped, setSkipped] = useState<{ location: string; count: number }[]>([]);
   return (
     <>
       <button
@@ -235,10 +263,16 @@ function SyncButton() {
         onClick={() =>
           startTransition(async () => {
             const res = await syncLumaAction();
+            setMovedAway(res.movedAway ?? []);
+            setSkipped(res.skipped ?? []);
+            const elsewhere = (res.skipped ?? []).reduce((n, s) => n + s.count, 0);
             setResult(
               res.error
                 ? res.error
-                : `Synced ${res.total} Luma events — ${res.created} new, ${res.updated} updated.`
+                : `Read ${res.total} Luma events — ${res.created} new at the office, ` +
+                  `${res.updated} updated, ${elsewhere} at another address` +
+                  (res.queued ? `, ${res.queued} waiting on you below` : "") +
+                  "."
             );
             router.refresh();
           })
@@ -247,7 +281,116 @@ function SyncButton() {
         {pending ? "Syncing…" : "Sync from Luma"}
       </button>
       {result && <span className="text-sm text-slate-500">{result}</span>}
+      {/* Folded away, but there: if one of these venues is really yours
+          written a way we don't recognise, the fix is to paste the line into
+          "Office locations in the feed" — and you can only do that if you can
+          see what the feed actually says. */}
+      {skipped.length > 0 && (
+        <details className="basis-full text-sm">
+          <summary className="cursor-pointer text-slate-500 hover:text-slate-700">
+            Addresses we treated as somewhere else ({skipped.length})
+          </summary>
+          <ul className="mt-2 space-y-0.5 text-xs text-slate-600">
+            {skipped.map((s) => (
+              <li key={s.location} className="break-all">
+                {s.location}
+                {s.count > 1 && <span className="text-slate-400"> × {s.count}</span>}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-slate-500">
+            Is one of these the office under another name? Add it to{" "}
+            <strong>Office locations in the feed</strong> in Settings and sync
+            again.
+          </p>
+        </details>
+      )}
+      {/* These are already in the app but the feed now puts them elsewhere —
+          either they predate the office check or the venue has moved. Nothing
+          is removed automatically: some carry a guest list. */}
+      {movedAway.length > 0 && (
+        <p className="basis-full text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+          {movedAway.length === 1 ? "One event we hold is" : `${movedAway.length} events we hold are`}{" "}
+          no longer at the office. Check whether {movedAway.length === 1 ? "it belongs" : "they belong"} here,
+          and delete below if not:
+          <span className="block mt-1 text-amber-900">
+            {movedAway
+              .map((m) => `${m.date} — ${m.title} (${m.location})`)
+              .join("; ")}
+          </span>
+        </p>
+      )}
     </>
+  );
+}
+
+/**
+ * One synced event whose Luma page never said where it happened.
+ *
+ * Two buttons and nothing else. There's no organiser to email and no capacity
+ * to weigh — the admin is settling a fact, not granting a request, so the
+ * member-proposal machinery (questions to the proposer, keep-or-clear the
+ * day) would only be in the way. Confirming runs the ordinary confirm path,
+ * so a co-working day still closes its day and brings the people already
+ * booked along.
+ */
+function UnplacedItem({
+  e,
+  onNotice,
+}: {
+  e: EventRow;
+  onNotice: (note: string | null) => void;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const coworking = !needsEveningWindow(e.type);
+
+  function decide(decision: "confirmed" | "declined") {
+    startTransition(async () => {
+      const res = await decideEventAction(e.id, decision);
+      onNotice(res.note ?? res.error ?? null);
+      router.refresh();
+    });
+  }
+
+  return (
+    <li className="py-3">
+      <p className="text-sm font-medium">{e.title}</p>
+      <p className="text-xs text-slate-500 mt-0.5">
+        {formatDay(e.date)}
+        {e.startsAt ? ` \u00b7 ${e.startsAt}${e.endsAt ? `\u2013${e.endsAt}` : ""}` : ""}
+      </p>
+      {e.location && (
+        <p className="text-xs text-slate-500 mt-0.5 break-all">
+          Luma says: <span className="text-slate-600">{e.location}</span>
+        </p>
+      )}
+      {/* Said before the button rather than after it: on a co-working day
+          "at the office" takes the whole room, and that shouldn't be a
+          surprise discovered afterwards. */}
+      {coworking && !e.past && (
+        <p className="text-xs text-slate-600 mt-1.5 bg-white border border-slate-200 rounded-lg px-2 py-1.5">
+          It&apos;s a co-working day, so saying it was at the office closes{" "}
+          {formatDay(e.date)} to general desk booking.{" "}
+          {e.bookedThatDay === 0
+            ? "Nobody has booked that day."
+            : `${e.bookedThatDay} ${e.bookedThatDay === 1 ? "person keeps their desk" : "people keep their desks"} and hears about it.`}
+        </p>
+      )}
+      <div className="mt-2 flex gap-2 flex-wrap">
+        <button className={btnPrimary} disabled={pending} onClick={() => decide("confirmed")}>
+          {pending ? "Working\u2026" : "At the office"}
+        </button>
+        <button className={btnSecondary} disabled={pending} onClick={() => decide("declined")}>
+          Somewhere else
+        </button>
+        {e.url && (
+          <a href={e.url} target="_blank" rel="noreferrer" className={btnSecondary}>
+            Open on Luma
+          </a>
+        )}
+      </div>
+    </li>
   );
 }
 

@@ -210,7 +210,7 @@ export async function askQuestionAction(
   requestId: string,
   question: string
 ): Promise<AdminActionState> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   if (!question.trim()) return { error: "Write a question first." };
   const [req] = await db.select().from(visitRequests).where(eq(visitRequests.id, requestId));
   if (!req) return { error: "Request not found." };
@@ -224,6 +224,7 @@ export async function askQuestionAction(
 
   await sendEmail({
     to: user.email,
+    replyTo: admin.email,
     subject: "Quick question about your office visit request",
     kind: "request_question",
     html: `<p>Hi ${user.name},</p>
@@ -431,6 +432,10 @@ export async function saveSettingsAction(
   await setSetting("pm_window", String(formData.get("pm_window") || "12:30–19:00"));
   await setSetting("office_address", String(formData.get("office_address") || ""));
   await setSetting("luma_ics_url", String(formData.get("luma_ics_url") || "").trim());
+  await setSetting(
+    "luma_office_locations",
+    String(formData.get("luma_office_locations") || "").trim()
+  );
 
   // Holiday mode. "" clears it; anything else has to be a real ISO date, or
   // the notice would silently never appear and nobody would know why.
@@ -694,12 +699,27 @@ export async function saveInfoPageAction(
 }
 
 export async function syncLumaAction(): Promise<
-  AdminActionState & { created?: number; updated?: number; total?: number }
+  AdminActionState & {
+    created?: number;
+    updated?: number;
+    queued?: number;
+    total?: number;
+    skipped?: { location: string; count: number }[];
+    movedAway?: { id: string; title: string; date: string; location: string }[];
+  }
 > {
   await requireAdmin();
   const { syncLuma } = await import("@/lib/luma");
   const res = await syncLuma();
   revalidatePath("/admin/events");
   if (!res.ok) return { error: res.error };
-  return { ok: true, created: res.created, updated: res.updated, total: res.total };
+  return {
+    ok: true,
+    created: res.created,
+    updated: res.updated,
+    queued: res.queued,
+    skipped: res.skipped,
+    total: res.total,
+    movedAway: res.movedAway,
+  };
 }

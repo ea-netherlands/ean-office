@@ -198,6 +198,21 @@ export function SettingsForm({ cfg }: { cfg: Settings }) {
             hand.
           </p>
         </div>
+        <div>
+          <label className={labelCls}>Office locations in the feed</label>
+          <textarea
+            name="luma_office_locations"
+            defaultValue={cfg.luma_office_locations}
+            rows={3}
+            className={inputCls}
+          />
+          <p className="text-xs text-slate-400 mt-1">
+            One per line. The Luma calendar covers the whole country, so an
+            event syncs only when its location contains one of these — the rest
+            happen somewhere else and never appear here. Street and number is
+            usually enough.
+          </p>
+        </div>
       </Card>
 
       {state.error && <p className="text-sm text-red-700">{state.error}</p>}

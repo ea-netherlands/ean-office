@@ -2,118 +2,56 @@ import { db, events } from "@/db";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { newId } from "./ids";
 import { getSettings } from "./settings";
-import { TZ, todayAms } from "./dates";
+import { todayAms } from "./dates";
 import { isCoworkingDay } from "./coworking";
+import {
+  parseIcs,
+  locationVerdict,
+  officeNeedles,
+  guessType,
+  amsDateFmt,
+  amsTimeFmt,
+} from "./luma-feed";
 import { absorbExistingBookings } from "./coworking-guests";
 
 // Sync events from the public Luma calendar ICS feed. Luma stays the events
 // platform (promotion, RSVPs); the app only mirrors title/date/time so
 // attendance can be counted against them for M&E. No API key needed.
+//
+// The feed is the *national* calendar, so most of what's on it happens
+// somewhere else entirely — Utrecht, Rotterdam, Tilburg, a university café, a
+// meetup.com page. Only the events at our address are mirrored here: the rest
+// aren't in the room, can't be checked into, mustn't pad the event figure EAN
+// reports, and — where the title says "co-working" — would otherwise shut the
+// office and turn people's desks out for a day happening in another city.
 
-type IcsEvent = {
-  uid: string;
-  title: string;
-  start: Date;
-  end: Date | null;
-  allDay: boolean;
-  url: string | null;
-};
-
-function unescapeIcs(s: string): string {
-  return s
-    .replace(/\\n/g, " ")
-    .replace(/\\,/g, ",")
-    .replace(/\\;/g, ";")
-    .replace(/\\\\/g, "\\")
-    .trim();
-}
-
-function parseIcsDate(value: string): { date: Date; allDay: boolean } | null {
-  // 20240622T090000Z (UTC), 20240622T090000 (floating), or 20240622 (all-day)
-  let m = value.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z?)$/);
-  if (m) {
-    const [, y, mo, d, h, mi, s, z] = m;
-    const iso = `${y}-${mo}-${d}T${h}:${mi}:${s}${z ? "Z" : "+02:00"}`;
-    return { date: new Date(iso), allDay: false };
-  }
-  m = value.match(/^(\d{4})(\d{2})(\d{2})$/);
-  if (m) {
-    const [, y, mo, d] = m;
-    return { date: new Date(`${y}-${mo}-${d}T12:00:00Z`), allDay: true };
-  }
-  return null;
-}
-
-export function parseIcs(ics: string): IcsEvent[] {
-  // Unfold continuation lines, then walk VEVENT blocks.
-  const unfolded = ics.replace(/\r?\n[ \t]/g, "");
-  const blocks = unfolded.split("BEGIN:VEVENT").slice(1);
-  const out: IcsEvent[] = [];
-  for (const block of blocks) {
-    const body = block.split("END:VEVENT")[0];
-    const prop = (name: string): string | null => {
-      const m = body.match(new RegExp(`^${name}(?:;[^:\\r\\n]*)?:(.*)$`, "m"));
-      return m ? m[1].trim() : null;
-    };
-    const uid = prop("UID");
-    const summary = prop("SUMMARY");
-    const dtstart = prop("DTSTART");
-    if (!uid || !summary || !dtstart) continue;
-    const start = parseIcsDate(dtstart);
-    if (!start) continue;
-    const dtend = prop("DTEND");
-    const end = dtend ? parseIcsDate(dtend) : null;
-    const description = prop("DESCRIPTION") ?? "";
-    const urlMatch = description.match(/https:\/\/(?:lu\.ma|luma\.com)\/[A-Za-z0-9-]+/);
-    const url =
-      urlMatch && !urlMatch[0].endsWith("/eanetherlands") ? urlMatch[0] : null;
-    out.push({
-      uid,
-      title: unescapeIcs(summary),
-      start: start.date,
-      end: end?.date ?? null,
-      allDay: start.allDay,
-      url,
-    });
-  }
-  return out;
-}
-
-const amsDateFmt = new Intl.DateTimeFormat("en-CA", {
-  timeZone: TZ,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-const amsTimeFmt = new Intl.DateTimeFormat("en-GB", {
-  timeZone: TZ,
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
-
-/** Best-effort event type from the title; admins can correct it. */
-export function guessType(title: string): typeof events.$inferInsert.type {
-  const t = title.toLowerCase();
-  if (/co-?working/.test(t)) return "themed_coworking";
-  if (/(borrel|social|drinks|dinner|poker|party|picnic|bbq)/.test(t)) return "social";
-  if (/reading group|book club/.test(t)) return "reading_group";
-  if (/workshop|hackathon/.test(t)) return "workshop";
-  if (/unconference/.test(t)) return "unconference";
-  if (/(talk|lecture|presentation|q&a|panel)/.test(t)) return "talk";
-  return "other";
-}
-
-export async function syncLuma(): Promise<{
+export type LumaSyncResult = {
   ok: boolean;
   created: number;
   updated: number;
+  /** Feed entries at a real address that isn't ours, by location. */
+  skipped: { location: string; count: number }[];
+  /** New entries whose location settles nothing, waiting on an admin. */
+  queued: number;
+  /** Events we already hold that the feed now places at another address. */
+  movedAway: { id: string; title: string; date: string; location: string }[];
   total: number;
   error?: string;
-}> {
+};
+
+const EMPTY: Omit<LumaSyncResult, "ok" | "error"> = {
+  created: 0,
+  updated: 0,
+  skipped: [],
+  queued: 0,
+  movedAway: [],
+  total: 0,
+};
+
+export async function syncLuma(): Promise<LumaSyncResult> {
   const cfg = await getSettings();
   if (!cfg.luma_ics_url) {
-    return { ok: false, created: 0, updated: 0, total: 0, error: "No Luma feed URL configured in settings." };
+    return { ok: false, ...EMPTY, error: "No Luma feed URL configured in settings." };
   }
   let ics: string;
   try {
@@ -125,15 +63,38 @@ export async function syncLuma(): Promise<{
     ics = await res.text();
   } catch (err) {
     return {
-      ok: false, created: 0, updated: 0, total: 0,
+      ok: false, ...EMPTY,
       error: err instanceof Error ? err.message : "Fetch failed",
     };
   }
 
   const parsed = parseIcs(ics);
+  const needles = officeNeedles(cfg.luma_office_locations);
   let created = 0;
   let updated = 0;
+  let queued = 0;
+  const skipped = new Map<string, number>();
+  const movedAway: LumaSyncResult["movedAway"] = [];
   for (const ev of parsed) {
+    const verdict = locationVerdict(ev.location, needles);
+    if (verdict === "elsewhere") {
+      // Grouped by the location itself, because the fix for a venue that is
+      // ours but written unfamiliarly is to add that string to the setting,
+      // and you can only do that if you can see what the feed actually says.
+      const where = ev.location ?? "no location given";
+      skipped.set(where, (skipped.get(where) ?? 0) + 1);
+      // It may still be one we took in before this check existed, or a venue
+      // that has since moved out of the building. Say so rather than deleting
+      // it here: a feed that briefly drops its locations would take real guest
+      // lists and attendance with it, and an admin can remove the row in one
+      // click once they've seen which event it is.
+      const [held] = await db
+        .select({ id: events.id, title: events.title, date: events.date })
+        .from(events)
+        .where(and(eq(events.externalId, ev.uid), eq(events.source, "luma")));
+      if (held) movedAway.push({ ...held, location: where });
+      continue;
+    }
     const date = amsDateFmt.format(ev.start);
     const startsAt = ev.allDay ? null : amsTimeFmt.format(ev.start);
     const endsAt = ev.end && !ev.allDay ? amsTimeFmt.format(ev.end) : null;
@@ -177,6 +138,12 @@ export async function syncLuma(): Promise<{
       // Refresh what Luma owns; never touch what admins set here
       // (type, cause area, headcount, organiser).
       //
+      // `status` is on that list, and deliberately so. When the feed can't say
+      // where an event is, an admin answers for it — and that answer has to
+      // outlive every later sync, because the Luma page it disagrees with is
+      // often one nobody here can edit. Re-reading the feed must never undo
+      // someone's "yes, that one was in our room".
+      //
       // The feed only carries a page URL when the description happens to
       // contain one, so a missing one means "the feed didn't say", not "there
       // is no page". Keeping what we have matters: on a co-working day the URL
@@ -188,16 +155,23 @@ export async function syncLuma(): Promise<{
         existing.date !== date ||
         existing.startsAt !== startsAt ||
         existing.endsAt !== endsAt ||
-        existing.url !== url
+        existing.url !== url ||
+        existing.location !== ev.location
       ) {
         await db
           .update(events)
-          .set({ title: ev.title, date, startsAt, endsAt, url })
+          .set({ title: ev.title, date, startsAt, endsAt, url, location: ev.location })
           .where(eq(events.id, existing.id));
         updated++;
       }
     } else {
       const type = guessType(ev.title);
+      // An event the feed can't place goes in as a proposal rather than a
+      // fact. `proposed` already means "no member sees it, no report counts
+      // it, an admin decides" everywhere in the app, so this needs no new
+      // filtering — and forgetting one such filter is exactly how events that
+      // weren't in the room got counted as if they were.
+      const status = verdict === "office" ? "confirmed" : "proposed";
       const [inserted] = await db
         .insert(events)
         .values({
@@ -211,16 +185,30 @@ export async function syncLuma(): Promise<{
           source: "luma",
           externalId: ev.uid,
           url: ev.url,
+          location: ev.location,
+          status,
         })
         .returning();
-      created++;
+      if (status === "proposed") queued++;
+      else created++;
       // A synced co-working day closes its day to booking the moment it
       // lands, so it owes the same courtesy as one an admin confirms: the
-      // people already booked keep their desks and hear about it.
-      if (isCoworkingDay(type) && date >= todayAms()) {
+      // people already booked keep their desks and hear about it. A proposed
+      // one closes nothing yet, so it displaces nobody until it's confirmed.
+      if (status === "confirmed" && isCoworkingDay(type) && date >= todayAms()) {
         await absorbExistingBookings(inserted);
       }
     }
   }
-  return { ok: true, created, updated, total: parsed.length };
+  return {
+    ok: true,
+    created,
+    updated,
+    queued,
+    movedAway,
+    total: parsed.length,
+    skipped: [...skipped]
+      .map(([location, count]) => ({ location, count }))
+      .sort((a, b) => b.count - a.count),
+  };
 }

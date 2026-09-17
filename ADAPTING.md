@@ -49,6 +49,7 @@ change those if you want a clean install to start right.
 | `checkin_retention_months` | 24 | GDPR purge horizon for check-in rows |
 | `office_address` | HNK Houthavens… | Shown in emails and on `/info` |
 | `luma_ics_url` | our Luma calendar | Events sync; see §5 |
+| `luma_office_locations` | Van Diemenstraat 92 | Which feed events count as yours; see §5 |
 
 The `/info` page (public and members-only halves) is admin-editable markdown at
 `/admin/info`. Door codes, wifi, kitchen rules, and how to find the place all
@@ -103,6 +104,33 @@ components and emails that use them, not in a bundle.
 - **Luma events sync.** `/admin/events` pulls from a public Luma ICS feed, no
   API key. If you don't use Luma, clear `luma_ics_url` and the sync stays
   quiet; admins can still create events by hand.
+
+  If the feed is a calendar for more than your office — ours covers the whole
+  country — set `luma_office_locations` to the address of your space, one
+  match per line. Match on street and number rather than the full address:
+  the same venue turns up written several ways, and ours arrives under three
+  different postcodes. Extra lines are the escape hatch for a page you can't
+  edit: ours lists the kade behind the building and an office-page URL,
+  because that's how two of our own recurring events are written and nobody
+  here can change them.
+
+  Each feed entry then lands one of three ways:
+
+  - **location names the office** → synced and confirmed, as before;
+  - **location is a different street address** → not imported at all. The
+    sync panel lists the addresses it treated this way, so if one is yours
+    under an unfamiliar name you can see it and add the line;
+  - **location settles nothing** — a registration URL, "Online", a bare city
+    → imported as a *proposal*, listed under "Where were these?" on
+    `/admin/events` with two buttons. It shows to nobody and counts in no
+    report until someone answers, and the answer sticks: later syncs never
+    overwrite it.
+
+  That third case is not an edge case. Our monthly Amsterdam drinks carry a
+  meetup.com link as their location every time, and they're at a café most
+  months and at the office some months — nothing in the feed can tell those
+  apart. Guessing "here" is what put events in the room that were never in
+  it; guessing "elsewhere" would quietly lose the real ones.
 - **Funder reports.** `/admin/reports` emits the figures our EAIF grant asks
   for — occupancy as a percentage of desks, booked and attended counted
   separately, trials and conversions. The shape is in `src/lib/reports.ts`.
