@@ -22,6 +22,10 @@ import {
 } from "@/components/ui";
 import { MergePanel, MergeCandidate } from "@/components/merge-panel";
 import { formatDayLong } from "@/lib/dates";
+import {
+  DECLINE_EMAIL_TEMPLATES,
+  DeclineEmailTemplate,
+} from "@/lib/profile-options";
 
 export type MemberRow = {
   id: string;
@@ -68,6 +72,11 @@ export function MembersClient({
   );
   const [merging, setMerging] = useState<{ a?: string; b?: string } | null>(null);
   const [mergeNote, setMergeNote] = useState<string | null>(null);
+  const [declining, setDeclining] = useState<string | null>(null);
+  const [declineTemplate, setDeclineTemplate] = useState<DeclineEmailTemplate>(
+    DECLINE_EMAIL_TEMPLATES[0].value
+  );
+  const [declineCustomMessage, setDeclineCustomMessage] = useState("");
 
   const trialsToReview = rows.filter((r) => r.trialEnded);
 
@@ -98,31 +107,79 @@ export function MembersClient({
           </p>
           <ul className="space-y-2">
             {trialsToReview.map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-2 flex-wrap">
-                <span className="text-sm font-medium">
-                  {r.name}{" "}
-                  <span className="text-slate-400 font-normal">
-                    visited {r.trialDate && formatDayLong(r.trialDate)}
+              <li key={r.id} className="space-y-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-sm font-medium">
+                    {r.name}{" "}
+                    <span className="text-slate-400 font-normal">
+                      visited {r.trialDate && formatDayLong(r.trialDate)}
+                    </span>
                   </span>
-                </span>
-                <span className="flex gap-1.5">
-                  <SmallBtn onClick={() => run(() => resolveTrialAction(r.id, "admit"))}>
-                    Admit
-                  </SmallBtn>
-                  <SmallBtn
-                    danger
-                    onClick={() => {
-                      if (
-                        confirm(
-                          `Decline ${r.name}? They'll get an email, and they won't be able to log in again unless you mark them active.`
-                        )
-                      )
-                        run(() => resolveTrialAction(r.id, "decline"));
-                    }}
-                  >
-                    Decline
-                  </SmallBtn>
-                </span>
+                  <span className="flex gap-1.5">
+                    <SmallBtn onClick={() => run(() => resolveTrialAction(r.id, "admit"))}>
+                      Admit
+                    </SmallBtn>
+                    <SmallBtn
+                      danger
+                      onClick={() => {
+                        setDeclineTemplate(DECLINE_EMAIL_TEMPLATES[0].value);
+                        setDeclineCustomMessage("");
+                        setDeclining(r.id);
+                      }}
+                    >
+                      Decline
+                    </SmallBtn>
+                  </span>
+                </div>
+                {declining === r.id && (
+                  <div className="rounded-lg border border-orange-200 bg-white p-2.5 space-y-2">
+                    <select
+                      className={inputCls}
+                      value={declineTemplate}
+                      onChange={(e) =>
+                        setDeclineTemplate(e.target.value as DeclineEmailTemplate)
+                      }
+                    >
+                      {DECLINE_EMAIL_TEMPLATES.map((t) => (
+                        <option key={t.value} value={t.value}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                    {declineTemplate === "custom" && (
+                      <textarea
+                        className={inputCls}
+                        rows={3}
+                        placeholder="What should they read instead of the generic message?"
+                        value={declineCustomMessage}
+                        onChange={(e) => setDeclineCustomMessage(e.target.value)}
+                      />
+                    )}
+                    <p className="text-xs text-slate-400">
+                      They&apos;ll get an email, and won&apos;t be able to log
+                      in again unless you mark them active.
+                    </p>
+                    <div className="flex gap-1.5">
+                      <SmallBtn
+                        danger
+                        onClick={() => {
+                          setDeclining(null);
+                          run(() =>
+                            resolveTrialAction(
+                              r.id,
+                              "decline",
+                              declineTemplate,
+                              declineCustomMessage
+                            )
+                          );
+                        }}
+                      >
+                        Confirm decline
+                      </SmallBtn>
+                      <SmallBtn onClick={() => setDeclining(null)}>Back</SmallBtn>
+                    </div>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

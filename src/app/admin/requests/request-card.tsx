@@ -7,7 +7,11 @@ import {
   declineRequestAction,
   askQuestionAction,
 } from "@/actions/admin";
-import { DECLINE_REASONS } from "@/lib/profile-options";
+import {
+  DECLINE_REASONS,
+  DECLINE_EMAIL_TEMPLATES,
+  DeclineEmailTemplate,
+} from "@/lib/profile-options";
 import { Badge, btnPrimary, btnSecondary, btnDanger, inputCls } from "@/components/ui";
 import { formatDayLong } from "@/lib/dates";
 
@@ -40,6 +44,10 @@ export function RequestCard({
   const [mode, setMode] = useState<"none" | "ask" | "decline">("none");
   const [question, setQuestion] = useState("");
   const [reason, setReason] = useState<string>(DECLINE_REASONS[0]);
+  const [template, setTemplate] = useState<DeclineEmailTemplate>(
+    DECLINE_EMAIL_TEMPLATES[0].value
+  );
+  const [customMessage, setCustomMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   if (compact) {
@@ -151,16 +159,42 @@ export function RequestCard({
             ))}
           </select>
           <p className="text-xs text-slate-400">
-            The reason is stored for EAN&apos;s records and never shown to the
-            requester — they get the kind templated email.
+            The reason above is stored for EAN&apos;s records and never shown
+            to the requester.
           </p>
+          <select
+            className={inputCls}
+            value={template}
+            onChange={(e) => setTemplate(e.target.value as DeclineEmailTemplate)}
+          >
+            {DECLINE_EMAIL_TEMPLATES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+          {template === "custom" && (
+            <textarea
+              className={inputCls}
+              rows={3}
+              placeholder="What should they read instead of the generic message?"
+              value={customMessage}
+              onChange={(e) => setCustomMessage(e.target.value)}
+            />
+          )}
+          <p className="text-xs text-slate-400">This is what they&apos;ll actually receive.</p>
           <div className="flex gap-2">
             <button
               className={btnDanger}
               disabled={pending}
               onClick={() =>
                 startTransition(async () => {
-                  const res = await declineRequestAction(req.id, reason);
+                  const res = await declineRequestAction(
+                    req.id,
+                    reason,
+                    template,
+                    customMessage
+                  );
                   if (res.error) setError(res.error);
                   else router.refresh();
                 })

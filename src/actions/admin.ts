@@ -27,6 +27,7 @@ import {
   absorbExistingBookings,
   clearDayForCoworking,
 } from "@/lib/coworking-guests";
+import { DeclineEmailTemplate } from "@/lib/profile-options";
 
 async function requireAdmin() {
   const user = await getCurrentUser();
@@ -130,15 +131,52 @@ function adminEmailFrom(): string {
   return match ? match[1] : from;
 }
 
+/**
+ * The paragraph that varies by template — everything else in a decline email
+ * (greeting, opening line, sign-off) is shared regardless of which one an
+ * admin picks. `custom` is free text the admin wrote themselves, so it's
+ * escaped rather than trusted like the other two.
+ */
+function declineMiddle(template: DeclineEmailTemplate, customMessage?: string): string {
+  switch (template) {
+    case "intro_course":
+      return `<p>The office itself isn't the right first step for you right now, but our ${link("https://effectiefaltruisme.nl/en/introductory-course", "introductory course")} is — it's a free, self-paced course covering the core ideas we'd want any member to already be engaging with.</p>
+<p>This isn't a judgement on your work, and we'd love to see you apply to the office again once you've been through it.</p>`;
+    case "custom":
+      return `<p>${(customMessage ?? "").replace(/</g, "&lt;")}</p>`;
+    case "generic":
+    default:
+      return `<p>We're not able to offer you a spot right now — the space is small and we have to be selective about capacity.</p>
+<p>This isn't a judgement on your work, and we'd encourage you to stay involved: EA Netherlands runs regular public events, and the ${link("https://effectiefaltruisme.nl", "community")} is very much open to you.</p>`;
+  }
+}
+
+function declineEmailHtml(
+  name: string,
+  opening: string,
+  template: DeclineEmailTemplate,
+  customMessage?: string
+): string {
+  return `<p>Hi ${name},</p>
+<p>${opening}</p>
+${declineMiddle(template, customMessage)}
+<p>Warm regards,<br>The EA Netherlands team</p>`;
+}
+
 export async function declineRequestAction(
   requestId: string,
-  reason: string
+  reason: string,
+  template: DeclineEmailTemplate = "generic",
+  customMessage?: string
 ): Promise<AdminActionState> {
   const admin = await requireAdmin();
   const [req] = await db.select().from(visitRequests).where(eq(visitRequests.id, requestId));
   if (!req) return { error: "Request not found." };
   const [user] = await db.select().from(users).where(eq(users.id, req.userId));
   if (!user) return { error: "User not found." };
+  if (template === "custom" && !customMessage?.trim()) {
+    return { error: "Write the custom message first." };
+  }
 
   await db
     .update(visitRequests)
@@ -155,10 +193,12 @@ export async function declineRequestAction(
     to: user.email,
     subject: "About your office visit request",
     kind: "request_declined",
-    html: `<p>Hi ${user.name},</p>
-<p>Thanks so much for your interest in the EA Netherlands office. We're not able to offer you a spot right now — the space is small and we have to be selective about capacity.</p>
-<p>This isn't a judgement on your work, and we'd encourage you to stay involved: EA Netherlands runs regular public events, and the ${link("https://effectiefaltruisme.nl", "community")} is very much open to you.</p>
-<p>Warm regards,<br>The EA Netherlands team</p>`,
+    html: declineEmailHtml(
+      user.name,
+      "Thanks so much for your interest in the EA Netherlands office.",
+      template,
+      customMessage
+    ),
   });
 
   revalidatePath("/admin/requests");
@@ -266,11 +306,16 @@ async function sendAdmittedEmail(user: { name: string; email: string }): Promise
  */
 export async function resolveTrialAction(
   userId: string,
-  outcome: "admit" | "decline"
+  outcome: "admit" | "decline",
+  template: DeclineEmailTemplate = "generic",
+  customMessage?: string
 ): Promise<AdminActionState> {
   await requireAdmin();
   const [user] = await db.select().from(users).where(eq(users.id, userId));
   if (!user) return { error: "User not found." };
+  if (outcome === "decline" && template === "custom" && !customMessage?.trim()) {
+    return { error: "Write the custom message first." };
+  }
 
   await db
     .update(users)
@@ -284,10 +329,12 @@ export async function resolveTrialAction(
       to: user.email,
       subject: "About your visit to the office",
       kind: "trial_declined",
-      html: `<p>Hi ${user.name},</p>
-<p>Thanks for coming to try the office, and for the time you gave it. We're not able to offer you a spot as a member right now — the space is small and we have to be selective about capacity.</p>
-<p>This isn't a judgement on your work, and we'd encourage you to stay involved: EA Netherlands runs regular public events, and the ${link("https://effectiefaltruisme.nl", "community")} is very much open to you.</p>
-<p>Warm regards,<br>The EA Netherlands team</p>`,
+      html: declineEmailHtml(
+        user.name,
+        "Thanks for coming to try the office, and for the time you gave it.",
+        template,
+        customMessage
+      ),
     });
   }
 

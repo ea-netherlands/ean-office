@@ -98,3 +98,17 @@ export const DECLINE_REASONS = [
   "Concerns from screening",
   "Other",
 ] as const;
+
+/**
+ * What the requester actually reads, as opposed to DECLINE_REASONS above
+ * (which is internal-only and never shown to them). Kept separate because
+ * the internal reason can be specific ("concerns from screening") without
+ * that ever being the wording sent externally.
+ */
+export const DECLINE_EMAIL_TEMPLATES = [
+  { value: "generic", label: "Generic — capacity / not right now" },
+  { value: "intro_course", label: "Refer to the intro course" },
+  { value: "custom", label: "Custom message" },
+] as const;
+
+export type DeclineEmailTemplate = (typeof DECLINE_EMAIL_TEMPLATES)[number]["value"];
