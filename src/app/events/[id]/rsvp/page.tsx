@@ -4,7 +4,7 @@ import { db, events, eventGuests, bookings } from "@/db";
 import { eq, and } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { Nav } from "@/components/nav";
-import { Page, H1, Sub, Card, Icon } from "@/components/ui";
+import { Page, H1, Sub, Card, Icon, btnPrimary } from "@/components/ui";
 import { formatDayLong, todayAms } from "@/lib/dates";
 import { describeSeat } from "@/lib/booking";
 import { coworkingSpots } from "@/lib/coworking-guests";
@@ -105,6 +105,26 @@ export default async function EventRsvpPage({
               door when you arrive.
             </p>
           )}
+        </Card>
+      );
+    } else if (event.url) {
+      // The day takes its RSVPs on Luma, so this form would be a second
+      // guest list nobody reads. Old links and emails still land here.
+      body = (
+        <Card className="text-center py-8">
+          <Icon name="calendar-event" className="text-4xl text-teal-600 mb-2" />
+          <p className="text-slate-600">
+            This day takes sign-ups on its event page — that&apos;s where the
+            organiser keeps the guest list.
+          </p>
+          <a
+            href={event.url}
+            target="_blank"
+            rel="noreferrer"
+            className={`${btnPrimary} mt-4 inline-flex`}
+          >
+            RSVP on Luma
+          </a>
         </Card>
       );
     } else {

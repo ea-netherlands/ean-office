@@ -80,6 +80,7 @@ export default async function BookPage({
           {
             id: e.id,
             title: e.title,
+            url: e.url,
             startsAt: e.startsAt,
             endsAt: e.endsAt,
             spotsTotal,

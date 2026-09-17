@@ -22,10 +22,11 @@ import { clearAllNoShows } from "@/lib/noshow";
 import { buildIcs } from "@/lib/ics";
 import { bookDay, coworkingDayOn } from "@/lib/booking";
 import { validateEventHours } from "@/lib/event-hours";
-import { isCoworkingDay, validateCoworkingDay } from "@/lib/coworking";
+import { coworkingJoin, isCoworkingDay, validateCoworkingDay } from "@/lib/coworking";
 import {
   absorbExistingBookings,
   clearDayForCoworking,
+  coworkingSpots,
 } from "@/lib/coworking-guests";
 import { DeclineEmailTemplate } from "@/lib/profile-options";
 
@@ -555,7 +556,8 @@ export async function decideEventAction(
   if (event.createdBy) {
     const [proposer] = await db.select().from(users).where(eq(users.id, event.createdBy));
     if (proposer) {
-      const shareLink = `${appUrl()}/events/${event.id}/rsvp`;
+      const join = coworkingJoin(event, appUrl());
+      const spots = coworking ? await coworkingSpots(event.date) : null;
       await sendEmail({
         to: proposer.email,
         subject:
@@ -572,8 +574,13 @@ export async function decideEventAction(
             ? coworking
               ? `<p>Hi ${proposer.name},</p>
 <p>Your co-working day <strong>${event.title}</strong> on ${formatDayLong(event.date)} is confirmed. The office is closed to general desk booking that day, and the day is on the calendar for everyone to see.</p>
-<p><strong>Share this link</strong> with anyone you'd like there — members and people who've never been alike:<br>${link(shareLink, shareLink)}</p>
-<p>Requests land in ${link(`${appUrl()}/events/${event.id}/guests`, "your guest list")}, where you approve or decline each one. Approving gives that person a desk straight away.</p>
+${
+  join.external
+    ? `<p>Sign-ups stay on ${link(join.href, "your Luma page")} — we won't run a second list here.${spots ? ` <strong>Set the capacity there to ${spots.total}</strong>, which is everyone the office holds, desks and lunch table together, and Luma will waitlist anyone past it.` : ""}</p>
+<p>You can see who's in the room that day, including anyone who'd already booked a desk, on ${link(`${appUrl()}/events/${event.id}/guests`, "your guest list")}.</p>`
+    : `<p><strong>Share this link</strong> with anyone you'd like there — members and people who've never been alike:<br>${link(join.href, join.href)}</p>
+<p>Requests land in ${link(`${appUrl()}/events/${event.id}/guests`, "your guest list")}, where you approve or decline each one. Approving gives that person a desk straight away.</p>`
+}
 ${absorbed > 0 ? `<p>${absorbed === 1 ? "One person had" : `${absorbed} people had`} already booked that day. They keep their desks, they're on your guest list as approved, and we've emailed them to say what's happening.</p>` : ""}
 ${cleared > 0 ? `<p>${cleared === 1 ? "One booking that day was" : `${cleared} bookings that day were`} cancelled to free the space, and we've apologised to the people affected and pointed them at your link in case they'd like to come.</p>` : ""}
 <p>Thanks for organising it!</p>`
@@ -635,6 +642,28 @@ export async function askEventQuestionAction(
 <p>${admin.name}</p>`,
   });
 
+  revalidatePath("/admin/events");
+  return { ok: true };
+}
+
+/**
+ * Attach (or remove) a co-working day's Luma page. Setting it moves sign-ups
+ * to Luma — see coworkingJoin — which is how a day proposed here gets joined
+ * up with the Luma page its organiser made afterwards.
+ */
+export async function setEventUrlAction(
+  eventId: string,
+  url: string
+): Promise<AdminActionState> {
+  await requireAdmin();
+  const trimmed = url.trim();
+  if (trimmed && !/^https:\/\/(www\.)?(lu\.ma|luma\.com)\//.test(trimmed)) {
+    return { error: "That doesn't look like a Luma page." };
+  }
+  await db
+    .update(events)
+    .set({ url: trimmed || null })
+    .where(eq(events.id, eventId));
   revalidatePath("/admin/events");
   return { ok: true };
 }

@@ -7,6 +7,7 @@ import {
   setHeadcountAction,
   deleteEventAction,
   setEventTypeAction,
+  setEventUrlAction,
   decideEventAction,
   askEventQuestionAction,
   syncLumaAction,
@@ -389,6 +390,44 @@ function ProposalItem({
   );
 }
 
+/**
+ * Point a co-working day at its Luma page. Days get proposed here and
+ * promoted on Luma afterwards, and until the two are joined up the office
+ * site keeps collecting requests the organiser never reads.
+ */
+function LumaLinkField({ e }: { e: EventRow }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [url, setUrl] = useState(e.url ?? "");
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <div className="mt-1.5 flex gap-2 items-center flex-wrap">
+      <input
+        type="url"
+        placeholder="Luma page (https://lu.ma/…)"
+        value={url}
+        onChange={(ev) => setUrl(ev.target.value)}
+        className="flex-1 min-w-56 rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+      />
+      <button
+        className={btnSecondary}
+        disabled={pending || url === (e.url ?? "")}
+        onClick={() =>
+          startTransition(async () => {
+            const res = await setEventUrlAction(e.id, url);
+            setError(res.error ?? null);
+            if (!res.error) router.refresh();
+          })
+        }
+      >
+        {e.url ? "Update link" : "Move sign-ups to Luma"}
+      </button>
+      {error && <span className="text-xs text-red-600">{error}</span>}
+    </div>
+  );
+}
+
 function EventItem({
   e,
   onNotice,
@@ -466,13 +505,19 @@ function EventItem({
         </div>
       </div>
       {coworking && !e.past && !cancelled && (
-        <p className="text-xs text-slate-500 mt-1">
-          Closed to general booking ·{" "}
-          <a href={`/events/${e.id}/guests`} className="text-teal-700 underline">
-            {e.guestsApproved} approved
-            {e.guestsPending > 0 ? `, ${e.guestsPending} waiting` : ""}
-          </a>
-        </p>
+        <>
+          <p className="text-xs text-slate-500 mt-1">
+            Closed to general booking ·{" "}
+            <a href={`/events/${e.id}/guests`} className="text-teal-700 underline">
+              {e.guestsApproved} approved
+              {e.guestsPending > 0 ? `, ${e.guestsPending} waiting` : ""}
+            </a>
+            {e.url
+              ? " · sign-ups are on Luma"
+              : " · sign-ups are here, on the office site"}
+          </p>
+          <LumaLinkField e={e} />
+        </>
       )}
       {/* Calling it off is for events still to come; past ones get deleted
           below once they've been counted. */}

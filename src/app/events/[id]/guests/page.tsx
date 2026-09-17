@@ -8,7 +8,7 @@ import { formatDay, formatDayLong, todayAms } from "@/lib/dates";
 import { describeSeat } from "@/lib/booking";
 import { asSlot, SLOT_LABEL } from "@/lib/slots";
 import { coworkingSpots } from "@/lib/coworking-guests";
-import { isCoworkingDay } from "@/lib/coworking";
+import { coworkingJoin, isCoworkingDay } from "@/lib/coworking";
 import { GuestsClient, GuestRow } from "./guests-client";
 
 export const dynamic = "force-dynamic";
@@ -92,7 +92,8 @@ export default async function EventGuestsPage({
         <GuestsClient
           guests={guests}
           spots={spots}
-          shareUrl={`${appUrl()}/events/${event.id}/rsvp`}
+          shareUrl={coworkingJoin(event, appUrl()).href}
+          viaLuma={!!event.url}
           open={isCoworkingDay(event.type) && event.status === "confirmed" && event.date >= todayAms()}
           event={{
             id: event.id,

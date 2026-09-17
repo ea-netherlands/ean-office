@@ -30,12 +30,15 @@ export function GuestsClient({
   guests,
   spots,
   shareUrl,
+  viaLuma,
   open,
   event,
 }: {
   guests: GuestRow[];
   spots: { total: number; taken: number; left: number };
   shareUrl: string;
+  /** The day signs people up on Luma, so the guest list lives there. */
+  viaLuma: boolean;
   open: boolean;
   event: GuestsEvent;
 }) {
@@ -75,7 +78,7 @@ export function GuestsClient({
             style={{ width: `${Math.min(100, (spots.taken / spots.total) * 100)}%` }}
           />
         </div>
-        {open && <ShareLink url={shareUrl} />}
+        {open && <ShareLink url={shareUrl} viaLuma={viaLuma} spots={spots} />}
       </Card>
 
       {/* Plans change, and the organiser is usually the first to know. */}
@@ -130,13 +133,36 @@ export function GuestsClient({
 }
 
 /** The one thing an organiser needs on day one: a link they can paste. */
-function ShareLink({ url }: { url: string }) {
+function ShareLink({
+  url,
+  viaLuma,
+  spots,
+}: {
+  url: string;
+  viaLuma: boolean;
+  spots: { total: number };
+}) {
   const [copied, setCopied] = useState(false);
   return (
     <div>
       <p className="text-sm text-slate-600 mb-1.5">
-        Share this with anyone you&apos;d like there — they don&apos;t need an
-        account.
+        {viaLuma ? (
+          <>
+            Sign-ups for this day happen on Luma, so share that page.{" "}
+            {/* We can't cap a Luma guest list from here, so the organiser
+                has to carry the number across themselves. */}
+            <strong>
+              Set the Luma capacity to {spots.total}
+            </strong>{" "}
+            — that&apos;s everyone the office holds, desks and lunch table
+            together, and Luma will run a waitlist past it.
+          </>
+        ) : (
+          <>
+            Share this with anyone you&apos;d like there — they don&apos;t need
+            an account.
+          </>
+        )}
       </p>
       <div className="flex gap-2 items-center flex-wrap">
         <code className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 break-all">

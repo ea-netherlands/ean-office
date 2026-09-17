@@ -6,6 +6,7 @@ import { Page, H1, Sub, Card, Badge, Icon, btnPrimary, btnSecondary } from "@/co
 import { PeopleList } from "@/components/people";
 import { capacityForDay } from "@/lib/booking";
 import { isCoworkingDay } from "@/lib/coworking";
+import { CoworkingJoinLink } from "@/components/coworking-join";
 import { db, checkins, events, eventAttendance, eventGuests, ensureMigrated } from "@/db";
 import { and, eq, gte, lte, asc } from "drizzle-orm";
 import { addDays, formatDayLong, todayAms, formatDay } from "@/lib/dates";
@@ -126,15 +127,15 @@ export default async function HomePage() {
                 <>
                   <p className="text-slate-600 text-sm">
                     A co-working day has the office today, so there&apos;s no
-                    general desk booking. Still want to come? Ask the
-                    organiser — they answer quickly.
+                    general desk booking.{" "}
+                    {coworkingToday.url
+                      ? "Still want to come? Sign up on the event page."
+                      : "Still want to come? Ask the organiser — they answer quickly."}
                   </p>
-                  <Link
-                    href={`/events/${coworkingToday.id}/rsvp`}
+                  <CoworkingJoinLink
+                    event={coworkingToday}
                     className={`${btnPrimary} mt-3 inline-flex`}
-                  >
-                    Ask to join
-                  </Link>
+                  />
                 </>
               )}
             </>
@@ -230,10 +231,7 @@ export default async function HomePage() {
                     </p>
                   </div>
                   {isCoworkingDay(e.type) ? (
-                    <CoworkingLink
-                      eventId={e.id}
-                      status={myGuestStatus.get(e.id)}
-                    />
+                    <CoworkingLink event={e} status={myGuestStatus.get(e.id)} />
                   ) : e.url ? (
                     <a
                       href={e.url}
@@ -256,32 +254,42 @@ export default async function HomePage() {
   );
 }
 
-/** Where a member stands on a co-working day: in, waiting, or free to ask. */
+/**
+ * Where a member stands on a co-working day: in, waiting, or free to ask.
+ * Someone already holding a desk that day is in regardless of where the day
+ * takes its RSVPs, so their link stays here — sending them to Luma to sign up
+ * for a seat they already have would be nonsense.
+ */
 function CoworkingLink({
-  eventId,
+  event,
   status,
 }: {
-  eventId: string;
+  event: { id: string; url?: string | null };
   status?: string;
 }) {
-  const label =
-    status === "approved"
-      ? "You're in"
-      : status === "pending"
-        ? "Asked"
-        : status === "declined"
-          ? "Full"
-          : "Ask to join";
+  const pill = "text-xs rounded-full px-3 py-1 whitespace-nowrap border";
+  if (status) {
+    return (
+      <Link
+        href={`/events/${event.id}/rsvp`}
+        className={`${pill} ${
+          status === "approved"
+            ? "border-teal-300 bg-teal-50 text-teal-800"
+            : "border-slate-300 hover:bg-slate-50"
+        }`}
+      >
+        {status === "approved"
+          ? "You're in"
+          : status === "pending"
+            ? "Asked"
+            : "Full"}
+      </Link>
+    );
+  }
   return (
-    <Link
-      href={`/events/${eventId}/rsvp`}
-      className={`text-xs rounded-full px-3 py-1 whitespace-nowrap border ${
-        status === "approved"
-          ? "border-teal-300 bg-teal-50 text-teal-800"
-          : "border-slate-300 hover:bg-slate-50"
-      }`}
-    >
-      {label}
-    </Link>
+    <CoworkingJoinLink
+      event={event}
+      className={`${pill} border-slate-300 hover:bg-slate-50`}
+    />
   );
 }

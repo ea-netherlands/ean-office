@@ -55,9 +55,9 @@ export function CoworkingForm({
         <h2 className="text-xl">Sent to the team</h2>
         <p className="text-slate-500 mt-2 max-w-md mx-auto">
           An admin will confirm it or come back to you with questions. Once
-          it&apos;s confirmed the day closes to general desk booking, it shows
-          on the office calendar, and you get a link to share — everyone who
-          wants to come asks you, and you decide who&apos;s in.
+          it&apos;s confirmed the day closes to general desk booking and shows
+          on the office calendar. The confirmation email tells you where people
+          sign up — your Luma page if you gave one, a link of your own if not.
         </p>
         <AwayNotice
           away={away}
@@ -168,6 +168,21 @@ export function CoworkingForm({
         </div>
 
         <div>
+          <label className={labelCls}>Luma page, if you&apos;ve made one</label>
+          <input
+            name="url"
+            type="url"
+            defaultValue={str(v, "url")}
+            className={inputCls}
+            placeholder="https://lu.ma/…"
+          />
+          <p className="text-xs text-slate-400 mt-1">
+            Add it and people sign up there instead of asking you here — one
+            guest list, not two. You can add it later.
+          </p>
+        </div>
+
+        <div>
           <label className={labelCls}>Anything the team should know?</label>
           <textarea
             name="proposalNote"
@@ -182,9 +197,10 @@ export function CoworkingForm({
       <Card className="text-sm text-slate-600 space-y-1.5">
         <p className="font-medium text-slate-800">What confirming does</p>
         <p>
-          The day closes to general desk booking and everyone who wants to come
-          — members and newcomers alike — asks you through a link you can
-          share. You approve or decline each one, and approving gives them a
+          The day closes to general desk booking. If you gave a Luma page,
+          people sign up there and you keep the guest list on Luma — set its
+          capacity to {days[0]?.total ?? 13}. If you didn&apos;t, they ask you
+          through a link you can share, and approving someone gives them a
           desk.
         </p>
         <p>

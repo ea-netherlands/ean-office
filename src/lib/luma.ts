@@ -1,5 +1,5 @@
 import { db, events } from "@/db";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { newId } from "./ids";
 import { getSettings } from "./settings";
 import { TZ, todayAms } from "./dates";
@@ -138,23 +138,61 @@ export async function syncLuma(): Promise<{
     const startsAt = ev.allDay ? null : amsTimeFmt.format(ev.start);
     const endsAt = ev.end && !ev.allDay ? amsTimeFmt.format(ev.end) : null;
 
-    const [existing] = await db
+    let [existing] = await db
       .select()
       .from(events)
       .where(eq(events.externalId, ev.uid));
+
+    // A co-working day is usually proposed here first and promoted on Luma
+    // after, so the feed arrives carrying an event we already have. Matching
+    // only on externalId made a second row for the same day — two pages, two
+    // guest lists, one room. Adopt the row we've got instead: it owns the
+    // organiser, the guest list and the proposal, and Luma brings the page.
+    if (!existing) {
+      const type = guessType(ev.title);
+      if (isCoworkingDay(type)) {
+        [existing] = await db
+          .select()
+          .from(events)
+          .where(
+            and(
+              eq(events.date, date),
+              eq(events.type, type),
+              isNull(events.externalId),
+              // A day that was called off or turned down isn't the one the
+              // feed is talking about.
+              inArray(events.status, ["proposed", "confirmed"])
+            )
+          );
+        if (existing) {
+          await db
+            .update(events)
+            .set({ externalId: ev.uid })
+            .where(eq(events.id, existing.id));
+        }
+      }
+    }
+
     if (existing) {
       // Refresh what Luma owns; never touch what admins set here
       // (type, cause area, headcount, organiser).
+      //
+      // The feed only carries a page URL when the description happens to
+      // contain one, so a missing one means "the feed didn't say", not "there
+      // is no page". Keeping what we have matters: on a co-working day the URL
+      // is what decides where sign-ups go, and dropping it would quietly move
+      // them back here mid-promotion. Clearing it is done by hand.
+      const url = ev.url ?? existing.url;
       if (
         existing.title !== ev.title ||
         existing.date !== date ||
         existing.startsAt !== startsAt ||
         existing.endsAt !== endsAt ||
-        existing.url !== ev.url
+        existing.url !== url
       ) {
         await db
           .update(events)
-          .set({ title: ev.title, date, startsAt, endsAt, url: ev.url })
+          .set({ title: ev.title, date, startsAt, endsAt, url })
           .where(eq(events.id, existing.id));
         updated++;
       }

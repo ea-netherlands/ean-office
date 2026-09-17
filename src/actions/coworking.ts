@@ -24,6 +24,7 @@ const FIELDS = [
   "endsAt",
   "expectedAttendance",
   "proposalNote",
+  "url",
 ] as const;
 
 /**
@@ -55,8 +56,12 @@ export async function proposeCoworkingDayAction(
   const endsAt = String(formData.get("endsAt") || "") || null;
   const expected = Number(formData.get("expectedAttendance"));
   const note = String(formData.get("proposalNote") || "").trim().slice(0, 1000);
+  const url = String(formData.get("url") || "").trim();
 
   if (!title) return fail("Give the day a name.", "title");
+  if (url && !/^https:\/\/(www\.)?(lu\.ma|luma\.com)\//.test(url)) {
+    return fail("That doesn't look like a Luma page — it should start with https://lu.ma/.", "url");
+  }
   const cfg = await getSettings();
   const today = todayAms();
   const dateError = validateCoworkingDay(
@@ -101,6 +106,7 @@ export async function proposeCoworkingDayAction(
       organiser: "ean",
       source: "manual",
       status: "proposed",
+      url: url || null,
       expectedAttendance: Number.isFinite(expected) && expected > 0 ? expected : null,
       proposalNote: note || null,
       createdBy: user!.id,

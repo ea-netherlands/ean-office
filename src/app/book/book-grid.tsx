@@ -17,6 +17,7 @@ import type { SeatTarget } from "@/lib/booking";
 import { DeskMap, DeskHalves, DeskOccupant } from "@/components/desk-map";
 import { ProfileForm } from "@/components/profile-form";
 import { PeopleList, PersonChipData } from "@/components/people";
+import { CoworkingJoinLink } from "@/components/coworking-join";
 import {
   Avatar,
   btnPrimary,
@@ -55,6 +56,7 @@ export type DayInfo = {
   themedEvent: {
     id: string;
     title: string;
+    url: string | null;
     startsAt: string | null;
     endsAt: string | null;
     spotsLeft: number;
@@ -591,12 +593,10 @@ function DayPanel({
                 ? `${event.spotsLeft} of ${event.spotsTotal} spots free.`
                 : `All ${event.spotsTotal} spots are taken, but you can still ask.`}
             </p>
-            <Link
-              href={`/events/${event.id}/rsvp`}
+            <CoworkingJoinLink
+              event={event}
               className={`${btnPrimary} mt-3 inline-flex`}
-            >
-              Ask to join
-            </Link>
+            />
           </>
         )}
       </div>

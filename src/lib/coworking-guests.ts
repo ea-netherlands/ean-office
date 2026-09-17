@@ -5,7 +5,7 @@ import { db, bookings, eventGuests, events, users } from "@/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { newId } from "./ids";
 import { getSettings, Settings } from "./settings";
-import { coworkingSpotCount } from "./coworking";
+import { coworkingJoin, coworkingSpotCount } from "./coworking";
 import {
   bookDay,
   cancelBooking,
@@ -123,6 +123,7 @@ export async function clearDayForCoworking(event: {
   date: string;
   startsAt: string | null;
   endsAt: string | null;
+  url: string | null;
   createdBy: string | null;
 }): Promise<{ cleared: number; names: string[] }> {
   const held = await db
@@ -139,7 +140,7 @@ export async function clearDayForCoworking(event: {
   const when = event.startsAt
     ? `${event.startsAt}${event.endsAt ? `–${event.endsAt}` : ""}`
     : "all day";
-  const askToJoin = `${appUrl()}/events/${event.id}/rsvp`;
+  const join = coworkingJoin(event, appUrl());
 
   // One email per person, not per booking — someone can hold a morning and an
   // afternoon, and two apologies for one day reads as a system, not a person.
@@ -166,7 +167,7 @@ export async function clearDayForCoworking(event: {
       html: `<p>Hi ${person.name},</p>
 <p>We're sorry: we've decided to run <strong>${event.title}</strong> at the office on <strong>${formatDayLong(event.date)}</strong> (${when}). It takes the whole space, so the office isn't available for general desk booking that day and we've had to cancel your booking.</p>
 <p>We know that's annoying when you'd already planned around it — apologies. Every other day is unaffected: ${link(`${appUrl()}/book`, "pick another one from the calendar")}.</p>
-<p>If the day itself is up your street, you're very welcome to come to it — ${link(askToJoin, "ask the organiser for a spot")}.</p>`,
+<p>If the day itself is up your street, you're very welcome to come to it — ${link(join.href, join.external ? "sign up on the event page" : "ask the organiser for a spot")}.</p>`,
     });
   }
 
