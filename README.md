@@ -40,6 +40,39 @@ delivered. Create real admins with `npm run admin:add -- "Name" email`.
   escalation ladder, expires stale requests, sends the Monday digest, and
   purges check-ins past the GDPR retention window. Idempotent. Protect it
   with `CRON_SECRET` in production.
+- **Calendar invites** — every booking email carries the day as an `.ics`,
+  attached and linked (`/calendar/<token>.ics`, a signed single-purpose token
+  like the cancel links). A full day is an all-day entry marked
+  `TRANSP:TRANSPARENT`, so it sits at the top of the day rather than blocking
+  ten hours of your calendar; half days are timed entries with a 30-minute
+  alarm. A repeat booking sends one file holding every day — VEVENTs, not an
+  `RRULE`, because the series skips full days and the recurrence rule would
+  quietly put them back. See `src/lib/booking-calendar.ts`.
+- **Which desk, and where it is** — booking and reminder emails name the desk
+  and place it in the room ("desk 7, against the top wall"). The hints in
+  `src/lib/desks.ts` only assert what the floor plan in
+  `components/desk-map.tsx` actually encodes, and go quiet for any desk count
+  other than the real room's eight — a confidently wrong direction sends
+  someone to somebody else's desk.
+- **Events take sign-ups through one shareable link** — `/events/<id>/rsvp`,
+  usable without an account, for evening events as well as co-working days.
+  The two differ in one respect, and it follows from desks: a co-working day
+  takes the whole office, so the organiser curates it; an evening event runs
+  after hours with nothing to ration, so a sign-up lands approved and the
+  organiser just gets a list at `/events/<id>/guests`. Luma wins wherever an
+  event has a Luma page. See `src/lib/event-join.ts`.
+- **Undoing a sign-up** — every sign-up email carries a one-tap "can't make
+  it" link (`/leave/<token>`, signed and single-purpose like the booking
+  cancel links), and logged-in people get the same thing on the event page.
+  Signing up in one tap and needing an email to undo it is what leaves a room
+  set out for twelve with six people in it. On a co-working day it also hands
+  the desk back and moves the waitlist — but only the desk *we* gave them, so
+  someone who booked that day before the takeover keeps their own booking.
+  The organiser is emailed with the new headcount. A withdrawal is recorded
+  as `decidedBy = "self_withdrawn"` rather than a plain decline, because
+  "they dropped out" and "I removed them" read very differently on a guest
+  list, and signing up again afterwards reuses the row. See
+  `src/lib/leave-event.ts`.
 - **Co-working days** — a member proposes one at `/coworking/propose`; an
   admin confirms it in the events queue. A confirmed one takes the whole
   office for that working day: general booking is refused (calendar, repeat
@@ -72,6 +105,14 @@ delivered. Create real admins with `npm run admin:add -- "Name" email`.
   still logs in. Every email lookup goes through `findUserByEmail`
   (`src/lib/users.ts`), which is what makes an alias behave like the real
   thing — don't query `users.email` directly.
+- **Profiles and photos** — the opt-in community profile now takes a photo.
+  The browser centre-crops and shrinks it to a 256px JPEG (~20KB) before
+  upload, so it lives in `user_avatars` rather than needing a file store, and
+  `users.avatar_updated_at` is what pages read and what cache-busts
+  `/avatar/<id>`. That route is members-only: a face is a bigger thing to hand
+  out than a name. Each member gets one "your profile is bare" email, ever
+  (`users.profile_nudge_sent_at` is both the record and the opt-out), and only
+  after two actual visits.
 - **Settings** — everything configurable (desk count, coverage days, no-show
   thresholds, how far ahead a first visit can be requested…) lives in the
   `settings` table, editable at `/admin/settings`.

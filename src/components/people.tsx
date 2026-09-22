@@ -11,6 +11,7 @@ export type PersonChipData = {
   deskNumber?: number | null;
   slot?: Slot;
   isYou?: boolean;
+  avatarUrl?: string | null;
   profile: {
     bio: string | null;
     expertise: string | null;
@@ -44,7 +45,7 @@ export function PeopleList({ people }: { people: PersonChipData[] }) {
               } ${clickable ? "cursor-pointer hover:bg-teal-50 hover:border-teal-300" : "cursor-default"}`}
               title={clickable ? `About ${p.name}` : undefined}
             >
-              <Avatar name={p.name} small />
+              <Avatar name={p.name} small src={p.avatarUrl} />
               {p.isYou ? "You" : p.name}
               {p.seatType === "flex" ? (
                 <span className="text-slate-400">table</span>
@@ -63,7 +64,7 @@ export function PeopleList({ people }: { people: PersonChipData[] }) {
       {open?.profile && (
         <div className="mt-3 border border-teal-200 bg-teal-50/50 rounded-xl p-3 text-sm">
           <div className="flex items-center gap-2 mb-1.5">
-            <Avatar name={open.name} />
+            <Avatar name={open.name} src={open.avatarUrl} />
             <span className="font-semibold">{open.name}</span>
             {open.profile.link && (
               <a

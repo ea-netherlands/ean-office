@@ -14,6 +14,14 @@ import {
 } from "./dates";
 import { minutesOfDayAms } from "./dates";
 import { sendEmail, btn, link } from "./email";
+import { describeSeat, deskWhere as deskWhereFor } from "./desks";
+import { avatarUrl } from "./avatars";
+import {
+  bookingIcs,
+  calendarUrl,
+  icsFilename,
+  seriesCalendarUrl,
+} from "./booking-calendar";
 import { makeToken } from "./tokens";
 import { appUrl } from "./auth";
 import { afterResponse } from "./after";
@@ -46,6 +54,13 @@ export type DayPerson = {
   seatType: string;
   deskNumber: number | null;
   slot: Slot;
+  /**
+   * Their photo, if they've added one. Not gated on `profileVisible`: the
+   * who's-in list already shows everyone's name to logged-in members, and a
+   * face next to it is the thing that makes the room legible when you walk
+   * in. The photo is opt-in by the act of uploading it.
+   */
+  avatarUrl: string | null;
   // Present only when the member opted in to a visible community profile.
   profile: PersonProfile | null;
 };
@@ -134,6 +149,7 @@ export async function capacityForRange(
       expertise: users.expertise,
       publicCauseAreas: users.publicCauseAreas,
       publicLink: users.publicLink,
+      avatarUpdatedAt: users.avatarUpdatedAt,
     })
     .from(bookings)
     .innerJoin(users, eq(users.id, bookings.userId))
@@ -187,6 +203,7 @@ export async function capacityForRange(
       seatType: r.seatType,
       deskNumber: r.deskNumber,
       slot,
+      avatarUrl: avatarUrl(r.userId, r.avatarUpdatedAt),
       profile: r.profileVisible
         ? {
             bio: r.bio,
@@ -569,11 +586,17 @@ export function releaseUrl(booking: Booking): string {
   return `${appUrl()}/release/${makeToken("release", booking.id, exp)}`;
 }
 
-/** "desk 3" / "a lunch-table spot" */
-export function describeSeat(booking: Booking): string {
-  return booking.seatType === "desk"
-    ? `desk ${booking.deskNumber ?? ""}`.trim()
-    : "a lunch-table spot";
+/**
+ * Seat vocabulary lives in lib/desks.ts and is re-exported here, where every
+ * existing caller already looks for it. It has to sit outside this module:
+ * lib/booking-calendar.ts needs it too, and importing it from here would put
+ * the two modules in a runtime import cycle.
+ */
+export { describeSeat } from "./desks";
+
+/** `deskWhere(booking, cfg)` — the settings-aware wrapper callers want. */
+export function deskWhere(booking: Booking, cfg?: Settings): string {
+  return deskWhereFor(booking, cfg?.desk_count);
 }
 
 /** "Tuesday 4 August 2026 (morning, 9:00–13:30)" */
@@ -581,6 +604,24 @@ export function describeWhen(booking: Booking, cfg: Settings): string {
   const slot = asSlot(booking.slot);
   if (slot === "day") return formatDayLong(booking.date);
   return `${formatDayLong(booking.date)} (${SLOT_LABEL[slot]}, ${slotWindow(slot, cfg)})`;
+}
+
+/**
+ * The two lines that belong at the foot of every booking email.
+ *
+ * People asked for both by name: somewhere to put the day in their own
+ * calendar, and a way back into the app to change something — free up a
+ * morning, check what else they booked — without hunting for the login page.
+ * A plain /me link is deliberate: the signed tokens here each grant exactly
+ * one action and never a session, so "manage everything" has to go through
+ * the front door.
+ */
+function calendarLine(booking: Booking): string {
+  return `<p>${link(calendarUrl(booking), "Add it to your calendar")} — or open the attached invite.</p>`;
+}
+
+function manageLine(): string {
+  return `<p>${link(`${appUrl()}/me`, "See all your bookings")} — change a day to a half day, free up a morning or an afternoon, or check what else you've got coming up.</p>`;
 }
 
 async function sendBookingConfirmation(
@@ -604,13 +645,19 @@ async function sendBookingConfirmation(
         : "";
   await sendEmail({
     to: email,
-    subject: `Booked: ${formatDayLong(booking.date)}${slotSuffix(slot)}`,
+    subject: `Booked: ${formatDayLong(booking.date)}${slotSuffix(slot)} — ${describeSeat(booking)}`,
     kind: "booking_confirmed",
     html: `<p>Hi ${name},</p>
-<p>You're booked for <strong>${describeWhen(booking, cfg)}</strong> — ${describeSeat(booking)}.</p>
+<p>You're booked for <strong>${describeWhen(booking, cfg)}</strong> — you have <strong>${describeSeat(booking)}</strong>${deskWhere(booking, cfg)}.</p>
 ${flexNote}
 ${shareNote}
-<p>Plans changed? ${link(cancelUrl(booking), "Cancel in one tap")} — no login needed, and it frees the desk for someone else.</p>`,
+${calendarLine(booking)}
+<p>Plans changed? ${link(cancelUrl(booking), "Cancel in one tap")} — no login needed, and it frees the desk for someone else.</p>
+${manageLine()}`,
+    icsAttachment: {
+      filename: icsFilename([booking]),
+      content: bookingIcs([booking], cfg),
+    },
   });
 }
 
@@ -846,8 +893,14 @@ export async function promoteWaitlist(date: string): Promise<void> {
         subject: `A desk opened up for ${formatDay(date)}${slotSuffix(slot)}`,
         kind: "waitlist_promoted",
         html: `<p>Hi ${user.name},</p>
-<p>Good news — a ${seatType === "desk" ? "desk" : "lunch-table spot"} opened up for <strong>${describeWhen(promoted, cfg)}</strong> and it's now yours.</p>
-<p>Can't make it after all? ${link(cancelUrl(promoted), "Cancel in one tap")}.</p>`,
+<p>Good news — <strong>${describeSeat(promoted)}</strong>${deskWhere(promoted)} opened up for <strong>${describeWhen(promoted, cfg)}</strong> and it's now yours.</p>
+${calendarLine(promoted)}
+<p>Can't make it after all? ${link(cancelUrl(promoted), "Cancel in one tap")}.</p>
+${manageLine()}`,
+        icsAttachment: {
+          filename: icsFilename([promoted]),
+          content: bookingIcs([promoted], cfg),
+        },
       });
     }
     return;
@@ -996,15 +1049,39 @@ export async function createBlockBooking(
             .join(", ")}). You can still join the waitlist for those from the booking page.</p>`
         : "";
     const unit = slot === "day" ? "days" : `${SLOT_LABEL[slot]}s`;
+    const cfg = await getSettings();
+    // The whole series in one file — a block booker is exactly the person who
+    // wants these in their calendar and won't add eleven days by hand.
+    const rows = await db
+      .select()
+      .from(bookings)
+      .where(and(eq(bookings.seriesId, series.id), eq(bookings.status, "booked")))
+      .orderBy(asc(bookings.date));
+    // Desks are assigned per day, so a series can span several of them —
+    // group the days by desk rather than repeating the number eleven times.
+    const bySeat = new Map<string, string[]>();
+    for (const b of rows) {
+      const label = `${describeSeat(b)}${deskWhere(b, cfg)}`;
+      bySeat.set(label, [...(bySeat.get(label) ?? []), formatDay(b.date)]);
+    }
+    const seatLines = [...bySeat.entries()]
+      .map(([label, days]) => `<li><strong>${label}</strong> — ${days.join(" · ")}</li>`)
+      .join("");
     await sendEmail({
       to: user.email,
       subject: `Booked: ${booked.length} ${unit} through ${formatDay(preview.endDate)}`,
       kind: "block_summary",
       html: `<p>Hi ${user.name},</p>
 <p>Your repeating booking is in — <strong>${booked.length} ${unit}</strong>:</p>
-<p>${booked.map(formatDay).join(" · ")}</p>
+<ul>${seatLines}</ul>
 ${skippedNote}
-<p>Each day is cancellable on its own from ${link(`${appUrl()}/me`, "your bookings page")}, or cancel the whole series there.</p>`,
+<p>${link(seriesCalendarUrl(series.id, preview.endDate), "Add the whole series to your calendar")} — or open the attached invite, which has every day in it.</p>
+<p>Each day is cancellable on its own from ${link(`${appUrl()}/me`, "your bookings page")}, or cancel the whole series there.</p>
+${manageLine()}`,
+      icsAttachment:
+        rows.length > 0
+          ? { filename: icsFilename(rows), content: bookingIcs(rows, cfg) }
+          : undefined,
     });
   }
   return { ok: true, booked, preview };

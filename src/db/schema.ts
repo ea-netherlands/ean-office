@@ -70,6 +70,9 @@ export const users = pgTable(
     gender: text("gender"),
     profileUpdatedAt: timestamp("profile_updated_at", { withTimezone: true }),
     profileSkipCount: integer("profile_skip_count").notNull().default(0),
+    // One-off "your profile is bare" nudge. Set the moment it goes out, so
+    // nobody ever gets a second one — the column is the opt-out.
+    profileNudgeSentAt: timestamp("profile_nudge_sent_at", { withTimezone: true }),
 
     // Community profile — what other members may see. Deliberately separate
     // from the M&E answers above, which are aggregate-reporting-only by
@@ -79,6 +82,10 @@ export const users = pgTable(
     expertise: text("expertise"), // "ask me about"
     publicCauseAreas: text("public_cause_areas").array(),
     publicLink: text("public_link"),
+    // When their photo last changed. The image itself lives in user_avatars
+    // so it isn't dragged into every `select * from users`; this column is
+    // what tells a page there's one to show, and cache-busts /avatar/<id>.
+    avatarUpdatedAt: timestamp("avatar_updated_at", { withTimezone: true }),
 
     // no-show ladder state
     noshowEmailOptOut: boolean("noshow_email_opt_out").notNull().default(false),
@@ -122,6 +129,27 @@ export const userEmails = pgTable(
   // share one constraint, so lookups check both — see lib/users.ts.
   (t) => [uniqueIndex("user_emails_unique").on(sql`lower(${t.email})`)]
 );
+
+/**
+ * Profile photos, one row per person who has one.
+ *
+ * Kept out of `users` on purpose: `getCurrentUser` selects the whole row on
+ * every request, and a ~20KB base64 string riding along on each one is a real
+ * cost against a free-tier Postgres over the wire. Pages read
+ * `users.avatarUpdatedAt` to know a photo exists; only /avatar/<id> reads the
+ * bytes. Images are squared and shrunk in the browser before upload (see
+ * components/avatar-upload.tsx), so rows are small by construction.
+ */
+export const userAvatars = pgTable("user_avatars", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  mime: text("mime").notNull(), // "image/jpeg" | "image/png" | "image/webp"
+  data: text("data").notNull(), // base64, no data: prefix
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
 
 // ---------- auth ----------
 

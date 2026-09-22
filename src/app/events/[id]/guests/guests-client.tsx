@@ -15,6 +15,7 @@ export type GuestRow = {
   createdAt: string;
   seat: string | null;
   wasAlreadyBooked: boolean;
+  withdrew: boolean;
 };
 
 export type GuestsEvent = {
@@ -35,9 +36,10 @@ export function GuestsClient({
   event,
 }: {
   guests: GuestRow[];
-  spots: { total: number; taken: number; left: number };
+  /** Co-working days only — an evening event has no seat count to run out of. */
+  spots: { total: number; taken: number; left: number } | null;
   shareUrl: string;
-  /** The day signs people up on Luma, so the guest list lives there. */
+  /** It signs people up on Luma, so the guest list lives there. */
   viaLuma: boolean;
   open: boolean;
   event: GuestsEvent;
@@ -46,38 +48,58 @@ export function GuestsClient({
   const pending = guests.filter((g) => g.status === "pending");
   const decided = guests.filter((g) => g.status !== "pending");
   const live = guests.filter((g) => g.status !== "declined").length;
+  // An evening event has nothing to decide, so its list isn't "decided" —
+  // it's who's coming and who dropped out, which are different questions and
+  // shouldn't share a heading.
+  const coming = decided.filter((g) => g.status === "approved");
+  const notComing = decided.filter((g) => g.status === "declined");
 
   return (
     <div className="space-y-4">
       {notice && <Notice className="mb-1">{notice}</Notice>}
       {event.cancelledReason !== null && (
         <Notice tone="error">
-          This one has been called off — nobody is expected, and the day is
-          open for normal desk booking again.
+          This one has been called off — nobody is expected
+          {event.coworking ? ", and the day is open for normal desk booking again" : ""}.
           {event.cancelledReason ? ` “${event.cancelledReason}”` : ""}
         </Notice>
       )}
       <Card className="space-y-3">
-        <div className="flex items-baseline justify-between gap-3 flex-wrap">
-          <h2>
-            {spots.taken} of {spots.total} spots taken
-          </h2>
-          <span className="text-sm text-slate-500">
-            {spots.left > 0
-              ? `${spots.left} still free`
-              : "The room is full — free a spot before approving anyone else"}
-          </span>
-        </div>
-        <div
-          className="h-2 rounded-full bg-slate-100 overflow-hidden"
-          role="img"
-          aria-label={`${spots.taken} of ${spots.total} spots taken`}
-        >
-          <div
-            className="h-full bg-teal-600"
-            style={{ width: `${Math.min(100, (spots.taken / spots.total) * 100)}%` }}
-          />
-        </div>
+        {spots ? (
+          <>
+            <div className="flex items-baseline justify-between gap-3 flex-wrap">
+              <h2>
+                {spots.taken} of {spots.total} spots taken
+              </h2>
+              <span className="text-sm text-slate-500">
+                {spots.left > 0
+                  ? `${spots.left} still free`
+                  : "The room is full — free a spot before approving anyone else"}
+              </span>
+            </div>
+            <div
+              className="h-2 rounded-full bg-slate-100 overflow-hidden"
+              role="img"
+              aria-label={`${spots.taken} of ${spots.total} spots taken`}
+            >
+              <div
+                className="h-full bg-teal-600"
+                style={{ width: `${Math.min(100, (spots.taken / spots.total) * 100)}%` }}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="flex items-baseline justify-between gap-3 flex-wrap">
+            <h2>
+              {live} {live === 1 ? "person" : "people"} signed up
+            </h2>
+            <span className="text-sm text-slate-500">
+              {open
+                ? "Sign-ups are open — anyone with the link can put their name down"
+                : "Sign-ups are closed"}
+            </span>
+          </div>
+        )}
         {open && <ShareLink url={shareUrl} viaLuma={viaLuma} spots={spots} />}
       </Card>
 
@@ -86,8 +108,10 @@ export function GuestsClient({
         <Card className="space-y-2">
           <p className="text-sm text-slate-600">
             Can&apos;t go ahead? Call it off here — everyone who signed up gets
-            an email, the desks go back, and the day reopens for normal
-            booking.
+            an email
+            {event.coworking
+              ? ", the desks go back, and the day reopens for normal booking."
+              : " so nobody turns up to a locked door."}
           </p>
           <CancelEventButton
             eventId={event.id}
@@ -103,8 +127,8 @@ export function GuestsClient({
 
       {guests.length === 0 ? (
         <p className="text-slate-500 text-sm">
-          No requests yet. Share the link above with anyone you&apos;d like
-          there.
+          {event.coworking ? "No requests yet." : "Nobody yet."} Share the link
+          above with anyone you&apos;d like there.
         </p>
       ) : (
         <>
@@ -114,18 +138,53 @@ export function GuestsClient({
                 Waiting on you ({pending.length})
               </h2>
               {pending.map((g) => (
-                <GuestCard key={g.id} guest={g} full={spots.left <= 0} />
+                <GuestCard
+                  key={g.id}
+                  guest={g}
+                  full={!!spots && spots.left <= 0}
+                  curated={event.coworking}
+                />
               ))}
             </div>
           )}
-          {decided.length > 0 && (
-            <div className="space-y-2">
-              <h2 className="text-sm text-slate-600">Decided</h2>
-              {decided.map((g) => (
-                <GuestCard key={g.id} guest={g} full={spots.left <= 0} />
-              ))}
-            </div>
-          )}
+          {event.coworking
+            ? decided.length > 0 && (
+                <div className="space-y-2">
+                  <h2 className="text-sm text-slate-600">Decided</h2>
+                  {decided.map((g) => (
+                    <GuestCard
+                      key={g.id}
+                      guest={g}
+                      full={!!spots && spots.left <= 0}
+                      curated
+                    />
+                  ))}
+                </div>
+              )
+            : (
+              <>
+                {coming.length > 0 && (
+                  <div className="space-y-2">
+                    <h2 className="text-sm text-slate-600">
+                      Coming ({coming.length})
+                    </h2>
+                    {coming.map((g) => (
+                      <GuestCard key={g.id} guest={g} full={false} curated={false} />
+                    ))}
+                  </div>
+                )}
+                {notComing.length > 0 && (
+                  <div className="space-y-2">
+                    <h2 className="text-sm text-slate-600">
+                      Not coming ({notComing.length})
+                    </h2>
+                    {notComing.map((g) => (
+                      <GuestCard key={g.id} guest={g} full={false} curated={false} />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
         </>
       )}
     </div>
@@ -140,7 +199,7 @@ function ShareLink({
 }: {
   url: string;
   viaLuma: boolean;
-  spots: { total: number };
+  spots: { total: number } | null;
 }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -148,14 +207,16 @@ function ShareLink({
       <p className="text-sm text-slate-600 mb-1.5">
         {viaLuma ? (
           <>
-            Sign-ups for this day happen on Luma, so share that page.{" "}
+            Sign-ups happen on Luma, so share that page.{" "}
             {/* We can't cap a Luma guest list from here, so the organiser
                 has to carry the number across themselves. */}
-            <strong>
-              Set the Luma capacity to {spots.total}
-            </strong>{" "}
-            — that&apos;s everyone the office holds, desks and lunch table
-            together, and Luma will run a waitlist past it.
+            {spots && (
+              <>
+                <strong>Set the Luma capacity to {spots.total}</strong> —
+                that&apos;s everyone the office holds, desks and lunch table
+                together, and Luma will run a waitlist past it.
+              </>
+            )}
           </>
         ) : (
           <>
@@ -189,7 +250,16 @@ function ShareLink({
   );
 }
 
-function GuestCard({ guest, full }: { guest: GuestRow; full: boolean }) {
+function GuestCard({
+  guest,
+  full,
+  curated,
+}: {
+  guest: GuestRow;
+  full: boolean;
+  /** Co-working days are decided one by one; evening sign-ups just are. */
+  curated: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -214,7 +284,7 @@ function GuestCard({ guest, full }: { guest: GuestRow; full: boolean }) {
         {guest.accessibilityNotes && (
           <p className="text-sm text-slate-500 mt-1">{guest.accessibilityNotes}</p>
         )}
-        {guest.status === "approved" && (
+        {curated && guest.status === "approved" && (
           <p className="text-sm text-teal-700 mt-1">
             <Icon name="armchair" className="mr-1" />
             {guest.seat ? `Has ${guest.seat}` : "No desk yet — the day was full"}
@@ -223,7 +293,26 @@ function GuestCard({ guest, full }: { guest: GuestRow; full: boolean }) {
         {error && <p className="text-sm text-red-700 mt-1">{error}</p>}
         {note && <p className="text-sm text-slate-600 mt-1">{note}</p>}
       </div>
-      {guest.status === "pending" ? (
+      {!curated ? (
+        // Nothing to decide — but an organiser still needs a way to take
+        // someone off the list when they say they can't come.
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <Badge tone={guest.status === "declined" ? "stone" : "teal"}>
+            {guest.status !== "declined"
+              ? "Coming"
+              : guest.withdrew
+                ? "Can't make it"
+                : "Removed"}
+          </Badge>
+          <button
+            disabled={pending}
+            onClick={() => decide(guest.status === "declined" ? "approved" : "declined")}
+            className="text-xs text-slate-500 underline cursor-pointer disabled:opacity-50"
+          >
+            {guest.status === "declined" ? "Put back on the list" : "Remove"}
+          </button>
+        </div>
+      ) : guest.status === "pending" ? (
         <div className="flex gap-2 shrink-0">
           <button
             disabled={pending}
@@ -244,15 +333,25 @@ function GuestCard({ guest, full }: { guest: GuestRow; full: boolean }) {
       ) : (
         <div className="flex flex-col items-end gap-2 shrink-0">
           <Badge tone={guest.status === "approved" ? "teal" : "stone"}>
-            {guest.status === "approved" ? "Approved" : "Declined"}
+            {guest.status === "approved"
+              ? "Approved"
+              : guest.withdrew
+                ? "Withdrew"
+                : "Declined"}
           </Badge>
-          {/* Both directions: a mis-tapped Decline shouldn't be final. */}
+          {/* Both directions: a mis-tapped Decline shouldn't be final. A
+              person who withdrew is a different case — re-approving them is
+              putting someone back who said they couldn't come, so it says so. */}
           <button
             disabled={pending || (guest.status === "declined" && full)}
             onClick={() => decide(guest.status === "approved" ? "declined" : "approved")}
             className="text-xs text-slate-500 underline cursor-pointer disabled:opacity-50"
           >
-            {guest.status === "approved" ? "Undo" : "Approve after all"}
+            {guest.status === "approved"
+              ? "Undo"
+              : guest.withdrew
+                ? "Put back on the list"
+                : "Approve after all"}
           </button>
         </div>
       )}

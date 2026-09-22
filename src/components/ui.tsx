@@ -116,19 +116,54 @@ export function Notice({
   );
 }
 
-export function Avatar({ name, small }: { name: string; small?: boolean }) {
+/**
+ * Someone's face, or their initials when they haven't added one.
+ *
+ * Deliberately the same shape and ring either way, so a list of people with
+ * and without photos reads as one list rather than two. `src` points at
+ * /avatar/<id>?v=<timestamp> — members only, and a new photo is a new URL.
+ */
+export function Avatar({
+  name,
+  small,
+  size,
+  src,
+}: {
+  name: string;
+  /** Back-compat for the inline chip size; prefer `size`. */
+  small?: boolean;
+  size?: "sm" | "md" | "lg";
+  src?: string | null;
+}) {
+  const resolved = size ?? (small ? "sm" : "md");
+  const box = {
+    sm: "w-5 h-5 text-[9px]",
+    md: "w-8 h-8 text-xs",
+    lg: "w-14 h-14 text-base",
+  }[resolved];
   const initials = name
     .split(/\s+/)
     .map((w) => w[0])
     .slice(0, 2)
     .join("")
     .toUpperCase();
+  if (src) {
+    return (
+      // A plain <img>: these are 256px squares we serve ourselves from a
+      // private route, so next/image's loader and cache buy nothing here.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={name}
+        title={name}
+        className={`inline-block shrink-0 object-cover rounded-full border border-teal-200 bg-teal-100 ${box}`}
+      />
+    );
+  }
   return (
     <span
       title={name}
-      className={`inline-flex items-center justify-center rounded-full bg-teal-100 text-teal-800 border border-teal-200 font-semibold ${
-        small ? "w-5 h-5 text-[9px]" : "w-8 h-8 text-xs"
-      }`}
+      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-teal-100 text-teal-800 border border-teal-200 font-semibold ${box}`}
     >
       {initials}
     </span>

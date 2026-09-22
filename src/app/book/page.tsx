@@ -120,6 +120,7 @@ export default async function BookPage({
         deskNumber: p.deskNumber,
         slot: p.slot,
         isYou: p.id === user.id,
+        avatarUrl: p.avatarUrl,
         profile: p.profile,
       })),
       // A member can hold a morning and an afternoon on the same day.

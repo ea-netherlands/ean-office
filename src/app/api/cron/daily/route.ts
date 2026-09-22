@@ -9,7 +9,7 @@ import {
   eventGuests,
   ensureMigrated,
 } from "@/db";
-import { and, eq, lt, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, eq, lt, inArray, isNull } from "drizzle-orm";
 import {
   addDays,
   amsDate,
@@ -23,7 +23,7 @@ import { markNoShowsForDate, runNoShowLadder, flaggedUsers } from "@/lib/noshow"
 import { getSettings } from "@/lib/settings";
 import { getReport } from "@/lib/reports";
 import { sendEmail, link } from "@/lib/email";
-import { cancelUrl, releaseUrl } from "@/lib/booking";
+import { cancelUrl, describeSeat, deskWhere, releaseUrl } from "@/lib/booking";
 import { asSlot, SLOT_LABEL, slotSuffix, slotWindow } from "@/lib/slots";
 import { appUrl } from "@/lib/auth";
 
@@ -72,14 +72,16 @@ export async function GET(request: NextRequest) {
       slot === "day"
         ? `<p><strong>Only here this morning?</strong> ${link(releaseUrl(b), "Free up your afternoon")} — you keep the desk until lunch and someone else can use it after.</p>`
         : "";
+    const seat = `${describeSeat(b)}${deskWhere(b, cfg)}`;
     await sendEmail({
       to: u.email,
-      subject: `You're booked at the office today${slotSuffix(slot)}`,
+      subject: `Today at the office${slotSuffix(slot)} — ${describeSeat(b)}`,
       kind: "morning_reminder",
       html: `<p>Hi ${u.name},</p>
-<p>You're booked for <strong>today, ${formatDayLong(today)}</strong>${slot === "day" ? "" : ` (${SLOT_LABEL[slot]}, ${slotWindow(slot, cfg)})`}${b.seatType === "flex" ? " — lunch table" : ""}. Scan the QR code by the door when you arrive — two taps, and it keeps the office's funding numbers honest.</p>
+<p>You're booked for <strong>today, ${formatDayLong(today)}</strong>${slot === "day" ? "" : ` (${SLOT_LABEL[slot]}, ${slotWindow(slot, cfg)})`}, and you have <strong>${seat}</strong>. Scan the QR code by the door when you arrive — two taps, and it keeps the office's funding numbers honest.</p>
 ${releaseNote}
-<p>Can't make it? ${link(cancelUrl(b), "Cancel in one tap")} — no login needed, and it frees the desk for someone else.</p>`,
+<p>Can't make it? ${link(cancelUrl(b), "Cancel in one tap")} — no login needed, and it frees the desk for someone else.</p>
+<p><strong>Something else to change?</strong> ${link(`${appUrl()}/me`, "Open your bookings")} — free up a morning or an afternoon, switch desks, and see every other day you've booked.</p>`,
     });
     await db
       .update(bookings)
@@ -261,6 +263,82 @@ ${awaitingDecision.length > 0 ? `<li>Trial visits awaiting a decision: <strong>$
     eventGuestNudges++;
   }
   result.eventGuestNudges = eventGuestNudges;
+
+  // 10b. The one-off "your profile is bare" nudge.
+  //
+  // One per person, ever — `profile_nudge_sent_at` is the opt-out, and it's
+  // set whether or not they act on it. Only people who've actually been here
+  // get it: nudging someone about a who's-in profile before they've met
+  // anyone is asking a stranger to introduce themselves to a room they
+  // haven't walked into. Capped per run so a first deploy against an
+  // established membership doesn't send two hundred emails in one go.
+  const NUDGE_PER_RUN = 20;
+  let profileNudges = 0;
+  if (isWorkingDay(today)) {
+    // Oldest members first, so the queue drains in a stable order rather
+    // than whatever Postgres hands back.
+    const candidates = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.status, "active"), isNull(users.profileNudgeSentAt)))
+      .orderBy(asc(users.createdAt))
+      .limit(200);
+
+    // Two visits is the bar: enough that faces in the who's-in list mean
+    // something to them, and that this doesn't reach someone who joined last
+    // week and hasn't been in yet. One grouped read rather than one per
+    // candidate — in production each of those is a hop to Neon.
+    const visitCounts = new Map<string, number>();
+    if (candidates.length > 0) {
+      for (const row of await db
+        .select({ userId: checkins.userId, n: count() })
+        .from(checkins)
+        .where(
+          inArray(
+            checkins.userId,
+            candidates.map((u) => u.id)
+          )
+        )
+        .groupBy(checkins.userId)) {
+        visitCounts.set(row.userId, Number(row.n));
+      }
+    }
+
+    for (const u of candidates) {
+      if (profileNudges >= NUDGE_PER_RUN) break;
+      const hasPhoto = !!u.avatarUpdatedAt;
+      const gaps = [
+        !hasPhoto ? "a photo" : "",
+        !u.bio ? "what you're working on" : "",
+        !u.expertise ? "what to ask you about" : "",
+      ].filter(Boolean);
+      if (gaps.length === 0) {
+        // Nothing to nudge about — mark it so they're never considered again.
+        await db
+          .update(users)
+          .set({ profileNudgeSentAt: new Date() })
+          .where(eq(users.id, u.id));
+        continue;
+      }
+      if ((visitCounts.get(u.id) ?? 0) < 2) continue;
+
+      await sendEmail({
+        to: u.email,
+        subject: "Put a face to your name at the office",
+        kind: "profile_nudge",
+        html: `<p>Hi ${u.name},</p>
+<p>When you book a desk, the booking page shows who else is in that day. It works much better when people have filled theirs in — it's how you spot that the person two desks over works on the thing you've been stuck on.</p>
+<p>Yours is missing ${gaps.length > 1 ? `${gaps.slice(0, -1).join(", ")} and ${gaps[gaps.length - 1]}` : gaps[0]}. It takes about a minute: ${link(`${appUrl()}/me`, "add yours")}.</p>
+<p>Entirely optional, and it's visible to other members only — never on the public web, and never to funders. This is the only email we'll send you about it.</p>`,
+      });
+      await db
+        .update(users)
+        .set({ profileNudgeSentAt: new Date() })
+        .where(eq(users.id, u.id));
+      profileNudges++;
+    }
+  }
+  result.profileNudges = profileNudges;
 
   // 11. GDPR: one-off event guests who never came back don't earn
   // indefinite retention either — same one-year window as unclaimed imports.

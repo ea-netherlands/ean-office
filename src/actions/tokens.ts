@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { verifyToken } from "@/lib/tokens";
 import { cancelBooking, changeSlot, checkInUser } from "@/lib/booking";
 import { clearNoShow } from "@/lib/noshow";
+import { leaveEvent } from "@/lib/leave-event";
 
 // Actions behind signed single-purpose email links. No session required, and
 // none of these ever grant one.
@@ -55,6 +56,22 @@ export async function retroByTokenAction(
   if (!res.ok) return { error: res.error };
   // Retroactive check-ins remove the no-show from the count.
   await clearNoShow(userId, date, "retro_checkin");
+  return { ok: true };
+}
+
+/**
+ * "Can't make it" from a sign-up email. Undoing a sign-up used to mean
+ * emailing the organiser, which is why rooms got set out for people who
+ * weren't coming.
+ */
+export async function leaveEventByTokenAction(
+  token: string
+): Promise<{ ok?: boolean; error?: string }> {
+  await ensureMigrated();
+  const verified = verifyToken(token, "unrsvp");
+  if (!verified) return { error: "This link has expired." };
+  const res = await leaveEvent(verified.subject);
+  if (!res.ok) return { error: res.error };
   return { ok: true };
 }
 

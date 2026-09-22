@@ -21,11 +21,13 @@ export type TokenPurpose =
   | "retro"
   | "optout"
   | "cancel_series"
-  | "release"; // give up the afternoon of a full-day booking
+  | "release" // give up the afternoon of a full-day booking
+  | "calendar" // fetch the .ics for a booking or a series
+  | "unrsvp"; // take your own name off an event you signed up for
 
 export function makeToken(
   purpose: TokenPurpose,
-  subject: string, // bookingId, `${userId}:${date}`, userId, seriesId
+  subject: string, // bookingId, `${userId}:${date}`, userId, seriesId, eventGuestId, `b:`/`s:` for calendar
   expiresAt: Date
 ): string {
   const payload = `${purpose}.${Buffer.from(subject).toString("base64url")}.${expiresAt.getTime()}`;

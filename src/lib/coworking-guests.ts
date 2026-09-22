@@ -5,7 +5,8 @@ import { db, bookings, eventGuests, events, users } from "@/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { newId } from "./ids";
 import { getSettings, Settings } from "./settings";
-import { coworkingJoin, coworkingSpotCount } from "./coworking";
+import { coworkingSpotCount } from "./coworking";
+import { eventJoin } from "./event-join";
 import {
   bookDay,
   cancelBooking,
@@ -140,7 +141,7 @@ export async function clearDayForCoworking(event: {
   const when = event.startsAt
     ? `${event.startsAt}${event.endsAt ? `–${event.endsAt}` : ""}`
     : "all day";
-  const join = coworkingJoin(event, appUrl());
+  const join = eventJoin(event, appUrl());
 
   // One email per person, not per booking — someone can hold a morning and an
   // afternoon, and two apologies for one day reads as a system, not a person.

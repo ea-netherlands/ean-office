@@ -56,28 +56,3 @@ export async function eventCheckinAction(eventId: string): Promise<CheckinState>
   revalidatePath("/checkin");
   return { ok: true };
 }
-
-export async function rsvpAction(eventId: string): Promise<{ ok: boolean }> {
-  const user = await getCurrentUser();
-  if (!user) return { ok: false };
-  const existing = await db
-    .select()
-    .from(eventAttendance)
-    .where(
-      and(
-        eq(eventAttendance.eventId, eventId),
-        eq(eventAttendance.userId, user.id),
-        eq(eventAttendance.source, "rsvp")
-      )
-    );
-  if (existing.length === 0) {
-    await db.insert(eventAttendance).values({
-      id: newId("ea"),
-      eventId,
-      userId: user.id,
-      source: "rsvp",
-    });
-  }
-  revalidatePath("/");
-  return { ok: true };
-}

@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { checkinAction } from "@/actions/checkin";
-import { rsvpAction } from "@/actions/checkin";
 import { btnPrimary, btnSecondary, Icon, Spinner } from "@/components/ui";
 import { Slot, SLOT_LABEL } from "@/lib/slots";
 
@@ -88,45 +87,5 @@ export function TodayActions({
       )}
       {error && <p className="text-sm text-red-700 mt-2">{error}</p>}
     </div>
-  );
-}
-
-export function RsvpButton({
-  eventId,
-  rsvped,
-}: {
-  eventId: string;
-  rsvped: boolean;
-}) {
-  const [pending, startTransition] = useTransition();
-  const [done, setDone] = useState(rsvped);
-  if (done) {
-    return (
-      <span className="text-xs text-teal-700 font-medium whitespace-nowrap inline-flex items-center gap-1">
-        Going
-        <Icon name="circle-check" />
-      </span>
-    );
-  }
-  return (
-    <button
-      className="text-xs border border-slate-300 rounded-full px-3 py-1 hover:bg-slate-50 whitespace-nowrap cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
-      disabled={pending}
-      onClick={() =>
-        startTransition(async () => {
-          await rsvpAction(eventId);
-          setDone(true);
-        })
-      }
-    >
-      {pending ? (
-        <>
-          <Spinner />
-          Sending…
-        </>
-      ) : (
-        "RSVP"
-      )}
-    </button>
   );
 }

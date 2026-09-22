@@ -9,6 +9,10 @@ import { and, eq, gte, inArray, asc } from "drizzle-orm";
 import { todayAms, formatDay, formatDayLong } from "@/lib/dates";
 import { COWORKING_TYPE } from "@/lib/coworking";
 import { asSlot } from "@/lib/slots";
+import { getSettings } from "@/lib/settings";
+import { deskLocation } from "@/lib/desks";
+import { calendarUrl } from "@/lib/booking-calendar";
+import { avatarUrl } from "@/lib/avatars";
 import { MeClient } from "./me-client";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +21,7 @@ export default async function MePage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/me");
 
+  const cfg = await getSettings();
   const upcoming = await db
     .select()
     .from(bookings)
@@ -151,7 +156,9 @@ export default async function MePage() {
                   )}
                 </span>
                 <Link href={`/events/${e.id}/rsvp`} className="text-teal-700 underline">
-                  Details
+                  {/* The page it lands on is where you take your name off,
+                      so name the thing people come here to do. */}
+                  Details or cancel
                 </Link>
               </div>
             ))}
@@ -164,12 +171,18 @@ export default async function MePage() {
             date: b.date,
             dateLabel: formatDayLong(b.date),
             seatType: b.seatType,
+            deskNumber: b.deskNumber,
+            deskWhere: deskLocation(b.deskNumber, cfg.desk_count),
             slot: asSlot(b.slot),
             status: b.status as "booked" | "waitlisted",
             seriesId: b.seriesId,
+            // Signed, expiring, single-purpose — same as the cancel links.
+            calendarUrl: b.status === "booked" ? calendarUrl(b) : null,
           }))}
+          windows={{ am: cfg.am_window, pm: cfg.pm_window }}
           user={{
             name: user.name,
+            avatarUrl: avatarUrl(user.id, user.avatarUpdatedAt),
             noshowEmailOptOut: user.noshowEmailOptOut,
             community: {
               profileVisible: user.profileVisible,
@@ -224,9 +237,9 @@ function OrganiserRow({
             <Badge tone="teal">yours to run</Badge>
           )}
         </span>
-        {event.status === "confirmed" && event.coworking && (
+        {event.status === "confirmed" && (
           <Link href={`/events/${event.id}/guests`} className="text-teal-700 underline">
-            Manage guests
+            {event.coworking ? "Manage guests" : "Share link & who's coming"}
           </Link>
         )}
       </div>

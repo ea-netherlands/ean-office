@@ -1,11 +1,21 @@
 /**
- * Calendar invites for hosting duties.
+ * Calendar invites.
  *
  * The app runs on a server with no access to anyone's Google account, so
- * rather than an OAuth integration we send a standard iCalendar invite.
- * Gmail, Outlook and Apple Calendar all show it as an event you can accept,
- * which lands it in the host's calendar with one tap and works for whoever
- * approved the request without any per-person setup.
+ * rather than an OAuth integration we send a standard iCalendar file. Gmail,
+ * Outlook and Apple Calendar all understand it, which lands the thing in
+ * someone's calendar with one tap and works for whoever gets the email
+ * without any per-person setup.
+ *
+ * Two shapes go out of here:
+ *
+ *  - **Hosting duties** — one timed VEVENT with METHOD:REQUEST and an
+ *    ATTENDEE, so it arrives as an invitation you accept.
+ *  - **Your own desk bookings** — METHOD:PUBLISH, no attendee. Nobody invited
+ *    you to your own booking, and a REQUEST for it makes mail clients ask you
+ *    to RSVP to yourself. A block booking is many VEVENTs in one file (not an
+ *    RRULE: the series skips full days and days at the repeat-booking cap, and
+ *    a recurrence rule would quietly put those days back).
  */
 
 function stamp(d: Date): string {
@@ -15,7 +25,7 @@ function stamp(d: Date): string {
 function escapeText(s: string): string {
   return s
     .replace(/\\/g, "\\\\")
-    .replace(/;/g, "\\;")
+    .replace(/;/g, "\;")
     .replace(/,/g, "\\,")
     .replace(/\r?\n/g, "\\n");
 }
@@ -33,64 +43,131 @@ function fold(line: string): string {
   return parts.join("\r\n");
 }
 
-export type IcsInvite = {
+const compact = (day: string) => day.replace(/-/g, "");
+
+export type IcsEvent = {
   uid: string;
   title: string;
   description?: string;
   location?: string;
+  url?: string;
   /** Amsterdam calendar date, YYYY-MM-DD */
   date: string;
-  /** "11:00" — Amsterdam local */
-  startTime: string;
-  durationMinutes: number;
+  /**
+   * "11:00" — Amsterdam local. Omit for an all-day entry, which is what a
+   * whole day at the office should be: a ten-hour block from 9:00 buries
+   * every other thing on that day's calendar.
+   */
+  startTime?: string;
+  /** Required alongside `startTime`. */
+  durationMinutes?: number;
   organiserEmail: string;
   attendeeEmails?: string[];
+  /** Minutes before the start. Skipped on all-day entries, where a 30-minute
+   *  trigger fires at half past eleven the night before. */
+  alarmMinutesBefore?: number;
 };
 
-export function buildIcs(invite: IcsInvite): string {
+/** Back-compat alias — this used to be the only shape here. */
+export type IcsInvite = IcsEvent;
+
+const TIMEZONE = [
+  // Amsterdam rules, so the time is right whatever the reader's timezone.
+  "BEGIN:VTIMEZONE",
+  "TZID:Europe/Amsterdam",
+  "BEGIN:DAYLIGHT",
+  "TZOFFSETFROM:+0100",
+  "TZOFFSETTO:+0200",
+  "TZNAME:CEST",
+  "DTSTART:19700329T020000",
+  "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU",
+  "END:DAYLIGHT",
+  "BEGIN:STANDARD",
+  "TZOFFSETFROM:+0200",
+  "TZOFFSETTO:+0100",
+  "TZNAME:CET",
+  "DTSTART:19701025T030000",
+  "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU",
+  "END:STANDARD",
+  "END:VTIMEZONE",
+];
+
+function vevent(e: IcsEvent, now: Date): string[] {
+  const allDay = !e.startTime;
+  const lines: string[] = [
+    "BEGIN:VEVENT",
+    `UID:${e.uid}`,
+    `DTSTAMP:${stamp(now)}`,
+  ];
+  if (allDay) {
+    // DTEND is exclusive for a DATE value — the day after.
+    const end = new Date(`${e.date}T00:00:00Z`);
+    end.setUTCDate(end.getUTCDate() + 1);
+    lines.push(
+      `DTSTART;VALUE=DATE:${compact(e.date)}`,
+      `DTEND;VALUE=DATE:${compact(end.toISOString().slice(0, 10))}`,
+      "TRANSP:TRANSPARENT" // a day at the office doesn't make you unbookable
+    );
+  } else {
+    lines.push(
+      `DTSTART;TZID=Europe/Amsterdam:${compact(e.date)}T${e.startTime!.replace(":", "")}00`,
+      `DURATION:PT${e.durationMinutes ?? 60}M`,
+      "TRANSP:OPAQUE"
+    );
+  }
+  lines.push(
+    `SUMMARY:${escapeText(e.title)}`,
+    "SEQUENCE:0",
+    "STATUS:CONFIRMED",
+    `ORGANIZER;CN=EA Netherlands Office:MAILTO:${e.organiserEmail}`
+  );
+  if (e.description) lines.push(`DESCRIPTION:${escapeText(e.description)}`);
+  if (e.location) lines.push(`LOCATION:${escapeText(e.location)}`);
+  if (e.url) lines.push(`URL:${e.url}`);
+  for (const email of e.attendeeEmails ?? []) {
+    lines.push(
+      `ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:MAILTO:${email}`
+    );
+  }
+  if (!allDay && e.alarmMinutesBefore) {
+    lines.push(
+      "BEGIN:VALARM",
+      `TRIGGER:-PT${e.alarmMinutesBefore}M`,
+      "ACTION:DISPLAY",
+      "DESCRIPTION:Reminder",
+      "END:VALARM"
+    );
+  }
+  lines.push("END:VEVENT");
+  return lines;
+}
+
+export function buildIcsCalendar(
+  events: IcsEvent[],
+  method: "REQUEST" | "PUBLISH" = "PUBLISH",
+  calendarName?: string
+): string {
+  const now = new Date();
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//EA Netherlands//Office//EN",
     "CALSCALE:GREGORIAN",
-    "METHOD:REQUEST",
-    // Amsterdam rules, so the time is right whatever the reader's timezone.
-    "BEGIN:VTIMEZONE",
-    "TZID:Europe/Amsterdam",
-    "BEGIN:DAYLIGHT",
-    "TZOFFSETFROM:+0100",
-    "TZOFFSETTO:+0200",
-    "TZNAME:CEST",
-    "DTSTART:19700329T020000",
-    "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU",
-    "END:DAYLIGHT",
-    "BEGIN:STANDARD",
-    "TZOFFSETFROM:+0200",
-    "TZOFFSETTO:+0100",
-    "TZNAME:CET",
-    "DTSTART:19701025T030000",
-    "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU",
-    "END:STANDARD",
-    "END:VTIMEZONE",
-    "BEGIN:VEVENT",
-    `UID:${invite.uid}`,
-    `DTSTAMP:${stamp(new Date())}`,
-    `DTSTART;TZID=Europe/Amsterdam:${invite.date.replace(/-/g, "")}T${invite.startTime.replace(":", "")}00`,
-    `DURATION:PT${invite.durationMinutes}M`,
-    `SUMMARY:${escapeText(invite.title)}`,
-    "SEQUENCE:0",
-    "STATUS:CONFIRMED",
-    "TRANSP:OPAQUE",
-    `ORGANIZER;CN=EA Netherlands Office:MAILTO:${invite.organiserEmail}`,
+    `METHOD:${method}`,
   ];
-  if (invite.description) lines.push(`DESCRIPTION:${escapeText(invite.description)}`);
-  if (invite.location) lines.push(`LOCATION:${escapeText(invite.location)}`);
-  for (const email of invite.attendeeEmails ?? []) {
-    lines.push(
-      `ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:MAILTO:${email}`
-    );
+  if (calendarName) {
+    lines.push(`X-WR-CALNAME:${escapeText(calendarName)}`);
   }
-  lines.push("BEGIN:VALARM", "TRIGGER:-PT30M", "ACTION:DISPLAY", "DESCRIPTION:Reminder", "END:VALARM");
-  lines.push("END:VEVENT", "END:VCALENDAR");
+  lines.push(...TIMEZONE);
+  for (const e of events) lines.push(...vevent(e, now));
+  lines.push("END:VCALENDAR");
   return lines.map(fold).join("\r\n");
+}
+
+/** One invitation, the hosting-duty shape. */
+export function buildIcs(invite: IcsEvent): string {
+  return buildIcsCalendar(
+    [{ alarmMinutesBefore: 30, ...invite }],
+    "REQUEST"
+  );
 }

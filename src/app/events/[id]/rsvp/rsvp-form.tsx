@@ -8,10 +8,14 @@ import { Card, btnPrimary, inputCls, labelCls, Icon } from "@/components/ui";
 
 export function RsvpForm({
   eventId,
+  open,
   defaultName,
   defaultEmail,
 }: {
   eventId: string;
+  /** Evening events: signing up is signing up, so say so rather than
+   *  promising a decision that never comes. */
+  open?: boolean;
   defaultName?: string;
   defaultEmail?: string;
 }) {
@@ -31,10 +35,11 @@ export function RsvpForm({
     return (
       <Card className="text-center py-10">
         <Icon name="circle-check" className="text-5xl text-teal-600 mb-3" />
-        <h2 className="text-xl">Request sent</h2>
+        <h2 className="text-xl">{open ? "You're on the list" : "Request sent"}</h2>
         <p className="text-slate-500 mt-2 max-w-sm mx-auto">
-          The organiser will confirm shortly — you&apos;ll get an email
-          either way.
+          {open
+            ? "We've emailed you the details, including where to find us. See you there."
+            : "The organiser will confirm shortly — you'll get an email either way."}
         </p>
       </Card>
     );
@@ -73,7 +78,11 @@ export function RsvpForm({
             rows={2}
             defaultValue={str(v, "accessibilityNotes")}
             className={inputCls}
-            placeholder="Accessibility needs, dietary things at lunch — anything."
+            placeholder={
+              open
+                ? "Accessibility needs, dietary things — anything."
+                : "Accessibility needs, dietary things at lunch — anything."
+            }
           />
         </div>
         <label className="flex items-start gap-2 text-sm text-slate-700">
@@ -105,7 +114,7 @@ export function RsvpForm({
         </p>
       )}
       <button type="submit" disabled={pending} className={`${btnPrimary} w-full py-3.5 text-base`}>
-        {pending ? "Sending…" : "Ask to join"}
+        {pending ? "Sending…" : open ? "Sign me up" : "Ask to join"}
       </button>
     </form>
   );

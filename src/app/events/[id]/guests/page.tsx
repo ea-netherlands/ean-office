@@ -8,7 +8,9 @@ import { formatDay, formatDayLong, todayAms } from "@/lib/dates";
 import { describeSeat } from "@/lib/booking";
 import { asSlot, SLOT_LABEL } from "@/lib/slots";
 import { coworkingSpots } from "@/lib/coworking-guests";
-import { coworkingJoin, isCoworkingDay } from "@/lib/coworking";
+import { isCoworkingDay } from "@/lib/coworking";
+import { eventJoin } from "@/lib/event-join";
+import { SELF_WITHDRAWN } from "@/lib/leave-event";
 import { GuestsClient, GuestRow } from "./guests-client";
 
 export const dynamic = "force-dynamic";
@@ -73,9 +75,15 @@ export default async function EventGuestsPage({
     seat: seats.get(r.u.id) ?? null,
     /** They'd booked the day before it became a co-working day. */
     wasAlreadyBooked: r.g.decidedBy === "already_booked",
+    /** They took their own name off, rather than being removed. */
+    withdrew: r.g.decidedBy === SELF_WITHDRAWN,
   }));
 
-  const spots = await coworkingSpots(event.date);
+  const coworking = isCoworkingDay(event.type);
+  // Only a co-working day rations seats. An evening event's "capacity" is the
+  // room, which nobody here can count, so the page shows a headcount instead
+  // of a progress bar against an invented number.
+  const spots = coworking ? await coworkingSpots(event.date) : null;
 
   return (
     <>
@@ -87,19 +95,19 @@ export default async function EventGuestsPage({
           {event.startsAt
             ? ` · ${event.startsAt}${event.endsAt ? `–${event.endsAt}` : ""}`
             : ""}{" "}
-          · you decide who&apos;s in.
+          · {coworking ? "you decide who's in." : "who's coming."}
         </Sub>
         <GuestsClient
           guests={guests}
           spots={spots}
-          shareUrl={coworkingJoin(event, appUrl()).href}
+          shareUrl={eventJoin(event, appUrl()).href}
           viaLuma={!!event.url}
-          open={isCoworkingDay(event.type) && event.status === "confirmed" && event.date >= todayAms()}
+          open={event.status === "confirmed" && event.date >= todayAms()}
           event={{
             id: event.id,
             title: event.title,
             dateLabel: formatDay(event.date),
-            coworking: isCoworkingDay(event.type),
+            coworking,
             cancellable: event.status === "confirmed" && event.date >= todayAms(),
             cancelledReason: event.status === "cancelled" ? event.cancelReason : null,
           }}

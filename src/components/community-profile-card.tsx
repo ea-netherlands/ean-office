@@ -3,7 +3,8 @@
 import { useState, useActionState } from "react";
 import { saveCommunityProfileAction, ProfileState } from "@/actions/profile";
 import { CAUSE_AREAS } from "@/lib/profile-options";
-import { Card, Badge, btnPrimary, inputCls, labelCls } from "@/components/ui";
+import { AvatarUpload } from "@/components/avatar-upload";
+import { Card, Badge, Icon, btnPrimary, inputCls, labelCls } from "@/components/ui";
 
 export type CommunityProfile = {
   profileVisible: boolean;
@@ -14,6 +15,28 @@ export type CommunityProfile = {
 };
 
 /**
+ * What's still missing, in the order it's worth filling in. Used for the
+ * nudge line — naming the one or two things left is what gets a profile
+ * finished; "complete your profile" on its own never has.
+ */
+export function communityProfileGaps(
+  community: CommunityProfile,
+  hasPhoto: boolean
+): string[] {
+  const gaps: string[] = [];
+  if (!hasPhoto) gaps.push("a photo");
+  if (!community.bio) gaps.push("what you're working on");
+  if (!community.expertise) gaps.push("what to ask you about");
+  return gaps;
+}
+
+/** "a photo and what you're working on" */
+export function listGaps(gaps: string[]): string {
+  if (gaps.length <= 1) return gaps[0] ?? "";
+  return `${gaps.slice(0, -1).join(", ")} and ${gaps[gaps.length - 1]}`;
+}
+
+/**
  * Opt-in "who's-in" networking profile — deliberately separate from the
  * M&E reporting questions, which are never shown to anyone. Reused on
  * /me (where it starts collapsed) and /welcome (started expanded, since
@@ -22,9 +45,13 @@ export type CommunityProfile = {
 export function CommunityProfileCard({
   community,
   defaultOpen,
+  name,
+  avatarUrl,
 }: {
   community: CommunityProfile;
   defaultOpen?: boolean;
+  name: string;
+  avatarUrl: string | null;
 }) {
   const [open, setOpen] = useState(defaultOpen ?? community.profileVisible);
   const [visible, setVisible] = useState(community.profileVisible);
@@ -32,6 +59,7 @@ export function CommunityProfileCard({
     saveCommunityProfileAction,
     {}
   );
+  const gaps = communityProfileGaps(community, !!avatarUrl);
 
   return (
     <Card>
@@ -51,12 +79,34 @@ export function CommunityProfileCard({
           {open ? "Close" : "Edit"}
         </button>
       </div>
-      {!open && (
-        <p className="text-sm text-slate-500 mt-1">
-          Optional: let other members tap your name on the booking calendar to
-          see what you work on. Completely separate from the reporting
-          questions below, which are never shown to anyone.
+      {/* The photo sits outside the form and saves on pick: it's the one
+          thing people actually want to add, and burying it behind "Edit"
+          then "Save" is how it stays unadded. */}
+      <div className="mt-3">
+        <AvatarUpload name={name} src={avatarUrl} />
+        <p className="text-xs text-slate-500 mt-2">
+          Your photo shows next to your name on the booking calendar, so
+          people can match a face to the person two desks over. Members only —
+          it never leaves the app.
         </p>
+      </div>
+      {!open && (
+        <>
+          <p className="text-sm text-slate-500 mt-3">
+            Optional: let other members tap your name on the booking calendar to
+            see what you work on. Completely separate from the reporting
+            questions below, which are never shown to anyone.
+          </p>
+          {gaps.length > 0 && (
+            <p className="text-sm text-teal-800 mt-2 flex items-start gap-1.5">
+              <Icon name="sparkles" className="mt-0.5 text-teal-600" />
+              <span>
+                Still missing: {listGaps(gaps)}. It takes a minute, and
+                it&apos;s what makes the who&apos;s-in list worth tapping.
+              </span>
+            </p>
+          )}
+        </>
       )}
       {open && (
         <form action={action} className="mt-4 space-y-3">

@@ -643,10 +643,22 @@ function EventItem({
             <strong className="text-base text-slate-800">{counted}</strong> attended
           </p>
           <p>
-            {e.checkins} via QR · {e.rsvps} RSVPs
+            {e.checkins} via QR · {e.guestsApproved + e.rsvps} signed up
           </p>
         </div>
       </div>
+      {/* Evening events now take open sign-ups through the same shareable
+          link. Nothing to approve, so this is a headcount and a way in. */}
+      {!coworking && !e.past && !cancelled && (
+        <p className="text-xs text-slate-500 mt-1">
+          <a href={`/events/${e.id}/guests`} className="text-teal-700 underline">
+            {e.guestsApproved + e.rsvps} signed up
+          </a>
+          {e.url
+            ? " · sign-ups are on Luma"
+            : " · sign-ups are here, on the office site"}
+        </p>
+      )}
       {coworking && !e.past && !cancelled && (
         <>
           <p className="text-xs text-slate-500 mt-1">

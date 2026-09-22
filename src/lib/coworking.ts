@@ -22,27 +22,6 @@ export function isCoworkingDay(type: string | null | undefined): boolean {
   return type === COWORKING_TYPE;
 }
 
-/**
- * Where someone asks for a spot on a co-working day — the one place, not two.
- *
- * A day promoted on Luma already collects RSVPs there, so a second request
- * queue here splits one guest list across two pages and leaves the organiser
- * checking both. Luma therefore wins wherever it exists, and the app's own
- * form is for days that never got a Luma page. Capacity follows the RSVPs: we
- * can't cap a Luma list from here, so the organiser is told the number and
- * sets it as the Luma capacity.
- *
- * `base` makes it absolute for emails; leave it off in the UI.
- */
-export function coworkingJoin(
-  event: { id: string; url?: string | null },
-  base = ""
-): { href: string; external: boolean; label: string } {
-  return event.url
-    ? { href: event.url, external: true, label: "RSVP on Luma" }
-    : { href: `${base}/events/${event.id}/rsvp`, external: false, label: "Ask to join" };
-}
-
 /** Desks plus the lunch table — the whole room is the organiser's that day. */
 export function coworkingSpotCount(cfg: Settings): number {
   return cfg.desk_count + cfg.flex_count;

@@ -17,7 +17,7 @@ import type { SeatTarget } from "@/lib/booking";
 import { DeskMap, DeskHalves, DeskOccupant } from "@/components/desk-map";
 import { ProfileForm } from "@/components/profile-form";
 import { PeopleList, PersonChipData } from "@/components/people";
-import { CoworkingJoinLink } from "@/components/coworking-join";
+import { EventJoinLink } from "@/components/event-join-link";
 import {
   Avatar,
   btnPrimary,
@@ -593,7 +593,7 @@ function DayPanel({
                 ? `${event.spotsLeft} of ${event.spotsTotal} spots free.`
                 : `All ${event.spotsTotal} spots are taken, but you can still ask.`}
             </p>
-            <CoworkingJoinLink
+            <EventJoinLink
               event={event}
               className={`${btnPrimary} mt-3 inline-flex`}
             />

@@ -6,11 +6,11 @@ import { Page, H1, Sub, Card, Badge, Icon, btnPrimary, btnSecondary } from "@/co
 import { PeopleList } from "@/components/people";
 import { capacityForDay } from "@/lib/booking";
 import { isCoworkingDay } from "@/lib/coworking";
-import { CoworkingJoinLink } from "@/components/coworking-join";
+import { EventJoinLink } from "@/components/event-join-link";
 import { db, checkins, events, eventAttendance, eventGuests, ensureMigrated } from "@/db";
 import { and, eq, gte, lte, asc } from "drizzle-orm";
 import { addDays, formatDayLong, todayAms, formatDay } from "@/lib/dates";
-import { TodayActions, RsvpButton } from "./today-actions";
+import { TodayActions } from "./today-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -66,24 +66,25 @@ export default async function HomePage() {
       )
     )
     .orderBy(asc(events.date));
-  const myRsvps = new Set(
+  // Where each thing coming up stands for the person looking at it. One
+  // table for both kinds now: a co-working day's row is a request the
+  // organiser decides on, an evening event's is a sign-up that's already
+  // approved. `eventAttendance` still carries RSVPs made before this page
+  // moved over, so those count as being on the list too.
+  const myGuestStatus = new Map<string, string>(
     (
       await db
         .select()
         .from(eventAttendance)
         .where(and(eq(eventAttendance.userId, user.id), eq(eventAttendance.source, "rsvp")))
-    ).map((r) => r.eventId)
+    ).map((r) => [r.eventId, "approved"])
   );
-  // Co-working days are curated, not RSVP'd — this is where each one stands
-  // for the person looking at it.
-  const myGuestStatus = new Map(
-    (
-      await db
-        .select()
-        .from(eventGuests)
-        .where(eq(eventGuests.userId, user.id))
-    ).map((g) => [g.eventId, g.status])
-  );
+  for (const g of await db
+    .select()
+    .from(eventGuests)
+    .where(eq(eventGuests.userId, user.id))) {
+    myGuestStatus.set(g.eventId, g.status);
+  }
 
   const others = cap.people.filter((p) => p.id !== user.id);
   // A co-working day owns the whole office, so today's card has to lead with
@@ -132,7 +133,7 @@ export default async function HomePage() {
                       ? "Still want to come? Sign up on the event page."
                       : "Still want to come? Ask the organiser — they answer quickly."}
                   </p>
-                  <CoworkingJoinLink
+                  <EventJoinLink
                     event={coworkingToday}
                     className={`${btnPrimary} mt-3 inline-flex`}
                   />
@@ -179,6 +180,7 @@ export default async function HomePage() {
                   deskNumber: p.deskNumber,
                   slot: p.slot,
                   isYou: p.id === user.id,
+                  avatarUrl: p.avatarUrl,
                   profile: p.profile,
                 }))}
               />
@@ -230,20 +232,10 @@ export default async function HomePage() {
                       {e.endsAt ? `–${e.endsAt}` : ""}
                     </p>
                   </div>
-                  {isCoworkingDay(e.type) ? (
-                    <CoworkingLink event={e} status={myGuestStatus.get(e.id)} />
-                  ) : e.url ? (
-                    <a
-                      href={e.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs border border-slate-300 rounded-full px-3 py-1 hover:bg-slate-50 whitespace-nowrap"
-                    >
-                      RSVP on Luma
-                    </a>
-                  ) : (
-                    <RsvpButton eventId={e.id} rsvped={myRsvps.has(e.id)} />
-                  )}
+                  {/* One link for everything now: a co-working day asks the
+                      organiser, an evening event signs you up, and either
+                      goes to Luma when that's where the list lives. */}
+                  <EventLink event={e} status={myGuestStatus.get(e.id)} />
                 </li>
               ))}
             </ul>
@@ -255,19 +247,20 @@ export default async function HomePage() {
 }
 
 /**
- * Where a member stands on a co-working day: in, waiting, or free to ask.
- * Someone already holding a desk that day is in regardless of where the day
- * takes its RSVPs, so their link stays here — sending them to Luma to sign up
- * for a seat they already have would be nonsense.
+ * Where a member stands on something coming up: in, waiting, or free to sign
+ * up. Someone who's already on a list is shown their own status and sent to
+ * our page for it, whatever the thing does elsewhere — pointing them at Luma
+ * to sign up for a place they already have would be nonsense.
  */
-function CoworkingLink({
+function EventLink({
   event,
   status,
 }: {
-  event: { id: string; url?: string | null };
+  event: { id: string; url?: string | null; type?: string | null };
   status?: string;
 }) {
   const pill = "text-xs rounded-full px-3 py-1 whitespace-nowrap border";
+  const coworking = isCoworkingDay(event.type);
   if (status) {
     return (
       <Link
@@ -282,12 +275,14 @@ function CoworkingLink({
           ? "You're in"
           : status === "pending"
             ? "Asked"
-            : "Full"}
+            : coworking
+              ? "Full"
+              : "Not on the list"}
       </Link>
     );
   }
   return (
-    <CoworkingJoinLink
+    <EventJoinLink
       event={event}
       className={`${pill} border-slate-300 hover:bg-slate-50`}
     />

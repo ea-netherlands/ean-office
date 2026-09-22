@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { Nav } from "@/components/nav";
 import { Page, H1, Sub } from "@/components/ui";
 import { CommunityProfileCard } from "@/components/community-profile-card";
+import { avatarUrl } from "@/lib/avatars";
 import { WelcomeForm } from "./welcome-form";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +54,8 @@ export default async function WelcomePage() {
         <div className="mt-4">
           <CommunityProfileCard
             defaultOpen
+            name={user.name}
+            avatarUrl={avatarUrl(user.id, user.avatarUpdatedAt)}
             community={{
               profileVisible: user.profileVisible,
               bio: user.bio ?? user.about,

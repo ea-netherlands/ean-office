@@ -113,8 +113,12 @@ ${because}
     }
   }
 
-  // Evening events collect RSVPs rather than a guest list.
+  // Evening events used to collect one-tap RSVPs from logged-in members
+  // rather than sign-ups; those rows are still out there on events booked
+  // before the shareable link existed. Anyone already told via the guest
+  // list above is skipped — one cancellation email per person.
   if (!coworking) {
+    const told = new Set(guests.map((g) => g.u.id));
     const rsvps = await db
       .select({ u: users })
       .from(eventAttendance)
@@ -123,7 +127,7 @@ ${because}
         and(eq(eventAttendance.eventId, eventId), eq(eventAttendance.source, "rsvp"))
       );
     for (const { u } of rsvps) {
-      if (u.id === event.createdBy) continue;
+      if (u.id === event.createdBy || told.has(u.id)) continue;
       await sendEmail({
         to: u.email,
         subject: `Cancelled: ${event.title} on ${when}`,

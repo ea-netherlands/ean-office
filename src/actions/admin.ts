@@ -22,7 +22,8 @@ import { clearAllNoShows } from "@/lib/noshow";
 import { buildIcs } from "@/lib/ics";
 import { bookDay, coworkingDayOn } from "@/lib/booking";
 import { validateEventHours } from "@/lib/event-hours";
-import { coworkingJoin, isCoworkingDay, validateCoworkingDay } from "@/lib/coworking";
+import { isCoworkingDay, validateCoworkingDay } from "@/lib/coworking";
+import { eventJoin } from "@/lib/event-join";
 import {
   absorbExistingBookings,
   clearDayForCoworking,
@@ -561,7 +562,7 @@ export async function decideEventAction(
   if (event.createdBy) {
     const [proposer] = await db.select().from(users).where(eq(users.id, event.createdBy));
     if (proposer) {
-      const join = coworkingJoin(event, appUrl());
+      const join = eventJoin(event, appUrl());
       const spots = coworking ? await coworkingSpots(event.date) : null;
       await sendEmail({
         to: proposer.email,
@@ -591,6 +592,12 @@ ${cleared > 0 ? `<p>${cleared === 1 ? "One booking that day was" : `${cleared} b
 <p>Thanks for organising it!</p>`
               : `<p>Hi ${proposer.name},</p>
 <p>Your event <strong>${event.title}</strong> on ${formatDayLong(event.date)} is confirmed — it's on the office calendar now.</p>
+${
+  join.external
+    ? `<p>Sign-ups stay on ${link(join.href, "your Luma page")} — we won't run a second list here.</p>`
+    : `<p><strong>Share this link</strong> with anyone you'd like there. They don't need an account, and signing up is one form:<br>${link(join.href, join.href)}</p>
+<p>Everyone who signs up lands on ${link(`${appUrl()}/events/${event.id}/guests`, "your list")}, and you get an email each time. Nothing to approve — an evening event has no desks to ration — but you can take someone off the list from there if plans change.</p>`
+}
 <p>Before the day, run through the ${link("https://tinyurl.com/checklist-office-events", "event checklist")}. Two things people forget: the alarm is active from 22:00, and the connecting doors close at 18:00.</p>
 <p>Thanks for organising it!</p>`
             : `<p>Hi ${proposer.name},</p>
@@ -653,7 +660,7 @@ export async function askEventQuestionAction(
 
 /**
  * Attach (or remove) a co-working day's Luma page. Setting it moves sign-ups
- * to Luma — see coworkingJoin — which is how a day proposed here gets joined
+ * to Luma — see eventJoin — which is how a day proposed here gets joined
  * up with the Luma page its organiser made afterwards.
  */
 export async function setEventUrlAction(
