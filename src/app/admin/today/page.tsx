@@ -4,6 +4,7 @@ import { Page, H1, Sub, Card, Badge, Avatar } from "@/components/ui";
 import { todayAms, formatDayLong, formatInstant } from "@/lib/dates";
 import { asSlot, halves, SLOT_LABEL } from "@/lib/slots";
 import { getSettings } from "@/lib/settings";
+import { avatarUrl } from "@/lib/avatars";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +68,10 @@ export default async function AdminTodayPage() {
               const ci = checkinByUser.get(r.b.userId);
               return (
                 <li key={r.b.id} className="py-2.5 flex items-center gap-3">
-                  <Avatar name={r.u.name} />
+                  <Avatar
+                    name={r.u.name}
+                    src={avatarUrl(r.u.id, r.u.avatarUpdatedAt)}
+                  />
                   <div className="flex-1">
                     <p className="text-sm font-medium">
                       {r.u.name}{" "}

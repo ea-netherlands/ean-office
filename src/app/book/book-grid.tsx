@@ -499,7 +499,7 @@ function DayCell({
           {!closedForEvent && d.people.length > 0 && (
             <span className="flex -space-x-1 mt-auto max-w-full">
               {d.people.slice(0, 2).map((p) => (
-                <Avatar key={p.id} name={p.name} small />
+                <Avatar key={p.id} name={p.name} size="xs" />
               ))}
               {d.people.length > 2 && (
                 <span className="text-[9px] self-center pl-1">

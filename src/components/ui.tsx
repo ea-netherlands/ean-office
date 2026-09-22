@@ -130,16 +130,24 @@ export function Avatar({
   src,
 }: {
   name: string;
-  /** Back-compat for the inline chip size; prefer `size`. */
+  /** Back-compat alias for `size="xs"`. */
   small?: boolean;
-  size?: "sm" | "md" | "lg";
+  /**
+   * `xs` is for dense grids where a face can't help anyway (two initials in a
+   * calendar cell, ~51px of room on a phone). Everywhere a photo is meant to
+   * be *recognised*, use `sm` or larger — a 20px circle of someone's head is
+   * a coloured dot, which is what a name badge already was.
+   */
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
   src?: string | null;
 }) {
-  const resolved = size ?? (small ? "sm" : "md");
+  const resolved = size ?? (small ? "xs" : "md");
   const box = {
-    sm: "w-5 h-5 text-[9px]",
-    md: "w-8 h-8 text-xs",
-    lg: "w-14 h-14 text-base",
+    xs: "w-5 h-5 text-[9px]",
+    sm: "w-7 h-7 text-[10px]",
+    md: "w-10 h-10 text-sm",
+    lg: "w-20 h-20 text-lg",
+    xl: "w-24 h-24 text-2xl",
   }[resolved];
   const initials = name
     .split(/\s+/)

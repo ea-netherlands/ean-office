@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { saveAvatarAction, removeAvatarAction } from "@/actions/avatar";
 import { Avatar, Icon, Notice, btnSecondary } from "@/components/ui";
 
-const MAX_PX = 256;
+// Rendered at up to 96px, and phones are 3x — 256px was sized for the 32px
+// circles this started out as and goes soft the moment a face is worth
+// looking at. 384px JPEG at q0.82 is still only ~40KB.
+const MAX_PX = 384;
 const MAX_INPUT_BYTES = 12 * 1024 * 1024;
 
 /**
@@ -14,9 +17,10 @@ const MAX_INPUT_BYTES = 12 * 1024 * 1024;
  * Cropping and shrinking happen in the browser: a phone photo is 4MB and
  * 4000px wide, and neither a server action's body limit nor a free-tier
  * Postgres wants that. The canvas centre-crops to a square and exports a
- * 256px JPEG at quality 0.82 — about 20KB, which is plenty for a 32px chip
- * and a 64px profile card, and small enough to keep in the database next to
- * everything else rather than standing up a file store for one feature.
+ * 384px JPEG at quality 0.82 — about 40KB, enough to stay sharp at the 96px
+ * it's shown at on a 3x phone screen, and small enough to keep in the
+ * database next to everything else rather than standing up a file store for
+ * one feature.
  */
 export function AvatarUpload({
   name,
@@ -90,7 +94,7 @@ export function AvatarUpload({
   return (
     <div className={className}>
       <div className="flex items-center gap-3">
-        <Avatar name={name} src={preview} size="lg" />
+        <Avatar name={name} src={preview} size="xl" />
         <div className="flex flex-wrap gap-1.5">
           <button
             type="button"
