@@ -10,6 +10,7 @@ import { appUrl, getCurrentUser, isAdmin } from "@/lib/auth";
 import { formatDayLong, todayAms } from "@/lib/dates";
 import { cancelBooking } from "@/lib/booking";
 import { isCoworkingDay } from "@/lib/coworking";
+import { acceptsSignups } from "@/lib/event-join";
 import { getSettings } from "@/lib/settings";
 import { leaveEvent, leaveEventUrl, SELF_WITHDRAWN } from "@/lib/leave-event";
 import {
@@ -56,6 +57,9 @@ export async function requestEventGuestAction(
     return fail("This one isn't open for sign-ups.");
   }
   if (event.date < todayAms()) return fail("This one's already happened.");
+  // The real gate. The page hides the form, but a stale tab or a forwarded
+  // link can still post, and a private session must refuse the write.
+  if (!acceptsSignups(event)) return fail("This one isn't open for sign-ups.");
   const coworking = isCoworkingDay(event.type);
 
   const name = String(formData.get("name") || "").trim();
@@ -225,6 +229,23 @@ export async function leaveEventAction(
   revalidatePath(`/events/${eventId}/guests`);
   revalidatePath("/me");
   revalidatePath("/book");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** The organiser's own copy of the admin switch. */
+export async function setMyEventSignupsAction(
+  eventId: string,
+  open: boolean
+): Promise<{ ok?: boolean; error?: string }> {
+  try {
+    await requireOrganiserOrAdmin(eventId);
+  } catch {
+    return { error: "Only an admin or the organiser can change this." };
+  }
+  await db.update(events).set({ signupsOpen: open }).where(eq(events.id, eventId));
+  revalidatePath(`/events/${eventId}/guests`);
+  revalidatePath(`/events/${eventId}/rsvp`);
   revalidatePath("/");
   return { ok: true };
 }

@@ -9,6 +9,7 @@ import { formatDayLong, todayAms } from "@/lib/dates";
 import { describeSeat } from "@/lib/booking";
 import { coworkingSpots } from "@/lib/coworking-guests";
 import { isCoworkingDay } from "@/lib/coworking";
+import { acceptsSignups } from "@/lib/event-join";
 import { SELF_WITHDRAWN } from "@/lib/leave-event";
 import { getSettings } from "@/lib/settings";
 import { RsvpForm } from "./rsvp-form";
@@ -68,6 +69,22 @@ export default async function EventRsvpPage({
       <Card className="text-center py-8">
         <Icon name="calendar-off" className="text-4xl text-slate-400 mb-2" />
         <p className="text-slate-500">This one&apos;s already happened.</p>
+      </Card>
+    );
+  } else if (!acceptsSignups(event)) {
+    // Hiding the link isn't enough — the URL is guessable and gets forwarded.
+    body = (
+      <Card className="text-center py-8">
+        <Icon name="lock" className="text-4xl text-slate-400 mb-2" />
+        <p className="text-slate-600">This one isn&apos;t open for sign-ups.</p>
+        <p className="text-sm text-slate-500 mt-2">
+          Invited? The organiser will have told you how to come. The office is
+          open as usual that day, so you can{" "}
+          <Link href="/book" className="text-teal-700 underline">
+            book a desk
+          </Link>{" "}
+          if you&apos;re a member.
+        </p>
       </Card>
     );
   } else {

@@ -23,7 +23,7 @@ import { buildIcs } from "@/lib/ics";
 import { bookDay, coworkingDayOn } from "@/lib/booking";
 import { validateEventHours } from "@/lib/event-hours";
 import { isCoworkingDay, validateCoworkingDay } from "@/lib/coworking";
-import { eventJoin } from "@/lib/event-join";
+import { acceptsSignups, eventJoin } from "@/lib/event-join";
 import {
   absorbExistingBookings,
   clearDayForCoworking,
@@ -595,8 +595,10 @@ ${cleared > 0 ? `<p>${cleared === 1 ? "One booking that day was" : `${cleared} b
 ${
   join.external
     ? `<p>Sign-ups stay on ${link(join.href, "your Luma page")} — we won't run a second list here.</p>`
-    : `<p><strong>Share this link</strong> with anyone you'd like there. They don't need an account, and signing up is one form:<br>${link(join.href, join.href)}</p>
+    : acceptsSignups(event)
+      ? `<p><strong>Share this link</strong> with anyone you'd like there. They don't need an account, and signing up is one form:<br>${link(join.href, join.href)}</p>
 <p>Everyone who signs up lands on ${link(`${appUrl()}/events/${event.id}/guests`, "your list")}, and you get an email each time. Nothing to approve — an evening event has no desks to ration — but you can take someone off the list from there if plans change.</p>`
+      : `<p>This one is closed to sign-ups, so nobody can add themselves — right for an invite-only session. If you'd like a link people can use, open sign-ups on ${link(`${appUrl()}/events/${event.id}/guests`, "your event page")}.</p>`
 }
 <p>Before the day, run through the ${link("https://tinyurl.com/checklist-office-events", "event checklist")}. Two things people forget: the alarm is active from 22:00, and the connecting doors close at 18:00.</p>
 <p>Thanks for organising it!</p>`
@@ -677,6 +679,28 @@ export async function setEventUrlAction(
     .set({ url: trimmed || null })
     .where(eq(events.id, eventId));
   revalidatePath("/admin/events");
+  return { ok: true };
+}
+
+/**
+ * Open or close an evening event to sign-ups. Off for everything that was on
+ * the calendar when this arrived, on for anything created since — so the
+ * private intro-course sessions stayed private and a new reading group works
+ * without anyone remembering a switch.
+ */
+export async function setEventSignupsAction(
+  eventId: string,
+  open: boolean
+): Promise<AdminActionState> {
+  await requireAdmin();
+  await db
+    .update(events)
+    .set({ signupsOpen: open })
+    .where(eq(events.id, eventId));
+  revalidatePath("/admin/events");
+  revalidatePath(`/events/${eventId}/rsvp`);
+  revalidatePath(`/events/${eventId}/guests`);
+  revalidatePath("/");
   return { ok: true };
 }
 

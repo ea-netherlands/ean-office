@@ -428,6 +428,19 @@ export const events = pgTable("events", {
    * apart from ordinary cancellations otherwise.
    */
   displacedUserIds: text("displaced_user_ids").array(),
+  /**
+   * Whether anyone with the link may put their name down (evening events
+   * only — a co-working day is always open to requests, which its organiser
+   * then decides on).
+   *
+   * New events default to open, because most of what happens here is a
+   * reading group or a social that wants people. Everything that already
+   * existed when this column arrived defaults to closed: the calendar held
+   * private intro-course sessions at the time, and silently putting a public
+   * sign-up button on somebody's invite-only course is not a migration's
+   * decision to make.
+   */
+  signupsOpen: boolean("signups_open").notNull().default(true),
   proposalNote: text("proposal_note"),
   questionAskedAt: timestamp("question_asked_at", { withTimezone: true }),
   externalId: text("external_id").unique(), // Luma UID for sync upserts

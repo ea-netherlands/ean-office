@@ -102,7 +102,11 @@ export default async function EventGuestsPage({
           spots={spots}
           shareUrl={eventJoin(event, appUrl()).href}
           viaLuma={!!event.url}
-          open={event.status === "confirmed" && event.date >= todayAms()}
+          open={
+            event.status === "confirmed" &&
+            event.date >= todayAms() &&
+            (coworking || event.signupsOpen)
+          }
           event={{
             id: event.id,
             title: event.title,
@@ -110,6 +114,7 @@ export default async function EventGuestsPage({
             coworking,
             cancellable: event.status === "confirmed" && event.date >= todayAms(),
             cancelledReason: event.status === "cancelled" ? event.cancelReason : null,
+            signupsOpen: event.signupsOpen,
           }}
         />
       </Page>

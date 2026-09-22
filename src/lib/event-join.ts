@@ -23,8 +23,29 @@ export type JoinableEvent = {
   id: string;
   url?: string | null;
   type?: string | null;
+  /** Evening events only — see `acceptsSignups`. */
+  signupsOpen?: boolean | null;
 };
 
+/**
+ * Whether this thing is taking names at all.
+ *
+ * A co-working day always is: asking to join one has been how they work from
+ * the start, and the organiser decides each request anyway. An evening event
+ * takes names only when someone has said it should — the office runs private
+ * sessions (the intro course) alongside the open reading groups and socials,
+ * and those two must not look the same to a member scrolling the calendar.
+ */
+export function acceptsSignups(event: JoinableEvent): boolean {
+  return isCoworkingDay(event.type) ? true : event.signupsOpen !== false;
+}
+
+/**
+ * Where someone would go to join this. Always answers — the page exists
+ * either way, and it is the page (and the action behind it) that turns
+ * people away when sign-ups are shut. Callers deciding whether to *show* a
+ * link ask `acceptsSignups` first; `EventJoinLink` does that for you.
+ */
 export function eventJoin(
   event: JoinableEvent,
   /** Makes it absolute, for emails. Leave off in the UI. */

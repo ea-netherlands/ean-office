@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { decideGuestAction } from "@/actions/event-guest";
+import { decideGuestAction, setMyEventSignupsAction } from "@/actions/event-guest";
 import { CancelEventButton } from "@/components/cancel-event-button";
 import { Badge, Card, Icon, Notice, btnPrimary, btnSecondary } from "@/components/ui";
 
@@ -25,6 +25,8 @@ export type GuestsEvent = {
   coworking: boolean;
   cancellable: boolean;
   cancelledReason: string | null;
+  /** Evening events only — whether anyone with the link can put their name down. */
+  signupsOpen: boolean;
 };
 
 export function GuestsClient({
@@ -89,16 +91,19 @@ export function GuestsClient({
             </div>
           </>
         ) : (
-          <div className="flex items-baseline justify-between gap-3 flex-wrap">
-            <h2>
-              {live} {live === 1 ? "person" : "people"} signed up
-            </h2>
-            <span className="text-sm text-slate-500">
-              {open
-                ? "Sign-ups are open — anyone with the link can put their name down"
-                : "Sign-ups are closed"}
-            </span>
-          </div>
+          <>
+            <div className="flex items-baseline justify-between gap-3 flex-wrap">
+              <h2>
+                {live} {live === 1 ? "person" : "people"} signed up
+              </h2>
+              <span className="text-sm text-slate-500">
+                {event.signupsOpen
+                  ? "Anyone with the link can put their name down"
+                  : "Nobody can sign themselves up"}
+              </span>
+            </div>
+            {!viaLuma && <SignupsToggle event={event} onNotice={setNotice} />}
+          </>
         )}
         {open && <ShareLink url={shareUrl} viaLuma={viaLuma} spots={spots} />}
       </Card>
@@ -186,6 +191,60 @@ export function GuestsClient({
               </>
             )}
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Open or close the door. Off by default for everything that predates the
+ * feature, because the calendar had invite-only intro-course sessions on it
+ * and a public sign-up button on one of those is a real mistake, not a
+ * cosmetic one.
+ */
+function SignupsToggle({
+  event,
+  onNotice,
+}: {
+  event: GuestsEvent;
+  onNotice: (s: string) => void;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const open = event.signupsOpen;
+
+  return (
+    <div className="rule-dashed-y pt-3 mt-1">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <p className="text-sm text-slate-600 max-w-md">
+          {open
+            ? "People can sign themselves up with the link below. Close it if this one is invite-only."
+            : "This one is closed: the link turns people away, and only you can say who's coming. Open it to let people sign themselves up."}
+        </p>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() =>
+            startTransition(async () => {
+              const res = await setMyEventSignupsAction(event.id, !open);
+              if (res.error) setError(res.error);
+              else {
+                onNotice(open ? "Sign-ups closed." : "Sign-ups open.");
+                router.refresh();
+              }
+            })
+          }
+          className={btnSecondary}
+        >
+          <Icon name={open ? "lock" : "lock-open"} />
+          {pending ? "One sec…" : open ? "Close sign-ups" : "Open sign-ups"}
+        </button>
+      </div>
+      {error && (
+        <Notice tone="error" className="mt-2">
+          {error}
+        </Notice>
       )}
     </div>
   );

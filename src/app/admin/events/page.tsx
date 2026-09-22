@@ -73,6 +73,7 @@ export default async function EventsPage() {
       location: e.location,
       url: e.url,
       status: e.status,
+      signupsOpen: e.signupsOpen,
       proposalNote: e.proposalNote,
       proposedBy: e.createdBy ? proposerNames.get(e.createdBy)?.name ?? null : null,
       proposedByEmail: e.createdBy ? proposerNames.get(e.createdBy)?.email ?? null : null,

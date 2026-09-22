@@ -56,6 +56,7 @@ export type EventRow = {
   bookedThatDay: number;
   guestsPending: number;
   guestsApproved: number;
+  signupsOpen: boolean;
 };
 
 const EVENT_TYPES = [
@@ -654,9 +655,17 @@ function EventItem({
           <a href={`/events/${e.id}/guests`} className="text-teal-700 underline">
             {e.guestsApproved + e.rsvps} signed up
           </a>
-          {e.url
-            ? " · sign-ups are on Luma"
-            : " · sign-ups are here, on the office site"}
+          {e.url ? (
+            " · sign-ups are on Luma"
+          ) : e.signupsOpen ? (
+            " · anyone with the link can sign up"
+          ) : (
+            <>
+              {" · "}
+              <Badge>invite only</Badge>{" "}
+              nobody can sign themselves up — open it from the event page
+            </>
+          )}
         </p>
       )}
       {coworking && !e.past && !cancelled && (

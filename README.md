@@ -60,7 +60,13 @@ delivered. Create real admins with `npm run admin:add -- "Name" email`.
   takes the whole office, so the organiser curates it; an evening event runs
   after hours with nothing to ration, so a sign-up lands approved and the
   organiser just gets a list at `/events/<id>/guests`. Luma wins wherever an
-  event has a Luma page. See `src/lib/event-join.ts`.
+  event has a Luma page. **Sign-ups are a switch per evening event**
+  (`events.signups_open`, flipped by the organiser or an admin): on for
+  anything created since the feature landed, off for everything that predates
+  it, because the calendar held invite-only intro-course sessions at the time
+  and a public sign-up button on one of those is a real mistake rather than a
+  cosmetic one. A closed event hides the link *and* refuses the write — a URL
+  gets forwarded. See `src/lib/event-join.ts`.
 - **Undoing a sign-up** — every sign-up email carries a one-tap "can't make
   it" link (`/leave/<token>`, signed and single-purpose like the booking
   cancel links), and logged-in people get the same thing on the event page.
