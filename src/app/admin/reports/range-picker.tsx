@@ -2,10 +2,20 @@
 
 import { useRouter } from "next/navigation";
 
-export function RangePicker({ from, to }: { from: string; to: string }) {
+export function RangePicker({
+  from,
+  to,
+  path = "/admin/reports",
+  extra = "",
+}: {
+  from: string;
+  to: string;
+  path?: string;
+  extra?: string; // other query params to keep, e.g. "basis=attended"
+}) {
   const router = useRouter();
   function set(f: string, t: string) {
-    router.push(`/admin/reports?from=${f}&to=${t}`);
+    router.push(`${path}?from=${f}&to=${t}${extra ? `&${extra}` : ""}`);
   }
   const today = new Date().toISOString().slice(0, 10);
   function monthsAgo(n: number): string {

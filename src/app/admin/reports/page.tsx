@@ -33,6 +33,9 @@ export default async function ReportsPage({
           </Sub>
         </div>
         <div className="flex gap-2 no-print">
+          <Link href={`/admin/reports/people?${q}`} className={btnSecondary}>
+            <Icon name="users" /> Per person
+          </Link>
           <a href={`/admin/reports/csv?${q}`} className={btnSecondary}>
             <Icon name="download" /> CSV
           </a>
