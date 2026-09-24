@@ -170,6 +170,26 @@ export default async function PeopleUsagePage({
           </div>
         )}
       </Card>
+
+      <Card className="mt-4">
+        <h2 className="mb-1">Raw data</h2>
+        <p className="text-sm text-slate-600 mb-3">
+          Every booking and check-in in this period, one row each, with the
+          person&apos;s profile alongside. The top of the file explains each
+          column, so you can give it straight to a spreadsheet or an AI tool
+          and ask your own questions. People appear as codes, not names, so
+          you aren&apos;t pasting member details into another service. Only
+          download the version with names if you need to know who is who.
+        </p>
+        <div className="flex gap-2 flex-wrap">
+          <a href={`/admin/reports/raw?from=${from}&to=${to}`} className={btnSecondary}>
+            <Icon name="download" /> Download raw data
+          </a>
+          <a href={`/admin/reports/raw?from=${from}&to=${to}&names=1`} className={btnSecondary}>
+            <Icon name="download" /> With names
+          </a>
+        </div>
+      </Card>
     </Page>
   );
 }

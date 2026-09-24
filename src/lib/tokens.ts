@@ -16,6 +16,15 @@ function sign(payload: string): string {
   return createHmac("sha256", secret()).update(payload).digest("base64url");
 }
 
+/**
+ * A stable stand-in for a person in exports that leave the app (e.g. pasted
+ * into an LLM). The same person gets the same code in every export, but it
+ * can't be turned back into a name without the app's secret.
+ */
+export function personRef(userId: string): string {
+  return `P-${createHmac("sha256", secret()).update(`person:${userId}`).digest("hex").slice(0, 8)}`;
+}
+
 export type TokenPurpose =
   | "cancel"
   | "retro"
