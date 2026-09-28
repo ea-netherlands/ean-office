@@ -34,21 +34,64 @@ export default async function ReportsPage({
         </div>
         <div className="flex gap-2 no-print">
           <Link href={`/admin/reports/people?${q}`} className={btnSecondary}>
-            <Icon name="users" /> Per person
+            <Icon name="users" /> Visits per person
           </Link>
-          <a href={`/admin/reports/csv?${q}`} className={btnSecondary}>
-            <Icon name="download" /> Daily CSV
-          </a>
-          <a href={`/admin/reports/profile/csv?${q}`} className={btnSecondary}>
-            <Icon name="download" /> Profile CSV
-          </a>
           <Link href={`/admin/reports/print?${q}`} className={btnSecondary}>
-            <Icon name="printer" /> One-page report
+            <Icon name="printer" /> Printable summary
           </Link>
         </div>
       </div>
 
       <RangePicker from={from} to={to} />
+
+      {/* Downloads — both files cover the range picked above */}
+      <Card className="mb-4 no-print">
+        <h2 className="mb-1">Download the data</h2>
+        <p className="text-sm text-slate-600 mb-4">
+          Both files cover the dates picked above and open in any spreadsheet.
+          The top of each file explains what&apos;s in it.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="border border-dashed border-slate-300 rounded-xl p-4 flex flex-col">
+            <h3 className="font-medium mb-1">Funder report</h3>
+            <p className="text-sm text-slate-600 mb-3 flex-1">
+              Totals only, ready for a funding application. Who used the office
+              (EA funding, which funders, cause area, role, experience, gender),
+              then how busy it was each day. No one is named, so you can share
+              it as it is.
+            </p>
+            <div>
+              <a href={`/admin/reports/csv?${q}`} className={btnSecondary}>
+                <Icon name="download" /> Download funder report
+              </a>
+            </div>
+          </div>
+          <form
+            action="/admin/reports/raw"
+            method="get"
+            className="border border-dashed border-slate-300 rounded-xl p-4 flex flex-col"
+          >
+            <input type="hidden" name="from" value={from} />
+            <input type="hidden" name="to" value={to} />
+            <h3 className="font-medium mb-1">All bookings</h3>
+            <p className="text-sm text-slate-600 mb-3 flex-1">
+              Every booking and check-in, one row each, with that person&apos;s
+              profile answers. For questions the report doesn&apos;t answer: give
+              it to a spreadsheet or an AI tool. People appear as codes unless
+              you include names. Don&apos;t share this one outside EAN.
+            </p>
+            <label className="flex items-center gap-2 text-sm text-slate-600 mb-3">
+              <input type="checkbox" name="names" value="1" />
+              Include names
+            </label>
+            <div>
+              <button type="submit" className={btnSecondary}>
+                <Icon name="download" /> Download all bookings
+              </button>
+            </div>
+          </form>
+        </div>
+      </Card>
 
       {/* Data quality panel — always visible, never hidden */}
       <Card className="mb-4 border-teal-300 bg-teal-50/50">

@@ -27,7 +27,6 @@ export default async function PeopleUsagePage({
   const to = /^\d{4}-\d{2}-\d{2}$/.test(sp.to || "") ? sp.to! : today;
   const basis = parseBasis(sp.basis);
   const r = await getUsage(from, to, basis);
-  const q = `from=${from}&to=${to}&basis=${basis}`;
 
   return (
     <Page wide>
@@ -43,9 +42,6 @@ export default async function PeopleUsagePage({
           <Link href={`/admin/reports?from=${from}&to=${to}`} className={btnSecondary}>
             <Icon name="arrow-left" /> Back to reports
           </Link>
-          <a href={`/admin/reports/people/csv?${q}`} className={btnSecondary}>
-            <Icon name="download" /> CSV
-          </a>
         </div>
       </div>
 
@@ -171,25 +167,6 @@ export default async function PeopleUsagePage({
         )}
       </Card>
 
-      <Card className="mt-4">
-        <h2 className="mb-1">Raw data</h2>
-        <p className="text-sm text-slate-600 mb-3">
-          Every booking and check-in in this period, one row each, with the
-          person&apos;s profile alongside. The top of the file explains each
-          column, so you can give it straight to a spreadsheet or an AI tool
-          and ask your own questions. People appear as codes, not names, so
-          you aren&apos;t pasting member details into another service. Only
-          download the version with names if you need to know who is who.
-        </p>
-        <div className="flex gap-2 flex-wrap">
-          <a href={`/admin/reports/raw?from=${from}&to=${to}`} className={btnSecondary}>
-            <Icon name="download" /> Download raw data
-          </a>
-          <a href={`/admin/reports/raw?from=${from}&to=${to}&names=1`} className={btnSecondary}>
-            <Icon name="download" /> With names
-          </a>
-        </div>
-      </Card>
     </Page>
   );
 }
