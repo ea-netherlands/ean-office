@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
       u?.roleCategory ?? "",
       u?.experienceLevel ?? "",
       u?.eaFunding ?? "",
+      (u?.funders ?? []).join("; "),
     ];
   };
 
@@ -132,6 +133,7 @@ export async function GET(request: NextRequest) {
     "role_category",
     "experience_level",
     "ea_funding",
+    "funders",
     "record",
     "booking_status",
     "slot",
@@ -155,7 +157,7 @@ export async function GET(request: NextRequest) {
     "One row per booking. A check-in with no live booking that day gets its own row with record=checkin_only.",
     `person: a stable code for one person, the same in every export.${withNames ? " name: their name." : " Names are left out on purpose."}`,
     "member_status: pending, trial, active, inactive, declined, imported or event_guest, as of today. member_role: visitor, member or admin (admins are EAN staff).",
-    "member_since: the date they were admitted. cause_area, role_category, experience_level, ea_funding: from their self-reported profile, as of today, blank if never filled in. ea_funding: direct, employer, none or undisclosed.",
+    "member_since: the date they were admitted. cause_area, role_category, experience_level, ea_funding: from their self-reported profile, as of today, blank if never filled in. ea_funding: direct, employer, none or undisclosed. funders: which EA funders they named, separated by semicolons (only asked if ea_funding is direct or employer).",
     "booking_status: booked, cancelled or waitlisted. slot: day, am (morning) or pm (afternoon); two half-day rows on one date are one visit.",
     "seat_type: desk or flex. booking_source: self, block (part of a repeat series), walkin or admin. repeat_booking: 1 if it came from a repeating series.",
     "days_booked_ahead: days between making the booking and the date. days_cancelled_ahead: days between cancelling and the date (0 = same day).",

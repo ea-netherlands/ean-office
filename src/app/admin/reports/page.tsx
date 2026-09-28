@@ -37,7 +37,10 @@ export default async function ReportsPage({
             <Icon name="users" /> Per person
           </Link>
           <a href={`/admin/reports/csv?${q}`} className={btnSecondary}>
-            <Icon name="download" /> CSV
+            <Icon name="download" /> Daily CSV
+          </a>
+          <a href={`/admin/reports/profile/csv?${q}`} className={btnSecondary}>
+            <Icon name="download" /> Profile CSV
           </a>
           <Link href={`/admin/reports/print?${q}`} className={btnSecondary}>
             <Icon name="printer" /> One-page report
@@ -210,6 +213,11 @@ export default async function ReportsPage({
         <Breakdown title="Cause area" rows={r.causeAreas} />
         <Breakdown title="Experience (target ~⅓ each across levels)" rows={r.experience} />
         <Breakdown title="EA funding" rows={r.funding} />
+        <Breakdown
+          title="Which EA funders (people can name several, so these overlap)"
+          rows={r.funders}
+        />
+        <Breakdown title="Role" rows={r.roleCategories} />
         <Breakdown title="Gender (target ~40% F)" rows={r.gender} />
       </Card>
 

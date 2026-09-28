@@ -54,6 +54,10 @@ export type Report = {
   // demographics (people vs desk-days)
   causeAreas: DemographicRow[];
   funding: DemographicRow[];
+  // Which EA funders, among the EA-funded. People can name several, so rows
+  // overlap and don't sum to 100%; percentages are of all attendees.
+  funders: DemographicRow[];
+  roleCategories: DemographicRow[];
   experience: DemographicRow[];
   gender: DemographicRow[];
   pctXRisk: { people: number; deskDays: number };
@@ -229,6 +233,32 @@ export async function getReport(from: string, to: string): Promise<Report> {
       .sort((a, b) => b.deskDays - a.deskDays);
   }
 
+  // Like breakdown, but for a multi-select answer: each person counts once
+  // under every label they picked, and people with no labels are left out.
+  function multiBreakdown(
+    field: (u: (typeof allUsers)[number]) => string[] | null
+  ): DemographicRow[] {
+    const acc = new Map<string, { people: number; deskDays: number }>();
+    for (const [userId, days] of attendeeDeskDays) {
+      const u = userById.get(userId);
+      for (const label of new Set((u && field(u)) || [])) {
+        const row = acc.get(label) ?? { people: 0, deskDays: 0 };
+        row.people++;
+        row.deskDays += days;
+        acc.set(label, row);
+      }
+    }
+    return [...acc.entries()]
+      .map(([label, v]) => ({
+        label,
+        people: v.people,
+        peoplePct: pct(v.people, totalPeople),
+        deskDays: v.deskDays,
+        deskDaysPct: pct(v.deskDays, totalDeskDays),
+      }))
+      .sort((a, b) => b.deskDays - a.deskDays);
+  }
+
   function share(match: (u: (typeof allUsers)[number]) => boolean) {
     let people = 0;
     let deskDays = 0;
@@ -299,6 +329,14 @@ export async function getReport(from: string, to: string): Promise<Report> {
               ? "Prefer not to say"
               : null
     ),
+    funders: multiBreakdown((u) =>
+      u.eaFunding === "direct" || u.eaFunding === "employer"
+        ? u.funders?.length
+          ? u.funders
+          : ["Funder not named"]
+        : null
+    ),
+    roleCategories: breakdown((u) => u.roleCategory),
     experience: breakdown((u) => u.experienceLevel),
     gender: breakdown((u) => genderReportLabel(u.gender)),
     pctXRisk: share((u) => u.causeArea === "Existential Risk Reduction"),
