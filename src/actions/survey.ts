@@ -4,7 +4,8 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { sendEmail, btn } from "@/lib/email";
-import { SURVEY, surveyLink, surveyRecipients } from "@/lib/survey";
+import { SURVEY, surveyLink, surveyOpen, surveyRecipients } from "@/lib/survey";
+import { todayAms } from "@/lib/dates";
 
 export async function dismissSurveyAction(): Promise<void> {
   const jar = await cookies();
@@ -36,16 +37,39 @@ function inviteHtml(name: string): string {
 <p>Thank you!<br>James</p>`;
 }
 
-const SUBJECT = `Help shape the office: ${SURVEY.minutes}-minute survey, open until ${SURVEY.closesLabel}`;
+function reminderHtml(name: string): string {
+  const first = name.split(" ")[0];
+  return `<p>Hi ${first},</p>
+<p>A quick reminder that the office survey closes on <strong>${SURVEY.closesLabel}</strong>. If you've already filled it in, thank you, and you can ignore this.</p>
+<p>If not, it takes about ${SURVEY.minutes} minutes, and you can answer anonymously if you prefer.</p>
+<p>${btn(surveyLink(true), "Take the survey")}</p>
+<p>Thanks!<br>James</p>`;
+}
 
-export async function sendSurveyTestAction(): Promise<SurveySendState> {
+const EMAILS = {
+  invite: {
+    subject: `Help shape the office: ${SURVEY.minutes}-minute survey, open until ${SURVEY.closesLabel}`,
+    kind: SURVEY.emailKind,
+    html: inviteHtml,
+  },
+  reminder: {
+    subject: `Reminder: the office survey closes ${SURVEY.closesLabel}`,
+    kind: SURVEY.reminderKind,
+    html: reminderHtml,
+  },
+} as const;
+type Which = keyof typeof EMAILS;
+
+export async function sendSurveyTestAction(which: Which): Promise<SurveySendState> {
   const admin = await getCurrentUser();
   if (!admin || admin.role !== "admin") return { error: "Admin only." };
+  const email = EMAILS[which];
+  if (!email) return { error: "Unknown email." };
   await sendEmail({
     to: admin.email,
-    subject: `[Test] ${SUBJECT}`,
+    subject: `[Test] ${email.subject}`,
     kind: "survey_2026_test",
-    html: inviteHtml(admin.name),
+    html: email.html(admin.name),
     from: SURVEY.from,
     replyTo: SURVEY.replyTo,
   });
@@ -53,23 +77,19 @@ export async function sendSurveyTestAction(): Promise<SurveySendState> {
   return { ok: true, note: `Test sent to ${admin.email}.` };
 }
 
-export async function sendSurveyBatchAction(
-  _prev: SurveySendState,
-  form: FormData
+async function sendBatch(
+  which: Which,
+  todo: { email: string; name: string }[]
 ): Promise<SurveySendState> {
-  const admin = await getCurrentUser();
-  if (!admin || admin.role !== "admin") return { error: "Admin only." };
-  const includeImported = form.get("includeImported") === "on";
-
-  const todo = (await surveyRecipients(includeImported)).filter((r) => !r.sent);
+  const email = EMAILS[which];
   const batch = todo.slice(0, BATCH);
   for (const [i, r] of batch.entries()) {
     if (i > 0) await new Promise((res) => setTimeout(res, GAP_MS));
     await sendEmail({
       to: r.email,
-      subject: SUBJECT,
-      kind: SURVEY.emailKind,
-      html: inviteHtml(r.name),
+      subject: email.subject,
+      kind: email.kind,
+      html: email.html(r.name),
       from: SURVEY.from,
       replyTo: SURVEY.replyTo,
     });
@@ -83,4 +103,25 @@ export async function sendSurveyBatchAction(
         ? `Sent ${batch.length}. ${left} still to go. Press send again to carry on.`
         : `Sent ${batch.length}. Everyone has been emailed.`,
   };
+}
+
+export async function sendSurveyBatchAction(
+  _prev: SurveySendState,
+  form: FormData
+): Promise<SurveySendState> {
+  const admin = await getCurrentUser();
+  if (!admin || admin.role !== "admin") return { error: "Admin only." };
+  const includeImported = form.get("includeImported") === "on";
+  const todo = (await surveyRecipients(includeImported)).filter((r) => !r.sent);
+  return sendBatch("invite", todo);
+}
+
+/** Everyone who got the invite and hasn't had the reminder yet. */
+export async function sendSurveyReminderAction(): Promise<SurveySendState> {
+  const admin = await getCurrentUser();
+  if (!admin || admin.role !== "admin") return { error: "Admin only." };
+  if (!surveyOpen(todayAms())) return { error: "The survey has closed." };
+  const todo = (await surveyRecipients(true)).filter((r) => r.sent && !r.reminded);
+  if (todo.length === 0) return { error: "Nobody to remind. Send the invite first." };
+  return sendBatch("reminder", todo);
 }

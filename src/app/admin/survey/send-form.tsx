@@ -1,7 +1,12 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import { sendSurveyBatchAction, sendSurveyTestAction, SurveySendState } from "@/actions/survey";
+import {
+  sendSurveyBatchAction,
+  sendSurveyReminderAction,
+  sendSurveyTestAction,
+  SurveySendState,
+} from "@/actions/survey";
 import { btnPrimary, btnSecondary, Notice, Spinner } from "@/components/ui";
 
 export function SurveySendForm({ importedCount }: { importedCount: number }) {
@@ -34,7 +39,7 @@ export function SurveySendForm({ importedCount }: { importedCount: number }) {
           type="button"
           className={btnSecondary}
           disabled={testing}
-          onClick={() => startTest(async () => setTest(await sendSurveyTestAction()))}
+          onClick={() => startTest(async () => setTest(await sendSurveyTestAction("invite")))}
         >
           {testing && <Spinner />}
           Send me a test
@@ -42,6 +47,42 @@ export function SurveySendForm({ importedCount }: { importedCount: number }) {
         <button type="submit" className={btnPrimary} disabled={sending}>
           {sending && <Spinner />}
           Send to members
+        </button>
+      </div>
+      {test.note && <Notice>{test.note}</Notice>}
+      {test.error && <Notice tone="error">{test.error}</Notice>}
+      {state.note && <Notice>{state.note}</Notice>}
+      {state.error && <Notice tone="error">{state.error}</Notice>}
+    </form>
+  );
+}
+
+export function SurveyReminderForm({ left }: { left: number }) {
+  const [state, send, sending] = useActionState<SurveySendState>(sendSurveyReminderAction, {});
+  const [test, setTest] = useState<SurveySendState>({});
+  const [testing, startTest] = useTransition();
+
+  return (
+    <form
+      action={send}
+      onSubmit={(e) => {
+        if (!confirm(`Send the reminder to ${left} ${left === 1 ? "person" : "people"}?`)) e.preventDefault();
+      }}
+      className="space-y-3"
+    >
+      <div className="flex gap-3 flex-wrap">
+        <button
+          type="button"
+          className={btnSecondary}
+          disabled={testing}
+          onClick={() => startTest(async () => setTest(await sendSurveyTestAction("reminder")))}
+        >
+          {testing && <Spinner />}
+          Send me a test
+        </button>
+        <button type="submit" className={btnPrimary} disabled={sending || left === 0}>
+          {sending && <Spinner />}
+          Send reminder
         </button>
       </div>
       {test.note && <Notice>{test.note}</Notice>}

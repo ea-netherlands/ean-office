@@ -1,7 +1,7 @@
 import { Page, H1, Sub, Card, Badge } from "@/components/ui";
 import { SURVEY, surveyOpen, surveyRecipients } from "@/lib/survey";
 import { todayAms } from "@/lib/dates";
-import { SurveySendForm } from "./send-form";
+import { SurveySendForm, SurveyReminderForm } from "./send-form";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +17,8 @@ export default async function SurveyAdminPage() {
   });
   const c = count(core);
   const i = count(imported);
+  const invited = everyone.filter((r) => r.sent);
+  const reminded = invited.filter((r) => r.reminded).length;
   const provider = !!process.env.RESEND_API_KEY;
 
   return (
@@ -50,6 +52,21 @@ export default async function SurveyAdminPage() {
         </ul>
         <div className="rule-dashed-y my-4" />
         <SurveySendForm importedCount={i.total - i.sent} />
+      </Card>
+
+      <Card className="mb-4">
+        <h2>Reminder</h2>
+        <p className="text-sm text-slate-600 mt-1">
+          A short nudge before the survey closes, to everyone who got the
+          invite. Answers are anonymous, so it can&apos;t skip people who
+          already replied. It thanks them and tells them to ignore it. Best
+          sent on Monday.
+        </p>
+        <p className="text-sm text-slate-700 mt-3">
+          <strong>{reminded}</strong> of {invited.length} reminded
+        </p>
+        <div className="rule-dashed-y my-4" />
+        <SurveyReminderForm left={invited.length - reminded} />
       </Card>
 
     </Page>

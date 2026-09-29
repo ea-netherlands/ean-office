@@ -15,6 +15,7 @@ export const SURVEY = {
   /** Set once someone opens or dismisses the card, so it stops asking. */
   cookie: "ean_survey_2026",
   emailKind: "survey_2026",
+  reminderKind: "survey_2026_reminder",
   /** Comes from a person, not the office, so it reads as a real ask. */
   from: "James Herbert <james@effectiefaltruisme.nl>",
   replyTo: "james@effectiefaltruisme.nl",
@@ -33,7 +34,19 @@ export function surveyLink(absolute = false): string {
   return absolute ? `${appUrl()}/survey` : "/survey";
 }
 
-/** Members who should get the invite, and whether each has had it yet. */
+async function emailedWith(kind: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ to: emailLog.toEmail })
+    .from(emailLog)
+    .where(eq(emailLog.kind, kind));
+  return new Set(rows.map((r) => r.to.toLowerCase()));
+}
+
+/**
+ * Members who should get the invite, and whether each has had it and the
+ * reminder yet. The reminder goes to everyone who got the invite: responses
+ * are anonymous, so there's no telling who has already answered.
+ */
 export async function surveyRecipients(includeImported: boolean) {
   const statuses = includeImported
     ? (["active", "trial", "imported"] as const)
@@ -42,13 +55,11 @@ export async function surveyRecipients(includeImported: boolean) {
     .select({ id: users.id, email: users.email, name: users.name, status: users.status })
     .from(users)
     .where(and(inArray(users.status, [...statuses]), inArray(users.role, ["member", "admin"])));
-  const sent = new Set(
-    (
-      await db
-        .select({ to: emailLog.toEmail })
-        .from(emailLog)
-        .where(eq(emailLog.kind, SURVEY.emailKind))
-    ).map((r) => r.to.toLowerCase())
-  );
-  return rows.map((r) => ({ ...r, sent: sent.has(r.email.toLowerCase()) }));
+  const sent = await emailedWith(SURVEY.emailKind);
+  const reminded = await emailedWith(SURVEY.reminderKind);
+  return rows.map((r) => ({
+    ...r,
+    sent: sent.has(r.email.toLowerCase()),
+    reminded: reminded.has(r.email.toLowerCase()),
+  }));
 }
