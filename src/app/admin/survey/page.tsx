@@ -52,12 +52,6 @@ export default async function SurveyAdminPage() {
         <SurveySendForm importedCount={i.total - i.sent} />
       </Card>
 
-      <p className="text-xs text-slate-500">
-        Each link carries the member&apos;s id as a <code>uid</code> hidden
-        field. Add a hidden field called <code>uid</code> to the Typeform and
-        each response will show who sent it, so you can remind only the people
-        who haven&apos;t answered.
-      </p>
     </Page>
   );
 }

@@ -25,17 +25,12 @@ export function surveyOpen(today: string): boolean {
 }
 
 /**
- * Typeform link carrying the member's id as the `uid` hidden field, so the
- * responses can be matched back to who hasn't answered yet. Typeform ignores
- * the hash if the form has no `uid` hidden field, so this is safe either way.
+ * Our own redirect, so opening the survey from anywhere hides the card. It
+ * deliberately carries nothing about who clicked: the survey promises people
+ * they can answer anonymously.
  */
-export function typeformUrl(userId?: string | null): string {
-  return userId ? `${SURVEY.url}#uid=${encodeURIComponent(userId)}` : SURVEY.url;
-}
-
-/** Our own redirect, so opening the survey from anywhere hides the card. */
-export function surveyLink(userId?: string): string {
-  return userId ? `${appUrl()}/survey?u=${encodeURIComponent(userId)}` : "/survey";
+export function surveyLink(absolute = false): string {
+  return absolute ? `${appUrl()}/survey` : "/survey";
 }
 
 /** Members who should get the invite, and whether each has had it yet. */

@@ -26,12 +26,12 @@ export type SurveySendState = { ok?: boolean; error?: string; note?: string };
 const BATCH = 40;
 const GAP_MS = 600;
 
-function inviteHtml(name: string, userId: string): string {
+function inviteHtml(name: string): string {
   const first = name.split(" ")[0];
   return `<p>Hi ${first},</p>
 <p>We're planning the office for next year and we'd love to hear from you. What works, what doesn't, and what would make the space more useful for your work?</p>
 <p>The survey takes about ${SURVEY.minutes} minutes. It's open until <strong>${SURVEY.closesLabel}</strong>.</p>
-<p>${btn(surveyLink(userId), "Take the survey")}</p>
+<p>${btn(surveyLink(true), "Take the survey")}</p>
 <p>Every answer gets read, and we'll share what we learned and what we're changing.</p>
 <p>Thank you!<br>James</p>`;
 }
@@ -45,7 +45,7 @@ export async function sendSurveyTestAction(): Promise<SurveySendState> {
     to: admin.email,
     subject: `[Test] ${SUBJECT}`,
     kind: "survey_2026_test",
-    html: inviteHtml(admin.name, admin.id),
+    html: inviteHtml(admin.name),
     from: SURVEY.from,
     replyTo: SURVEY.replyTo,
   });
@@ -69,7 +69,7 @@ export async function sendSurveyBatchAction(
       to: r.email,
       subject: SUBJECT,
       kind: SURVEY.emailKind,
-      html: inviteHtml(r.name, r.id),
+      html: inviteHtml(r.name),
       from: SURVEY.from,
       replyTo: SURVEY.replyTo,
     });
