@@ -6,6 +6,7 @@ import { todayAms, formatDayLong } from "@/lib/dates";
 import { capacityForDay, checkInUser } from "@/lib/booking";
 import { CheckinButtons, EventCheckinButtons } from "./checkin-buttons";
 import { btnPrimary, btnSecondary, Icon } from "@/components/ui";
+import { SurveyCard } from "@/components/survey-card";
 
 export const dynamic = "force-dynamic";
 
@@ -107,6 +108,8 @@ export default async function CheckinPage() {
           />
         </div>
       )}
+
+      <SurveyCard className="mt-8 w-full" />
 
       <p className="text-xs text-slate-400 mt-10">
         Checking in helps us show funders the office is being used. It&apos;s

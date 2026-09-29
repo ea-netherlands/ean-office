@@ -11,6 +11,7 @@ import { db, checkins, events, eventAttendance, eventGuests, ensureMigrated } fr
 import { and, eq, gte, lte, asc } from "drizzle-orm";
 import { addDays, formatDayLong, todayAms, formatDay } from "@/lib/dates";
 import { TodayActions } from "./today-actions";
+import { SurveyCard } from "@/components/survey-card";
 
 export const dynamic = "force-dynamic";
 
@@ -151,6 +152,8 @@ export default async function HomePage() {
             />
           )}
         </Card>
+
+        <SurveyCard className="mb-4" />
 
         {!cap.closed && (
           <Card className="mb-4">

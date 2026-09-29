@@ -16,6 +16,8 @@ export async function sendEmail(opts: {
   icsAttachment?: { filename: string; content: string };
   /** Send replies to a human rather than the shared office address. */
   replyTo?: string;
+  /** Send as a person rather than the office. Must be on a domain Resend has verified. */
+  from?: string;
 }): Promise<void> {
   await ensureMigrated();
   let delivered = false;
@@ -24,7 +26,7 @@ export async function sendEmail(opts: {
       const { Resend } = await import("resend");
       const resend = new Resend(process.env.RESEND_API_KEY);
       const result = await resend.emails.send({
-        from: FROM,
+        from: opts.from ?? FROM,
         to: opts.to,
         subject: opts.subject,
         html: wrap(opts.html),
