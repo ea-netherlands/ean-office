@@ -19,11 +19,18 @@ export async function dismissSurveyAction(): Promise<void> {
   revalidatePath("/checkin");
 }
 
-export type SurveySendState = { ok?: boolean; error?: string; note?: string };
+export type SurveySendState = {
+  ok?: boolean;
+  error?: string;
+  note?: string;
+  /** For a batch: how many went out this time, and how many are still waiting. */
+  sent?: number;
+  left?: number;
+};
 
 // Resend allows a couple of requests a second, and a server action shouldn't
-// run for minutes, so each press sends one batch. Pressing again carries on
-// where it stopped — anyone already emailed is skipped.
+// run for minutes, so each call sends one batch. The admin page keeps calling
+// until nobody is left — anyone already emailed is skipped.
 const BATCH = 40;
 const GAP_MS = 600;
 
@@ -95,23 +102,14 @@ async function sendBatch(
     });
   }
   revalidatePath("/admin/survey");
-  const left = todo.length - batch.length;
-  return {
-    ok: true,
-    note:
-      left > 0
-        ? `Sent ${batch.length}. ${left} still to go. Press send again to carry on.`
-        : `Sent ${batch.length}. Everyone has been emailed.`,
-  };
+  return { ok: true, sent: batch.length, left: todo.length - batch.length };
 }
 
 export async function sendSurveyBatchAction(
-  _prev: SurveySendState,
-  form: FormData
+  includeImported: boolean
 ): Promise<SurveySendState> {
   const admin = await getCurrentUser();
   if (!admin || admin.role !== "admin") return { error: "Admin only." };
-  const includeImported = form.get("includeImported") === "on";
   const todo = (await surveyRecipients(includeImported)).filter((r) => !r.sent);
   return sendBatch("invite", todo);
 }
@@ -122,6 +120,5 @@ export async function sendSurveyReminderAction(): Promise<SurveySendState> {
   if (!admin || admin.role !== "admin") return { error: "Admin only." };
   if (!surveyOpen(todayAms())) return { error: "The survey has closed." };
   const todo = (await surveyRecipients(true)).filter((r) => r.sent && !r.reminded);
-  if (todo.length === 0) return { error: "Nobody to remind. Send the invite first." };
   return sendBatch("reminder", todo);
 }

@@ -51,7 +51,7 @@ export default async function SurveyAdminPage() {
           </li>
         </ul>
         <div className="rule-dashed-y my-4" />
-        <SurveySendForm importedCount={i.total - i.sent} />
+        <SurveySendForm memberCount={c.total - c.sent} importedCount={i.total - i.sent} />
       </Card>
 
       <Card className="mb-4">
