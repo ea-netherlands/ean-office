@@ -149,8 +149,21 @@ export async function runNoShowLadder(): Promise<{
     }
 
     const events = await unclearedNoShows(userId, cfg.noshow_window_days);
-    const dates = events.slice(0, 3).map((e) => e.date);
-    await sendNoShowEmail(user.id, user.email, user.name, dates);
+    if (user.lastNoshowEmailAt) {
+      // They've had the "were you there?" email already, so asking it again
+      // reads as if nobody read their answer. Someone still booking week
+      // after week is almost always coming in and not scanning.
+      await sendRepeatNoShowEmail(
+        user.id,
+        user.email,
+        user.name,
+        events.map((e) => e.date),
+        cfg.noshow_window_days
+      );
+    } else {
+      const dates = events.slice(0, 3).map((e) => e.date);
+      await sendNoShowEmail(user.id, user.email, user.name, dates);
+    }
     await db
       .update(users)
       .set({ lastNoshowEmailAt: new Date() })
@@ -185,6 +198,46 @@ async function sendNoShowEmail(
 <p><strong>Were you actually there?</strong> Tap the days you came and we'll fix the record:</p>
 <p>${dayButtons}</p>
 <p><strong>Plans changed?</strong> Totally fine, and no need to explain. If you could cancel next time, it frees the desk for someone else — there's a cancel link in every booking email, and it takes one tap. With only eight desks it makes a real difference.</p>
+<p>Thanks,<br>The EA Netherlands team</p>
+<p style="font-size:13px;color:#888;">${link(optoutUrl, "Don't email me about check-ins again")}</p>`,
+  });
+}
+
+/** Second and later emails: same retro links, but about the scan, not the visit. */
+async function sendRepeatNoShowEmail(
+  userId: string,
+  email: string,
+  name: string,
+  dates: string[],
+  windowDays: number
+): Promise<void> {
+  const exp = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  // Enough buttons to clear a regular's backlog in one go, not so many the
+  // email turns into a calendar.
+  const shown = dates.slice(0, 10);
+  const dayButtons = shown
+    .map((d) =>
+      btn(`${appUrl()}/retro/${makeToken("retro", `${userId}:${d}`, exp)}`, formatDay(d))
+    )
+    .join(" ");
+  const more =
+    dates.length > shown.length
+      ? `<p style="font-size:13px;color:#888;">Plus ${dates.length - shown.length} earlier day${dates.length - shown.length === 1 ? "" : "s"} — mention them to any of us and we'll sort it.</p>`
+      : "";
+  const optoutUrl = `${appUrl()}/optout/${makeToken("optout", userId, exp)}`;
+  const weeks = Math.round(windowDays / 7);
+
+  await sendEmail({
+    to: email,
+    subject: "A quick one about checking in",
+    kind: "noshow_repeat",
+    html: `<p>Hi ${name},</p>
+<p>In the last ${weeks} weeks there are <strong>${dates.length} days</strong> with a desk booked in your name and no check-in. You keep booking, so our guess is you're here and the scan just isn't happening — which is easy to forget, and not a problem.</p>
+<p><strong>Were you in?</strong> Tap the days you came and we'll fix the record:</p>
+<p>${dayButtons}</p>
+${more}
+<p><strong>Why it matters:</strong> check-ins are how we show our funders the office gets used. A visit without one doesn't count, so the scan genuinely helps keep the desks funded. It's the QR code by the door — two taps once you're logged in. If something gets in the way (it logs you out, the code won't scan), tell us and we'll fix that instead of emailing you about it.</p>
+<p><strong>Not coming on a day?</strong> Cancel from the booking email or ${link(`${appUrl()}/me`, "your bookings")} so someone else can have the desk.</p>
 <p>Thanks,<br>The EA Netherlands team</p>
 <p style="font-size:13px;color:#888;">${link(optoutUrl, "Don't email me about check-ins again")}</p>`,
   });
