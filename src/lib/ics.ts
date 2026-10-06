@@ -11,6 +11,9 @@
  *
  *  - **Hosting duties** — one timed VEVENT with METHOD:REQUEST and an
  *    ATTENDEE, so it arrives as an invitation you accept.
+ *    If the visit is called off, the same UID goes out again with
+ *    METHOD:CANCEL and a higher SEQUENCE, which takes it out of the host's
+ *    calendar rather than leaving them to turn up for nobody.
  *  - **Your own desk bookings** — METHOD:PUBLISH, no attendee. Nobody invited
  *    you to your own booking, and a REQUEST for it makes mail clients ask you
  *    to RSVP to yourself. A block booking is many VEVENTs in one file (not an
@@ -66,6 +69,11 @@ export type IcsEvent = {
   /** Minutes before the start. Skipped on all-day entries, where a 30-minute
    *  trigger fires at half past eleven the night before. */
   alarmMinutesBefore?: number;
+  /** Bumped on every change to an invite that's already gone out — calendars
+   *  ignore an update that doesn't outrank what they hold. */
+  sequence?: number;
+  /** Marks the event STATUS:CANCELLED, for a METHOD:CANCEL file. */
+  cancelled?: boolean;
 };
 
 /** Back-compat alias — this used to be the only shape here. */
@@ -117,8 +125,8 @@ function vevent(e: IcsEvent, now: Date): string[] {
   }
   lines.push(
     `SUMMARY:${escapeText(e.title)}`,
-    "SEQUENCE:0",
-    "STATUS:CONFIRMED",
+    `SEQUENCE:${e.sequence ?? 0}`,
+    `STATUS:${e.cancelled ? "CANCELLED" : "CONFIRMED"}`,
     `ORGANIZER;CN=EA Netherlands Office:MAILTO:${e.organiserEmail}`
   );
   if (e.description) lines.push(`DESCRIPTION:${escapeText(e.description)}`);
@@ -129,7 +137,7 @@ function vevent(e: IcsEvent, now: Date): string[] {
       `ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:MAILTO:${email}`
     );
   }
-  if (!allDay && e.alarmMinutesBefore) {
+  if (!allDay && e.alarmMinutesBefore && !e.cancelled) {
     lines.push(
       "BEGIN:VALARM",
       `TRIGGER:-PT${e.alarmMinutesBefore}M`,
@@ -144,7 +152,7 @@ function vevent(e: IcsEvent, now: Date): string[] {
 
 export function buildIcsCalendar(
   events: IcsEvent[],
-  method: "REQUEST" | "PUBLISH" = "PUBLISH",
+  method: "REQUEST" | "PUBLISH" | "CANCEL" = "PUBLISH",
   calendarName?: string
 ): string {
   const now = new Date();
@@ -169,5 +177,13 @@ export function buildIcs(invite: IcsEvent): string {
   return buildIcsCalendar(
     [{ alarmMinutesBefore: 30, ...invite }],
     "REQUEST"
+  );
+}
+
+/** Withdraws an invitation sent by `buildIcs`. Same UID, higher sequence. */
+export function buildIcsCancel(invite: IcsEvent): string {
+  return buildIcsCalendar(
+    [{ ...invite, cancelled: true, sequence: Math.max(1, invite.sequence ?? 0) }],
+    "CANCEL"
   );
 }

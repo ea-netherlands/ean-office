@@ -20,6 +20,7 @@ import { formatDayLong, todayAms } from "@/lib/dates";
 import { getSettings, setSetting, Settings } from "@/lib/settings";
 import { clearAllNoShows } from "@/lib/noshow";
 import { buildIcs } from "@/lib/ics";
+import { welcomeIcsEvent } from "@/lib/visit-invite";
 import { bookDay, coworkingDayOn } from "@/lib/booking";
 import { validateEventHours } from "@/lib/event-hours";
 import { isCoworkingDay, validateCoworkingDay } from "@/lib/coworking";
@@ -100,37 +101,20 @@ export async function approveRequestAction(requestId: string): Promise<AdminActi
 
   // Calendar invite for the host, so welcoming someone is in their day rather
   // than only in the app. Sent to the admin who approved plus the visitor.
-  const invite = buildIcs({
-    uid: `visit-${req.id}@office.effectiefaltruisme.nl`,
-    title: `Welcome ${user.name} to the office`,
-    description: `${user.name}'s first visit. They arrive at ${req.requestedArrival}.\n\n${user.about ?? ""}\n\nProfile: ${user.profileUrl ?? "—"}\nWho's in that day: ${appUrl()}/book`,
-    location: cfg.office_address,
-    date: req.requestedDate,
-    startTime: req.requestedArrival,
-    durationMinutes: 60,
-    organiserEmail: adminEmailFrom(),
-    attendeeEmails: [admin.email],
-  });
+  const invite = buildIcs(welcomeIcsEvent(req, user, admin.email, cfg));
   await sendEmail({
     to: admin.email,
     subject: `Hosting ${user.name} — ${formatDayLong(req.requestedDate)} at ${req.requestedArrival}`,
     kind: "host_calendar_invite",
     html: `<p>You approved <strong>${user.name}</strong>'s first visit, so here's a calendar invite for the welcome.</p>
 <p><strong>${formatDayLong(req.requestedDate)} at ${req.requestedArrival}</strong> — accept the attached invite and it'll be in your calendar.</p>
-<p>${user.about ? `What they're working on: ${user.about}<br>` : ""}${user.profileUrl ? link(user.profileUrl, "Their profile") : ""}</p>
+<p>${user.about ? `What they're working on: ${user.about}<br>` : ""}Email: ${link(`mailto:${user.email}`, user.email)}${user.profileUrl ? `<br>${link(user.profileUrl, "Their profile")}` : ""}</p>
 <p>${link(`${appUrl()}/admin/today`, "Who else is in that day")}</p>`,
     icsAttachment: { filename: "office-visit.ics", content: invite },
   });
 
   revalidatePath("/admin/requests");
   return { ok: true };
-}
-
-/** Bare address for the iCalendar ORGANIZER field. */
-function adminEmailFrom(): string {
-  const from = process.env.EMAIL_FROM || "office@effectiefaltruisme.nl";
-  const match = from.match(/<([^>]+)>/);
-  return match ? match[1] : from;
 }
 
 /**

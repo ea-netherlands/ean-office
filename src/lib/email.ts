@@ -13,7 +13,7 @@ export async function sendEmail(opts: {
   html: string;
   kind: string;
   /** Optional calendar invite, shown by mail clients as an acceptable event. */
-  icsAttachment?: { filename: string; content: string };
+  icsAttachment?: { filename: string; content: string; method?: "REQUEST" | "CANCEL" };
   /** Send replies to a human rather than the shared office address. */
   replyTo?: string;
   /** Send as a person rather than the office. Must be on a domain Resend has verified. */
@@ -37,7 +37,7 @@ export async function sendEmail(opts: {
                 {
                   filename: opts.icsAttachment.filename,
                   content: Buffer.from(opts.icsAttachment.content).toString("base64"),
-                  contentType: "text/calendar; method=REQUEST; charset=utf-8",
+                  contentType: `text/calendar; method=${opts.icsAttachment.method ?? "REQUEST"}; charset=utf-8`,
                 },
               ],
             }
