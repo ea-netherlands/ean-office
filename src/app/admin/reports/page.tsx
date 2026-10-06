@@ -3,6 +3,7 @@ import { getReport, methodologyNote, Report } from "@/lib/reports";
 import { Page, H1, Sub, Card, Badge, btnSecondary, Icon } from "@/components/ui";
 import { addDays, todayAms } from "@/lib/dates";
 import { RangePicker } from "./range-picker";
+import { WeekdayChart } from "./weekday-chart";
 
 export const dynamic = "force-dynamic";
 
@@ -177,6 +178,17 @@ export default async function ReportsPage({
           expect the attended number to be lower, and say why. A defensible
           60% beats an unreproducible 75%.
         </p>
+      </Card>
+
+      {/* Usage by weekday */}
+      <Card className="mb-4">
+        <h2 className="mb-1">Busiest days of the week</h2>
+        <p className="text-sm text-slate-600 mb-4">
+          Average desk occupancy on each weekday over the dates picked above.
+          Desks only, like the figures above — the lunch table is in the
+          detail. Hover over a bar for more.
+        </p>
+        <WeekdayChart rows={r.byWeekday} />
       </Card>
 
       {/* Events */}

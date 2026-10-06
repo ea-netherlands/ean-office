@@ -1,7 +1,7 @@
 import { db, bookings, checkins, users, events, eventAttendance } from "@/db";
 import { and, eq, gte, lte, inArray } from "drizzle-orm";
 import { getSettings } from "./settings";
-import { addDays, isWorkingDay, todayAms } from "./dates";
+import { addDays, isoWeekday, isWorkingDay, todayAms } from "./dates";
 import { asSlot, slotWeight } from "./slots";
 import { genderReportLabel } from "./profile-options";
 
@@ -22,6 +22,17 @@ export type DemographicRow = {
   deskDaysPct: number;
 };
 
+// One row per weekday (Mon–Fri), averaged over the working days in the
+// period that fall on it. Same desk-only, half-day-weighted counting as the
+// headline occupancy, so the five bars average out to it.
+export type WeekdayRow = {
+  weekday: number; // 1=Mon … 5=Fri
+  days: number; // working days in the period on this weekday
+  occupancyBooked: number; // 0..1 of desks
+  occupancyAttended: number;
+  flexPerDay: number; // lunch-table spots used per day, overflow
+};
+
 export type Report = {
   from: string;
   to: string;
@@ -36,6 +47,7 @@ export type Report = {
   occupancyBooked: number; // 0..1, desks only
   occupancyAttended: number;
   flexDaysUsed: number; // overflow, reported separately
+  byWeekday: WeekdayRow[];
   walkIns: number;
   waitlistedDays: number;
   halfDayBookings: number; // count of morning/afternoon bookings
@@ -81,8 +93,13 @@ export async function getReport(from: string, to: string): Promise<Report> {
   const pastTo = to < today ? to : addDays(today, -1); // attendance facts only exist for past days
 
   let workingDays = 0;
+  const daysByWeekday = new Map<number, number>();
   for (let d = from; d <= pastTo; d = addDays(d, 1)) {
-    if (isWorkingDay(d)) workingDays++;
+    if (isWorkingDay(d)) {
+      workingDays++;
+      const wd = isoWeekday(d);
+      daysByWeekday.set(wd, (daysByWeekday.get(wd) ?? 0) + 1);
+    }
   }
   const months = Math.max(
     1 / 30,
@@ -127,6 +144,22 @@ export async function getReport(from: string, to: string): Promise<Report> {
   const halfDayBookings = booked.filter((b) => asSlot(b.slot) !== "day").length;
 
   const denom = workingDays * cfg.desk_count;
+
+  const byWeekday: WeekdayRow[] = [1, 2, 3, 4, 5].map((weekday) => {
+    const days = daysByWeekday.get(weekday) ?? 0;
+    const on = (rows: typeof booked) =>
+      rows.filter((b) => isoWeekday(b.date) === weekday);
+    return {
+      weekday,
+      days,
+      occupancyBooked: pct(deskDays(on(deskBooked)), days * cfg.desk_count),
+      occupancyAttended: pct(deskDays(on(deskAttended)), days * cfg.desk_count),
+      flexPerDay: pct(
+        deskDays(on(booked.filter((b) => b.seatType === "flex"))),
+        days
+      ),
+    };
+  });
   const uniqueVisitorIds = new Set(checkinRows.map((c) => c.userId));
 
   // unique visitors per calendar month, averaged
@@ -299,6 +332,7 @@ export async function getReport(from: string, to: string): Promise<Report> {
     occupancyBooked: pct(deskDays(deskBooked), denom),
     occupancyAttended: pct(deskDays(deskAttended), denom),
     flexDaysUsed: deskDays(booked.filter((b) => b.seatType === "flex")),
+    byWeekday,
     walkIns: booked.filter((b) => b.source === "walkin").length,
     waitlistedDays: new Set(
       bookingRows.filter((b) => b.status === "waitlisted").map((b) => b.date)
