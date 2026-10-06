@@ -25,6 +25,7 @@ import {
 import { makeToken } from "./tokens";
 import { appUrl } from "./auth";
 import { afterResponse } from "./after";
+import { notifyHostOfCancelledVisit } from "./visit-invite";
 import {
   Half,
   HALVES,
@@ -852,6 +853,8 @@ export async function cancelBooking(
   if (opts.promote !== false && booking.status === "booked") {
     await promoteWaitlist(booking.date);
   }
+  // A first visit's host has it in their calendar; tell them it's off.
+  await afterResponse(() => notifyHostOfCancelledVisit(booking));
   return { ok: true, booking: updated };
 }
 
