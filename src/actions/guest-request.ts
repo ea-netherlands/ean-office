@@ -15,6 +15,7 @@ export type GuestBookingState = EchoState & { ok?: boolean };
 const FIELDS = [
   "guestName",
   "guestEmail",
+  "guestEmailConfirm",
   "date",
   "endDate",
   "slot",
@@ -40,6 +41,18 @@ export async function requestGuestBookingAction(
 
   const visitType =
     String(formData.get("visitType")) === "first_visit" ? "first_visit" : "one_off";
+
+  // Typed twice: a mistyped address means the guest never gets the practical
+  // details once the request is approved.
+  const norm = (k: string) => String(formData.get(k) ?? "").trim().toLowerCase();
+  if (norm("guestEmailConfirm") !== norm("guestEmail")) {
+    return {
+      error: "The two email addresses don't match — check them both.",
+      field: "guestEmailConfirm",
+      values,
+      attempt,
+    };
+  }
 
   const res = await createGuestRequest(
     { id: user!.id, name: user!.name, email: user!.email },
