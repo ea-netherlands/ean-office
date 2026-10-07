@@ -23,7 +23,7 @@ import { EchoState, formValues } from "@/lib/form-values";
 
 export type GuestRequestState = EchoState & { ok?: boolean };
 
-const FIELDS = ["name", "email", "accessibilityNotes", "guidelines"] as const;
+const FIELDS = ["name", "email", "emailConfirm", "accessibilityNotes", "guidelines"] as const;
 
 /**
  * A newcomer (or anyone) putting their name down for something at the office.
@@ -69,6 +69,11 @@ export async function requestEventGuestAction(
 
   if (!name) return fail("Add your name.", "name");
   if (!email.includes("@")) return fail("Add a valid email address.", "email");
+  // Typed twice: a mistyped address means they never hear back.
+  const emailConfirm = String(formData.get("emailConfirm") || "").toLowerCase().trim();
+  if (emailConfirm !== email) {
+    return fail("The two email addresses don't match — check them both.", "emailConfirm");
+  }
   if (!guidelines) {
     return fail("Please read and accept the office guidelines.", "guidelines");
   }

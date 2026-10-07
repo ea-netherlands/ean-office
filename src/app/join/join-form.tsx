@@ -109,6 +109,18 @@ export function JoinForm({
           <FieldError state={state} field="email" />
         </div>
         <div>
+          <label className={labelCls}>Confirm email *</label>
+          <input
+            name="emailConfirm"
+            type="email"
+            required
+            defaultValue={str(v, "emailConfirm")}
+            className={bad("emailConfirm")}
+            autoComplete="email"
+          />
+          <FieldError state={state} field="emailConfirm" />
+        </div>
+        <div>
           <label className={labelCls}>Which best describes you? *</label>
           <select
             name="descriptor"

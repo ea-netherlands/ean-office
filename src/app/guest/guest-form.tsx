@@ -102,6 +102,18 @@ export function GuestForm({ away }: { away: Away | null }) {
           autoFocus={state.field === "guestEmail"}
           placeholder="them@example.org"
         />
+
+        <label className={`${labelCls} mt-4`} htmlFor="guestEmailConfirm">
+          Confirm their email
+        </label>
+        <input
+          id="guestEmailConfirm"
+          name="guestEmailConfirm"
+          type="email"
+          className={inputCls}
+          defaultValue={str(v, "guestEmailConfirm")}
+          autoFocus={state.field === "guestEmailConfirm"}
+        />
         <p className="text-sm text-slate-500 mt-1">
           Only used to send them the practical details if this is approved.
         </p>
