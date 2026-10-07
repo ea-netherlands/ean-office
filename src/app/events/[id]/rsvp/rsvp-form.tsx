@@ -72,6 +72,17 @@ export function RsvpForm({
           />
         </div>
         <div>
+          <label className={labelCls}>Confirm email *</label>
+          <input
+            name="emailConfirm"
+            type="email"
+            required
+            defaultValue={str(v, "emailConfirm") || defaultEmail}
+            className={inputCls}
+            autoComplete="email"
+          />
+        </div>
+        <div>
           <label className={labelCls}>Anything we should know?</label>
           <textarea
             name="accessibilityNotes"

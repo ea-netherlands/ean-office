@@ -20,6 +20,7 @@ export type JoinState = EchoState & { ok?: boolean };
 const FIELDS = [
   "name",
   "email",
+  "emailConfirm",
   "descriptor",
   "profileUrl",
   "about",
@@ -76,6 +77,12 @@ export async function submitJoinRequest(
 
   if (!name) return fail("Please add your name.", "name");
   if (!email.includes("@")) return fail("That email doesn't look right.", "email");
+  // Typed twice because a mistyped address fails silently: the request goes
+  // through, and the approval email goes nowhere.
+  const emailConfirm = String(formData.get("emailConfirm") || "").toLowerCase().trim();
+  if (emailConfirm !== email) {
+    return fail("The two email addresses don't match — check them both.", "emailConfirm");
+  }
   if (!descriptor) return fail("Please pick what best describes you.", "descriptor");
   if (!profileUrl) {
     return fail(
