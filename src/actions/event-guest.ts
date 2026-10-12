@@ -266,7 +266,9 @@ async function requireOrganiserOrAdmin(eventId: string) {
 
 export async function decideGuestAction(
   guestId: string,
-  decision: "approved" | "declined"
+  decision: "approved" | "declined",
+  /** Optional words from the organiser, put into the decline email as-is. */
+  message = ""
 ): Promise<GuestRequestState & { seat?: string; note?: string }> {
   const [guest] = await db.select().from(eventGuests).where(eq(eventGuests.id, guestId));
   if (!guest) return { error: "Not found." };
@@ -311,6 +313,13 @@ export async function decideGuestAction(
   const [guestUser] = await db.select().from(users).where(eq(users.id, guest.userId));
   if (guestUser) {
     const coworking = isCoworkingDay(event.type);
+    // A bare "we can't fit you in" reads as a verdict on the person; a line
+    // from the organiser saying why (asked for by one, after declining
+    // someone for a team-only day) makes it a sentence about the day.
+    const why = message.trim().slice(0, 500);
+    const because = why
+      ? `<p>${user.name} added:</p><blockquote>${why.replace(/</g, "&lt;").replace(/\n/g, "<br>")}</blockquote>`
+      : "";
     await sendEmail({
       to: guestUser.email,
       subject:
@@ -326,7 +335,7 @@ ${seat ? `<p>You've got <strong>${seat}</strong>. Scan the QR code by the door w
 <p>Can't make it after all? ${link(leaveEventUrl(guest.id, event.date), "Let us know in one tap")}${seat ? " — it hands your desk back for someone else that day" : ""}.</p>
 <p>${link(`${appUrl()}/info`, "Practical info about the office")} — where it is, wifi, lunch.</p>`
           : coworking
-            ? `<p>Hi ${guestUser.name},</p><p>Thanks for asking to join <strong>${event.title}</strong> — we can't fit you in this time. Hope to see you at a future one.</p>`
+            ? `<p>Hi ${guestUser.name},</p><p>Thanks for asking to join <strong>${event.title}</strong> — we can't fit you in this time.</p>${because}<p>Hope to see you at another event.</p>`
             : // Nobody was turned away here: an evening event doesn't ration
               // seats, so this is the organiser taking off someone who said
               // they can't come. Saying "we couldn't fit you in" would be a

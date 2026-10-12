@@ -4,7 +4,15 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { decideGuestAction, setMyEventSignupsAction } from "@/actions/event-guest";
 import { CancelEventButton } from "@/components/cancel-event-button";
-import { Badge, Card, Icon, Notice, btnPrimary, btnSecondary } from "@/components/ui";
+import {
+  Badge,
+  Card,
+  Icon,
+  Notice,
+  btnPrimary,
+  btnSecondary,
+  inputCls,
+} from "@/components/ui";
 
 export type GuestRow = {
   id: string;
@@ -323,14 +331,63 @@ function GuestCard({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  // Declining a request opens a box for a line to the person first — the
+  // email alone just says no, and an organiser often has a kind reason.
+  const [declining, setDeclining] = useState(false);
+  const [message, setMessage] = useState("");
 
-  const decide = (decision: "approved" | "declined") =>
+  const decide = (decision: "approved" | "declined", msg = "") =>
     startTransition(async () => {
-      const res = await decideGuestAction(guest.id, decision);
+      const res = await decideGuestAction(guest.id, decision, msg);
       setError(res.error ?? null);
       setNote(res.note ?? null);
+      if (!res.error) setDeclining(false);
       router.refresh();
     });
+
+  if (declining) {
+    const first = guest.name.split(" ")[0];
+    return (
+      <Card className="space-y-2">
+        <p className="text-sm text-slate-700">
+          Decline <strong>{guest.name}</strong>? They&apos;ll get an email
+          saying you can&apos;t fit them in this time.
+        </p>
+        <label className="block text-sm text-slate-600" htmlFor={`why-${guest.id}`}>
+          Add a note to {first} (optional)
+        </label>
+        <textarea
+          id={`why-${guest.id}`}
+          className={inputCls}
+          rows={3}
+          maxLength={500}
+          autoFocus
+          placeholder="e.g. This one is just for our own team — the next open co-working day is on the calendar."
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+        />
+        {error && <p className="text-sm text-red-700">{error}</p>}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => decide("declined", message)}
+            className={btnPrimary}
+          >
+            {pending ? "One sec…" : "Decline and send"}
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => setDeclining(false)}
+            className={btnSecondary}
+          >
+            Back
+          </button>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="flex items-start justify-between gap-3">
@@ -375,7 +432,7 @@ function GuestCard({
         <div className="flex gap-2 shrink-0">
           <button
             disabled={pending}
-            onClick={() => decide("declined")}
+            onClick={() => setDeclining(true)}
             className={btnSecondary}
           >
             Decline
