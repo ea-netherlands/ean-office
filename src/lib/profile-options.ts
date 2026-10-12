@@ -29,7 +29,7 @@ export const EXPERIENCE_LEVELS = [
 ] as const;
 
 export const FUNDERS = [
-  "Open Philanthropy",
+  "Coefficient Giving",
   "CEA",
   "EAIF",
   "LTFF",

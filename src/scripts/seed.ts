@@ -203,7 +203,7 @@ async function main() {
             eaFunding: funding,
             funders:
               funding === "direct" || funding === "employer"
-                ? [pick(["Open Philanthropy", "CEA", "EAIF", "LTFF", "SFF"])]
+                ? [pick(["Coefficient Giving", "CEA", "EAIF", "LTFF", "SFF"])]
                 : null,
             gender: female ? "F" : "M",
             profileUpdatedAt: new Date(Date.now() - Math.floor(rand() * 200) * 86400000),
