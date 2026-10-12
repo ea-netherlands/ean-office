@@ -120,6 +120,13 @@
       "when": 1790100000000,
       "tag": "0016_event_signups_open",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790200000000,
+      "tag": "0017_coefficient_giving",
+      "breakpoints": true
     }
   ]
 }
