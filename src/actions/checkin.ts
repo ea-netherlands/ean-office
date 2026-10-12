@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { checkInUser } from "@/lib/booking";
 import { newId } from "@/lib/ids";
 import { todayAms } from "@/lib/dates";
+import { answerMissedDays } from "@/lib/noshow";
 
 export type CheckinState = {
   ok?: boolean;
@@ -54,5 +55,16 @@ export async function eventCheckinAction(eventId: string): Promise<CheckinState>
   }
   await checkInUser(user.id, todayAms());
   revalidatePath("/checkin");
+  return { ok: true };
+}
+
+/** The missed check-ins card on /me: same answers as the email link, logged in. */
+export async function answerMissedAction(
+  attended: string[],
+  absent: string[]
+): Promise<{ ok?: boolean; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Not logged in." };
+  await answerMissedDays(user.id, attended, absent);
   return { ok: true };
 }

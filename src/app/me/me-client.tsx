@@ -9,6 +9,8 @@ import {
 } from "@/actions/booking";
 import { updatePrefsAction, ProfileState } from "@/actions/profile";
 import { logoutAction } from "@/actions/auth";
+import { answerMissedAction } from "@/actions/checkin";
+import { MissedDaysForm, MissedDay } from "@/components/missed-days-form";
 import { ProfileForm } from "@/components/profile-form";
 import { CommunityProfileCard } from "@/components/community-profile-card";
 import { Card, Badge, Icon, Notice, btnPrimary, btnSecondary, btnDanger, inputCls, labelCls } from "@/components/ui";
@@ -28,10 +30,12 @@ type BookingRow = {
 };
 
 export function MeClient({
+  missed,
   upcoming,
   windows,
   user,
 }: {
+  missed: MissedDay[];
   upcoming: BookingRow[];
   windows: { am: string; pm: string };
   user: {
@@ -67,6 +71,19 @@ export function MeClient({
 
   return (
     <div className="space-y-4">
+      {missed.length > 0 && (
+        <Card>
+          <h2 className="mb-1">Missed check-ins</h2>
+          <p className="text-sm text-slate-600 mb-3">
+            You had a desk booked on{" "}
+            {missed.length === 1 ? "this day" : "these days"}{" "}
+            but didn&apos;t check in. Tick the ones you were in and we&apos;ll
+            fix the record.
+          </p>
+          <MissedDaysForm days={missed} action={answerMissedAction} />
+        </Card>
+      )}
+
       <Card>
         <h2 className="mb-3">Upcoming</h2>
         {upcoming.length === 0 ? (

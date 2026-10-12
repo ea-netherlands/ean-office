@@ -28,6 +28,7 @@ export function personRef(userId: string): string {
 export type TokenPurpose =
   | "cancel"
   | "retro"
+  | "missed" // answer for every missed check-in at once (subject: userId)
   | "optout"
   | "cancel_series"
   | "release" // give up the afternoon of a full-day booking

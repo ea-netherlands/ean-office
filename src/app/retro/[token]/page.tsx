@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { verifyToken } from "@/lib/tokens";
 import { ensureMigrated } from "@/db";
 import { formatDayLong } from "@/lib/dates";
+import { missedPath } from "@/lib/noshow";
 import { TokenConfirm } from "@/components/token-confirm";
 import { retroByTokenAction } from "@/actions/tokens";
 
@@ -21,14 +23,20 @@ export default async function RetroPage({
       <Shell>
         <h1 className="text-xl">This link has expired</h1>
         <p className="text-slate-500 mt-2 text-sm">
-          If you were at the office that day, just mention it to any admin and
-          they&apos;ll fix the record.
+          If you were at the office that day, you can still say so from{" "}
+          <Link href="/me" className="text-teal-700 underline">
+            your bookings
+          </Link>
+          , or mention it to any of us and we&apos;ll fix the record.
         </p>
       </Shell>
     );
   }
 
-  const date = verified.subject.split(":")[1];
+  const [userId, date] = verified.subject.split(":");
+  // Emails sent before the one-page version link here a day at a time. Offer
+  // the rest from the same tap rather than another trip back to the inbox.
+  const allDays = missedPath(userId);
   return (
     <Shell>
       <h1 className="text-xl">Were you at the office?</h1>
@@ -43,6 +51,12 @@ export default async function RetroPage({
         doneTitle="Record fixed"
         doneText="You're marked as present. Thanks — this keeps our usage numbers honest."
       />
+      <Link
+        href={allDays}
+        className="text-sm text-teal-700 underline mt-5"
+      >
+        Missed more than one? Answer for them all on one page
+      </Link>
     </Shell>
   );
 }
