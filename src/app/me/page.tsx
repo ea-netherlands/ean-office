@@ -13,6 +13,7 @@ import { getSettings } from "@/lib/settings";
 import { deskLocation } from "@/lib/desks";
 import { calendarUrl } from "@/lib/booking-calendar";
 import { avatarUrl } from "@/lib/avatars";
+import { openMissedDays } from "@/lib/noshow";
 import { MeClient } from "./me-client";
 
 export const dynamic = "force-dynamic";
@@ -95,6 +96,12 @@ export default async function MePage() {
       .orderBy(asc(events.date))
   ).filter((r) => r.e.createdBy !== user.id);
 
+  // Booked, didn't check in, not answered yet. Here so a member can settle
+  // them without hunting down the email that asked.
+  const missed = [
+    ...new Set((await openMissedDays(user.id)).map((e) => e.date)),
+  ];
+
   const yearAgo = new Date();
   yearAgo.setFullYear(yearAgo.getFullYear() - 1);
   const profileStale =
@@ -166,6 +173,7 @@ export default async function MePage() {
         )}
 
         <MeClient
+          missed={missed.map((d) => ({ date: d, label: formatDayLong(d) }))}
           upcoming={upcoming.map((b) => ({
             id: b.id,
             date: b.date,

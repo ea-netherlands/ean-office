@@ -366,6 +366,11 @@ export const noShowEvents = pgTable("no_show_events", {
   date: date("date").notNull(),
   clearedAt: timestamp("cleared_at", { withTimezone: true }),
   clearedBy: text("cleared_by"), // "retro_checkin" | admin user id
+  // Each missed day goes in one check-in email, ever: set when it does.
+  askedAt: timestamp("asked_at", { withTimezone: true }),
+  // "I wasn't in." Still a no-show, so not cleared — but answered, so
+  // nothing asks about it again.
+  absentConfirmedAt: timestamp("absent_confirmed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

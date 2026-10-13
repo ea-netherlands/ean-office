@@ -4,7 +4,7 @@ import { db, bookings, users, ensureMigrated } from "@/db";
 import { eq } from "drizzle-orm";
 import { verifyToken } from "@/lib/tokens";
 import { cancelBooking, changeSlot, checkInUser } from "@/lib/booking";
-import { clearNoShow } from "@/lib/noshow";
+import { answerMissedDays, clearNoShow } from "@/lib/noshow";
 import { leaveEvent } from "@/lib/leave-event";
 
 // Actions behind signed single-purpose email links. No session required, and
@@ -56,6 +56,23 @@ export async function retroByTokenAction(
   if (!res.ok) return { error: res.error };
   // Retroactive check-ins remove the no-show from the count.
   await clearNoShow(userId, date, "retro_checkin");
+  return { ok: true };
+}
+
+/**
+ * Every missed check-in at once, from the link in the check-in email: the
+ * days ticked become retroactive check-ins, the rest are recorded as days
+ * they weren't in. Going day by day meant a trip back to the email for each.
+ */
+export async function answerMissedByTokenAction(
+  token: string,
+  attended: string[],
+  absent: string[]
+): Promise<{ ok?: boolean; error?: string }> {
+  await ensureMigrated();
+  const verified = verifyToken(token, "missed");
+  if (!verified) return { error: "This link has expired." };
+  await answerMissedDays(verified.subject, attended, absent);
   return { ok: true };
 }
 
