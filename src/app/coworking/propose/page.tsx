@@ -35,6 +35,7 @@ async function getDays(): Promise<CoworkingDayInfo[]> {
       title: events.title,
       type: events.type,
       status: events.status,
+      isPrivate: events.isPrivate,
     })
     .from(events)
     // Declined and cancelled events don't block a date.
@@ -68,7 +69,12 @@ async function getDays(): Promise<CoworkingDayInfo[]> {
       coworking: coworking
         ? {
             status: coworking.status === "confirmed" ? "confirmed" : "pending",
-            title: coworking.status === "confirmed" ? coworking.title : null,
+            title:
+              coworking.status !== "confirmed"
+                ? null
+                : coworking.isPrivate
+                  ? "Private event"
+                  : coworking.title,
           }
         : null,
       eveningEvent: other

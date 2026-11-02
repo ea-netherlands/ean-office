@@ -254,13 +254,22 @@ export async function capacityForDay(
  * Confirmed co-working days in a range. The office is closed to general
  * booking on these: the organiser hands out the seats, so the calendar hiding
  * the day isn't enough — the booking paths have to refuse it too.
+ *
+ * `label` is how to name the day to a member: its title in quotes, or "a
+ * private event" when it's private — every refusal built from this is read by
+ * people who aren't invited.
  */
 export async function coworkingDaysBetween(
   startDate: string,
   endDate: string
-): Promise<Map<string, { id: string; title: string }>> {
+): Promise<Map<string, { id: string; title: string; isPrivate: boolean; label: string }>> {
   const rows = await db
-    .select({ id: events.id, date: events.date, title: events.title })
+    .select({
+      id: events.id,
+      date: events.date,
+      title: events.title,
+      isPrivate: events.isPrivate,
+    })
     .from(events)
     .where(
       and(
@@ -270,12 +279,22 @@ export async function coworkingDaysBetween(
         eq(events.status, "confirmed")
       )
     );
-  return new Map(rows.map((r) => [r.date, { id: r.id, title: r.title }]));
+  return new Map(
+    rows.map((r) => [
+      r.date,
+      {
+        id: r.id,
+        title: r.title,
+        isPrivate: r.isPrivate,
+        label: r.isPrivate ? "a private event" : `"${r.title}"`,
+      },
+    ])
+  );
 }
 
 export async function coworkingDayOn(
   date: string
-): Promise<{ id: string; title: string } | null> {
+): Promise<{ id: string; title: string; isPrivate: boolean; label: string } | null> {
   return (await coworkingDaysBetween(date, date)).get(date) ?? null;
 }
 
@@ -415,7 +434,9 @@ export async function bookDay(
   if (coworking) {
     return {
       ok: false,
-      error: `${coworking.title} has the whole office that day — ask the organiser for a spot instead.`,
+      error: coworking.isPrivate
+        ? "The office is closed for a private event that day."
+        : `${coworking.title} has the whole office that day — ask the organiser for a spot instead.`,
     };
   }
 

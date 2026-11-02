@@ -46,7 +46,15 @@ export default async function CheckinPage() {
   const todaysEvents = await db
     .select()
     .from(events)
-    .where(and(eq(events.date, today), eq(events.status, "confirmed")));
+    // A private day isn't an event anyone checks in to — its people check in
+    // at their desks like any other day.
+    .where(
+      and(
+        eq(events.date, today),
+        eq(events.status, "confirmed"),
+        eq(events.isPrivate, false)
+      )
+    );
   const myEventCheckins = new Set(
     (
       await db

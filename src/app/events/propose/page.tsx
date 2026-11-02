@@ -21,6 +21,7 @@ async function getAvailability(): Promise<Availability[]> {
       date: events.date,
       title: events.title,
       status: events.status,
+      isPrivate: events.isPrivate,
     })
     .from(events)
     // Declined and cancelled events aren't in anyone's way.
@@ -43,7 +44,7 @@ async function getAvailability(): Promise<Availability[]> {
       byDate.set(e.date, {
         date: e.date,
         status,
-        title: status === "confirmed" ? e.title : null,
+        title: status !== "confirmed" ? null : e.isPrivate ? "Private event" : e.title,
       });
     }
   }

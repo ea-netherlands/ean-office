@@ -129,7 +129,7 @@ export async function createGuestRequest(
     if (coworking) {
       return {
         ok: false,
-        error: `${formatDayLong(input.date)} has the whole office out for "${coworking.title}" — a first visit needs an ordinary day, so please pick another.`,
+        error: `${formatDayLong(input.date)} has the whole office out for ${coworking.label} — a first visit needs an ordinary day, so please pick another.`,
         field: "date",
       };
     }

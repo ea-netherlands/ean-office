@@ -191,7 +191,8 @@ export async function getReport(from: string, to: string): Promise<Report> {
     (u) => u.status === "active"
   ).length;
 
-  // events
+  // events — a private day closed the office for the team, and nobody else
+  // could have come, so it isn't one of the community events funders ask about.
   const eventRows = await db
     .select()
     .from(events)
@@ -199,7 +200,8 @@ export async function getReport(from: string, to: string): Promise<Report> {
       and(
         gte(events.date, from),
         lte(events.date, to),
-        eq(events.status, "confirmed")
+        eq(events.status, "confirmed"),
+        eq(events.isPrivate, false)
       )
     );
   const attendanceRows =
