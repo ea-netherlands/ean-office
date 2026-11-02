@@ -450,9 +450,9 @@ export const events = pgTable("events", {
    * Co-working days only. A private day still closes the office — it's how
    * the team takes the room for itself — but members see "closed for a
    * private event" with no title, no spot count and no way to ask in, and it
-   * stays out of What's on and the funder figures, because nobody outside it
-   * could have come. The guest-list link still works for whoever the
-   * organiser sends it to.
+   * stays off What's on. It still counts in the funder figures like any other
+   * co-working day — private is about who's told, not whether it happened.
+   * The guest-list link still works for whoever the organiser sends it to.
    */
   isPrivate: boolean("is_private").notNull().default(false),
   proposalNote: text("proposal_note"),

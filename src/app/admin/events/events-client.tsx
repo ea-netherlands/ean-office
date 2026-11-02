@@ -172,7 +172,7 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
                   <span>
                     Private: members see the office as closed for a private
                     event, with no title and no way to ask for a spot. It
-                    stays off What&apos;s on and out of the funder figures.
+                    stays off What&apos;s on but still counts in reports.
                   </span>
                 </label>
                 <label className="sm:col-span-2 flex items-start gap-2 text-xs text-slate-600">

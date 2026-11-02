@@ -715,8 +715,8 @@ export async function setEventSignupsAction(
 
 /**
  * Make a co-working day private, or public again. The office stays closed
- * either way; this only decides what members are told and whether the day
- * counts in the funder figures.
+ * either way, and it counts in reports either way; this only decides what
+ * members are told.
  */
 export async function setEventPrivateAction(
   eventId: string,
