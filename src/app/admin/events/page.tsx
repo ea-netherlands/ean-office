@@ -74,6 +74,8 @@ export default async function EventsPage() {
       url: e.url,
       status: e.status,
       signupsOpen: e.signupsOpen,
+      isPrivate: e.isPrivate,
+      decidedByName: e.decidedBy ? proposerNames.get(e.decidedBy)?.name ?? null : null,
       proposalNote: e.proposalNote,
       proposedBy: e.createdBy ? proposerNames.get(e.createdBy)?.name ?? null : null,
       proposedByEmail: e.createdBy ? proposerNames.get(e.createdBy)?.email ?? null : null,

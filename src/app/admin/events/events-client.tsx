@@ -8,6 +8,7 @@ import {
   deleteEventAction,
   setEventTypeAction,
   setEventUrlAction,
+  setEventPrivateAction,
   decideEventAction,
   askEventQuestionAction,
   syncLumaAction,
@@ -57,6 +58,9 @@ export type EventRow = {
   guestsPending: number;
   guestsApproved: number;
   signupsOpen: boolean;
+  isPrivate: boolean;
+  /** The admin who confirmed it, for decisions made since that was recorded. */
+  decidedByName: string | null;
 };
 
 const EVENT_TYPES = [
@@ -160,14 +164,26 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
                 during office hours and are exempt.
               </p>
             ) : (
-              <label className="sm:col-span-2 flex items-start gap-2 text-xs text-slate-600">
-                <input type="checkbox" name="clearBookings" className="mt-0.5" />
-                <span>
-                  Clear the day: cancel any bookings already made for that date
-                  and email those people an apology. Leave this off and they
-                  keep their desks and join the guest list.
-                </span>
-              </label>
+              <>
+                {/* The way to take the office for the team: no proposal to
+                    approve, and nothing for members to ask to join. */}
+                <label className="sm:col-span-2 flex items-start gap-2 text-xs text-slate-600">
+                  <input type="checkbox" name="isPrivate" className="mt-0.5" />
+                  <span>
+                    Private: members see the office as closed for a private
+                    event, with no title and no way to ask for a spot. It
+                    stays off What&apos;s on but still counts in reports.
+                  </span>
+                </label>
+                <label className="sm:col-span-2 flex items-start gap-2 text-xs text-slate-600">
+                  <input type="checkbox" name="clearBookings" className="mt-0.5" />
+                  <span>
+                    Clear the day: cancel any bookings already made for that date
+                    and email those people an apology. Leave this off and they
+                    keep their desks and join the guest list.
+                  </span>
+                </label>
+              </>
             )}
             <div>
               <label className={labelCls}>Cause area</label>
@@ -604,7 +620,13 @@ function EventItem({
             {cancelled && <Badge tone="red">cancelled</Badge>}
             {e.source === "luma" && <Badge tone="teal">luma</Badge>}
             {e.organiser === "hosted" && <Badge>hosted</Badge>}
+            {coworking && e.isPrivate && <Badge>private</Badge>}
           </p>
+          {e.decidedByName && (
+            <p className="text-xs text-slate-500 mt-0.5">
+              {e.status === "declined" ? "Declined" : "Confirmed"} by {e.decidedByName}
+            </p>
+          )}
           {cancelled && (
             <p className="text-xs text-slate-500 mt-0.5">
               {e.cancelledByName ? `Called off by ${e.cancelledByName}` : "Called off"}
@@ -676,11 +698,28 @@ function EventItem({
               {e.guestsApproved} approved
               {e.guestsPending > 0 ? `, ${e.guestsPending} waiting` : ""}
             </a>
-            {e.url
-              ? " · sign-ups are on Luma"
-              : " · sign-ups are here, on the office site"}
+            {e.isPrivate
+              ? " · private — only people you send the link to can ask"
+              : e.url
+                ? " · sign-ups are on Luma"
+                : " · sign-ups are here, on the office site"}
           </p>
-          <LumaLinkField e={e} />
+          <div className="mt-1.5 flex gap-2 items-center flex-wrap">
+            <button
+              className={btnSecondary}
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  const res = await setEventPrivateAction(e.id, !e.isPrivate);
+                  onNotice(res.error ?? null);
+                  router.refresh();
+                })
+              }
+            >
+              {e.isPrivate ? "Make it public" : "Make it private"}
+            </button>
+          </div>
+          {!e.isPrivate && <LumaLinkField e={e} />}
         </>
       )}
       {/* Calling it off is for events still to come; past ones get deleted

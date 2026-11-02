@@ -79,7 +79,9 @@ export default async function BookPage({
           e.date,
           {
             id: e.id,
-            title: e.title,
+            // Members aren't told what a private day is for.
+            title: e.isPrivate ? "Private event" : e.title,
+            isPrivate: e.isPrivate,
             url: e.url,
             startsAt: e.startsAt,
             endsAt: e.endsAt,

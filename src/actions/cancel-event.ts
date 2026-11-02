@@ -106,7 +106,7 @@ ${coworking && future ? `<p>The office is back to normal desk booking that day �
         subject: `${when} is free again`,
         kind: "coworking_day_reopened",
         html: `<p>Hi ${person.name},</p>
-<p>Good news, and an apology for the back and forth: <strong>${event.title}</strong> isn't happening after all, so ${when} is an ordinary office day again — the day we cancelled your booking for.</p>
+<p>Good news, and an apology for the back and forth: ${event.isPrivate ? "the private event" : `<strong>${event.title}</strong>`} isn't happening after all, so ${when} is an ordinary office day again — the day we cancelled your booking for.</p>
 ${because}
 <p>Your old booking couldn't be un-cancelled, so if you'd still like that day: ${link(`${appUrl()}/book`, "book it back")}. It's first come, first served, hence the heads-up.</p>`,
       });

@@ -135,7 +135,7 @@ export async function submitJoinRequest(
   const coworking = await coworkingDayOn(requestedDate);
   if (coworking) {
     return fail(
-      `${formatDayLong(requestedDate)} has the whole office out for "${coworking.title}" — please pick a different day.`,
+      `${formatDayLong(requestedDate)} has the whole office out for ${coworking.label} — please pick a different day.`,
       "requestedDate"
     );
   }

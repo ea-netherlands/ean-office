@@ -12,7 +12,7 @@ import {
   events,
   eventAttendance,
 } from "@/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getCurrentUser, appUrl } from "@/lib/auth";
 import { newId } from "@/lib/ids";
 import { sendEmail, link } from "@/lib/email";
@@ -467,6 +467,7 @@ export async function createEventAction(
       causeArea: String(formData.get("causeArea") || "") || null,
       organiser: (String(formData.get("organiser") || "ean") as "ean" | "hosted"),
       expectedAttendance: Number(formData.get("expectedAttendance")) || null,
+      isPrivate: coworking && formData.get("isPrivate") === "on",
       createdBy: admin.id,
     })
     .returning();
@@ -527,10 +528,28 @@ export async function decideEventAction(
    */
   existingBookings: "keep" | "clear" = "keep"
 ): Promise<AdminActionState> {
-  await requireAdmin();
-  const [event] = await db.select().from(events).where(eq(events.id, eventId));
-  if (!event) return { error: "Event not found." };
-  await db.update(events).set({ status: decision }).where(eq(events.id, eventId));
+  const admin = await requireAdmin();
+  // Only a proposal can be decided, and only once. The status check is part
+  // of the update itself, so two admins (or one admin with a stale tab) can't
+  // both get through: on 2 Nov 2026 a day was confirmed twice an hour apart,
+  // and the people booked that day were told first that they kept their
+  // desks and then that they'd been cancelled.
+  const [event] = await db
+    .update(events)
+    .set({ status: decision, decidedBy: admin.id, decidedAt: new Date() })
+    .where(and(eq(events.id, eventId), eq(events.status, "proposed")))
+    .returning();
+  if (!event) {
+    const [current] = await db.select().from(events).where(eq(events.id, eventId));
+    revalidatePath("/admin/events");
+    if (!current) return { error: "Event not found." };
+    const by = current.decidedBy
+      ? (await db.select({ name: users.name }).from(users).where(eq(users.id, current.decidedBy)))[0]?.name
+      : null;
+    return {
+      error: `This one was already ${current.status}${by ? ` by ${by}` : ""}, so nothing was changed and nobody was emailed.`,
+    };
+  }
 
   const coworking = isCoworkingDay(event.type);
   let absorbed = 0;
@@ -563,13 +582,19 @@ export async function decideEventAction(
           decision === "confirmed"
             ? coworking
               ? `<p>Hi ${proposer.name},</p>
-<p>Your co-working day <strong>${event.title}</strong> on ${formatDayLong(event.date)} is confirmed. The office is closed to general desk booking that day, and the day is on the calendar for everyone to see.</p>
+${
+  event.isPrivate
+    ? `<p>Your co-working day <strong>${event.title}</strong> on ${formatDayLong(event.date)} is confirmed. The office is closed to general desk booking that day.</p>
+<p>It's private, so members just see the office as closed for a private event — no title, and no way to ask for a spot. If someone you're inviting needs a desk, send them this link yourself:<br>${link(join.href, join.href)}</p>
+<p>Their requests land in ${link(`${appUrl()}/events/${event.id}/guests`, "your guest list")}, where approving one gives that person a desk.</p>`
+    : `<p>Your co-working day <strong>${event.title}</strong> on ${formatDayLong(event.date)} is confirmed. The office is closed to general desk booking that day, and the day is on the calendar for everyone to see.</p>
 ${
   join.external
     ? `<p>Sign-ups stay on ${link(join.href, "your Luma page")} — we won't run a second list here.${spots ? ` <strong>Set the capacity there to ${spots.total}</strong>, which is everyone the office holds, desks and lunch table together, and Luma will waitlist anyone past it.` : ""}</p>
 <p>You can see who's in the room that day, including anyone who'd already booked a desk, on ${link(`${appUrl()}/events/${event.id}/guests`, "your guest list")}.</p>`
     : `<p><strong>Share this link</strong> with anyone you'd like there — members and people who've never been alike:<br>${link(join.href, join.href)}</p>
 <p>Requests land in ${link(`${appUrl()}/events/${event.id}/guests`, "your guest list")}, where you approve or decline each one. Approving gives that person a desk straight away.</p>`
+}`
 }
 ${absorbed > 0 ? `<p>${absorbed === 1 ? "One person had" : `${absorbed} people had`} already booked that day. They keep their desks, they're on your guest list as approved, and we've emailed them to say what's happening.</p>` : ""}
 ${cleared > 0 ? `<p>${cleared === 1 ? "One booking that day was" : `${cleared} bookings that day were`} cancelled to free the space, and we've apologised to the people affected and pointed them at your link in case they'd like to come.</p>` : ""}
@@ -688,6 +713,28 @@ export async function setEventSignupsAction(
   return { ok: true };
 }
 
+/**
+ * Make a co-working day private, or public again. The office stays closed
+ * either way, and it counts in reports either way; this only decides what
+ * members are told.
+ */
+export async function setEventPrivateAction(
+  eventId: string,
+  isPrivate: boolean
+): Promise<AdminActionState> {
+  await requireAdmin();
+  const [event] = await db.select().from(events).where(eq(events.id, eventId));
+  if (!event) return { error: "Event not found." };
+  if (!isCoworkingDay(event.type)) {
+    return { error: "Only co-working days can be private." };
+  }
+  await db.update(events).set({ isPrivate }).where(eq(events.id, eventId));
+  revalidatePath("/admin/events");
+  revalidatePath("/book");
+  revalidatePath("/");
+  return { ok: true };
+}
+
 export async function setEventTypeAction(
   eventId: string,
   type: string
@@ -695,7 +742,11 @@ export async function setEventTypeAction(
   await requireAdmin();
   await db
     .update(events)
-    .set({ type: type as typeof events.$inferInsert.type })
+    // Privacy only means something on a co-working day.
+    .set({
+      type: type as typeof events.$inferInsert.type,
+      ...(isCoworkingDay(type) ? {} : { isPrivate: false }),
+    })
     .where(eq(events.id, eventId));
   revalidatePath("/admin/events");
   return { ok: true };

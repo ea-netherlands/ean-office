@@ -446,8 +446,21 @@ export const events = pgTable("events", {
    * decision to make.
    */
   signupsOpen: boolean("signups_open").notNull().default(true),
+  /**
+   * Co-working days only. A private day still closes the office — it's how
+   * the team takes the room for itself — but members see "closed for a
+   * private event" with no title, no spot count and no way to ask in, and it
+   * stays off What's on. It still counts in the funder figures like any other
+   * co-working day — private is about who's told, not whether it happened.
+   * The guest-list link still works for whoever the organiser sends it to.
+   */
+  isPrivate: boolean("is_private").notNull().default(false),
   proposalNote: text("proposal_note"),
   questionAskedAt: timestamp("question_asked_at", { withTimezone: true }),
+  // Which admin confirmed or declined a proposal, and when. A decision sends
+  // email, so "who pressed it" needs an answer.
+  decidedBy: text("decided_by"),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
   externalId: text("external_id").unique(), // Luma UID for sync upserts
   url: text("url"), // luma.com event page
   createdBy: text("created_by"),
