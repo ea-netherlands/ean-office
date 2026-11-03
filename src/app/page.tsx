@@ -191,31 +191,21 @@ export default async function HomePage() {
           </Card>
         )}
 
-        <Card className="mb-4 space-y-3">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <p className="text-sm text-slate-600">
-              Got something you&apos;d like to run here? Reading groups, talks,
-              socials — the office is yours outside office hours.
-            </p>
-            <Link href="/events/propose" className={btnSecondary}>
-              Propose an event
+        <Card>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h2>Coming up</h2>
+            {/* Booking the office for an event lives on /book now; this is
+                the other place people think about events. */}
+            <Link href="/book" className="text-sm text-teal-700 underline">
+              Host your own
             </Link>
           </div>
-          <div className="rule-dashed-y" />
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <p className="text-sm text-slate-600">
-              Or take the whole office for a day — a cause area, a sprint, a
-              visiting team. You pick who comes.
+          {upcomingEvents.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              Nothing on in the next three weeks. Reading groups, talks,
+              socials, a co-working day — the office is yours to book for them.
             </p>
-            <Link href="/coworking/propose" className={btnSecondary}>
-              Organise a co-working day
-            </Link>
-          </div>
-        </Card>
-
-        {upcomingEvents.length > 0 && (
-          <Card>
-            <h2 className="mb-3">Coming up</h2>
+          ) : (
             <ul className="space-y-3">
               {upcomingEvents.map((e) => (
                 <li key={e.id} className="flex items-start justify-between gap-3">
@@ -242,8 +232,8 @@ export default async function HomePage() {
                 </li>
               ))}
             </ul>
-          </Card>
-        )}
+          )}
+        </Card>
       </Page>
     </>
   );

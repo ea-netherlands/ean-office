@@ -81,13 +81,24 @@ async function getDays(): Promise<CoworkingDayInfo[]> {
   return days;
 }
 
-export default async function ProposeCoworkingDayPage() {
+export default async function ProposeCoworkingDayPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string }>;
+}) {
+  const { date } = await searchParams;
   const user = await getCurrentUser();
-  if (!user) redirect("/login?next=/coworking/propose");
+  if (!user)
+    redirect(
+      `/login?next=${encodeURIComponent(`/coworking/propose${date ? `?date=${date}` : ""}`)}`
+    );
   if (user.status === "imported") redirect("/welcome");
   if (!isActiveMember(user)) redirect("/");
 
   const days = await getDays();
+  // The booking page links here with the day you were looking at; only keep
+  // it if it's one the picker offers.
+  const initialDate = days.some((d) => d.date === date) ? date! : "";
   const away = adminsAway((await getSettings()).admin_back_on);
 
   return (
@@ -101,7 +112,7 @@ export default async function ProposeCoworkingDayPage() {
           admin confirms it before anyone else sees it.
         </Sub>
         <AwayNotice away={away} className="mb-5" />
-        <CoworkingForm away={away} days={days} />
+        <CoworkingForm away={away} days={days} initialDate={initialDate} />
         <p className="text-sm text-slate-500 mt-6">
           Something in the evening instead — a reading group, a talk, a social?{" "}
           <Link href="/events/propose" className="text-teal-700 underline">

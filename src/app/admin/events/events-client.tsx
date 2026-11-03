@@ -24,7 +24,7 @@ import {
   labelCls,
 } from "@/components/ui";
 import { formatDay } from "@/lib/dates";
-import { EVENING_START_MIN, EVENING_END_MAX, needsEveningWindow } from "@/lib/event-hours";
+import { EVENING_END_MAX, eventHoursHint, eventStartMin, needsEveningWindow } from "@/lib/event-hours";
 import { CancelEventButton } from "@/components/cancel-event-button";
 
 export type EventRow = {
@@ -74,12 +74,15 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
   const [showForm, setShowForm] = useState(false);
   const [newType, setNewType] = useState<string>("talk");
   const [notice, setNotice] = useState<string | null>(null);
+  const [newDate, setNewDate] = useState("");
   const newEvening = needsEveningWindow(newType);
+  const newStartMin = eventStartMin(newType, newDate) ?? undefined;
   const [state, action, pending] = useActionState<AdminActionState, FormData>(
     async (prev, fd) => {
       const res = await createEventAction(prev, fd);
       if (res.ok) {
         setShowForm(false);
+        setNewDate("");
         setNotice(res.note ?? null);
         router.refresh();
       }
@@ -116,7 +119,14 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
             </div>
             <div>
               <label className={labelCls}>Date *</label>
-              <input name="date" type="date" required className={inputCls} />
+              <input
+                name="date"
+                type="date"
+                required
+                className={inputCls}
+                value={newDate}
+                onChange={(e) => setNewDate(e.target.value)}
+              />
             </div>
             <div>
               <label className={labelCls}>Type *</label>
@@ -138,7 +148,7 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
               <input
                 name="startsAt"
                 type="time"
-                min={newEvening ? EVENING_START_MIN : undefined}
+                min={newStartMin}
                 max={newEvening ? EVENING_END_MAX : undefined}
                 className={inputCls}
               />
@@ -148,16 +158,15 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
               <input
                 name="endsAt"
                 type="time"
-                min={newEvening ? EVENING_START_MIN : undefined}
+                min={newStartMin}
                 max={newEvening ? EVENING_END_MAX : undefined}
                 className={inputCls}
               />
             </div>
             {newEvening ? (
               <p className="text-xs text-slate-400 sm:col-span-2">
-                Evening events run {EVENING_START_MIN}–{EVENING_END_MAX} — the
-                alarm activates at {EVENING_END_MAX}. Co-working days run
-                during office hours and are exempt.
+                {eventHoursHint(newType, newDate)} Co-working days run during
+                office hours and are exempt.
               </p>
             ) : (
               <label className="sm:col-span-2 flex items-start gap-2 text-xs text-slate-600">
