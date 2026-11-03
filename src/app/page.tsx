@@ -93,6 +93,9 @@ export default async function HomePage() {
   const coworkingToday = upcomingEvents.find(
     (e) => e.date === today && isCoworkingDay(e.type)
   );
+  // A private day still closes the office, so it leads today's card — but it
+  // isn't something anyone else could come to, so it stays off What's on.
+  const listedEvents = upcomingEvents.filter((e) => !e.isPrivate);
 
   return (
     <>
@@ -111,7 +114,7 @@ export default async function HomePage() {
             <>
               <p className="text-sm text-teal-700 mb-2">
                 <Icon name="target-arrow" className="mr-1" />
-                {coworkingToday.title}
+                {coworkingToday.isPrivate ? "Private event" : coworkingToday.title}
                 {coworkingToday.startsAt
                   ? ` · ${coworkingToday.startsAt}${coworkingToday.endsAt ? `–${coworkingToday.endsAt}` : ""}`
                   : ""}
@@ -125,6 +128,11 @@ export default async function HomePage() {
                   slot={myBooking.slot}
                   full={cap.full}
                 />
+              ) : coworkingToday.isPrivate ? (
+                <p className="text-slate-600 text-sm">
+                  The office is closed for a private event today, so
+                  there&apos;s no desk booking.
+                </p>
               ) : (
                 <>
                   <p className="text-slate-600 text-sm">
@@ -200,14 +208,14 @@ export default async function HomePage() {
               Host your own
             </Link>
           </div>
-          {upcomingEvents.length === 0 ? (
+          {listedEvents.length === 0 ? (
             <p className="text-sm text-slate-500">
               Nothing on in the next three weeks. Reading groups, talks,
               socials, a co-working day — the office is yours to book for them.
             </p>
           ) : (
             <ul className="space-y-3">
-              {upcomingEvents.map((e) => (
+              {listedEvents.map((e) => (
                 <li key={e.id} className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-medium text-sm">

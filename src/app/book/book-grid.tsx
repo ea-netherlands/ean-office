@@ -56,6 +56,7 @@ export type DayInfo = {
   themedEvent: {
     id: string;
     title: string;
+    isPrivate: boolean;
     url: string | null;
     startsAt: string | null;
     endsAt: string | null;
@@ -464,7 +465,9 @@ function DayCell({
   const label = closedForEvent
     ? booked.length > 0
       ? "You're in"
-      : "Co-work"
+      : d.themedEvent?.isPrivate
+        ? "Closed"
+        : "Co-work"
     : allDayYours
       ? "You're in"
       : booked.length > 0
@@ -491,7 +494,9 @@ function DayCell({
       {!disabled && (
         <>
           <span className="text-[10px] leading-tight mt-0.5">{label}</span>
-          {d.themedEvent && <Icon name="target-arrow" className="text-[10px] text-teal-700" />}
+          {d.themedEvent && !d.themedEvent.isPrivate && (
+            <Icon name="target-arrow" className="text-[10px] text-teal-700" />
+          )}
           {/* Two initials, not three: five columns on a 375px screen leaves
               ~51px inside a cell, and three avatars plus the counter needed
               65 — the overflow clipped the "+7" that says how many are
@@ -570,7 +575,8 @@ function DayPanel({
         {yours ? (
           <>
             <p className="text-sm text-slate-600 mt-2">
-              A co-working day — the office is closed to general booking, but{" "}
+              {event.isPrivate ? "A private event" : "A co-working day"} — the
+              office is closed to general booking, but{" "}
               <strong>you already have a seat</strong>
               {yours.slot === "day" ? "" : ` for the ${SLOT_LABEL[yours.slot]}`}
               , so come as planned.
@@ -583,6 +589,11 @@ function DayPanel({
               {busy === "cancel" ? <Spinner /> : null} Cancel my seat
             </button>
           </>
+        ) : event.isPrivate ? (
+          <p className="text-sm text-slate-600 mt-2">
+            The office is closed for a private event that day, so there&apos;s
+            no desk booking. Every other day is unaffected.
+          </p>
         ) : (
           <>
             <p className="text-sm text-slate-600 mt-2">

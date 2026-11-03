@@ -134,6 +134,13 @@
       "when": 1790300000000,
       "tag": "0018_missed_days_answered",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790400000000,
+      "tag": "0019_private_events",
+      "breakpoints": true
     }
   ]
 }

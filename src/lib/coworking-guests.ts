@@ -59,6 +59,7 @@ export async function bookedThatDay(date: string) {
 export async function absorbExistingBookings(event: {
   id: string;
   title: string;
+  isPrivate: boolean;
   date: string;
   startsAt: string | null;
   endsAt: string | null;
@@ -98,11 +99,18 @@ export async function absorbExistingBookings(event: {
     if (user.id === event.createdBy) continue; // the organiser knows
     await sendEmail({
       to: user.email,
-      subject: `${formatDayLong(event.date)}: ${event.title} at the office`,
+      subject: event.isPrivate
+        ? `${formatDayLong(event.date)}: a private event at the office`
+        : `${formatDayLong(event.date)}: ${event.title} at the office`,
       kind: "coworking_day_absorbed",
       html: `<p>Hi ${user.name},</p>
-<p>You've got <strong>${describeSeat(booking)}</strong> booked for ${formatDayLong(event.date)}, and that day is now a co-working day at the office: <strong>${event.title}</strong>, ${when}.</p>
-<p><strong>Your desk is still yours</strong> — nothing to do, just come as planned. The day is closed to new general bookings, so the room will be mostly people there for the co-working day.</p>
+${
+  event.isPrivate
+    ? `<p>You've got <strong>${describeSeat(booking)}</strong> booked for ${formatDayLong(event.date)}, and the office is now hosting a private event that day, ${when}.</p>
+<p><strong>Your desk is still yours</strong> — nothing to do, just come as planned. The day is closed to new bookings, so expect the room to be busier than usual.</p>`
+    : `<p>You've got <strong>${describeSeat(booking)}</strong> booked for ${formatDayLong(event.date)}, and that day is now a co-working day at the office: <strong>${event.title}</strong>, ${when}.</p>
+<p><strong>Your desk is still yours</strong> — nothing to do, just come as planned. The day is closed to new general bookings, so the room will be mostly people there for the co-working day.</p>`
+}
 <p>Would rather pick another day? ${link(cancelUrl(booking), "Cancel in one tap")} and book a different one from ${link(`${appUrl()}/book`, "the calendar")}.</p>`,
     });
   }
@@ -121,6 +129,7 @@ export async function absorbExistingBookings(event: {
 export async function clearDayForCoworking(event: {
   id: string;
   title: string;
+  isPrivate: boolean;
   date: string;
   startsAt: string | null;
   endsAt: string | null;
@@ -166,19 +175,29 @@ export async function clearDayForCoworking(event: {
       subject: `Sorry — your booking for ${formatDayLong(event.date)} has been cancelled`,
       kind: "coworking_day_displaced",
       html: `<p>Hi ${person.name},</p>
-<p>We're sorry: we've decided to run <strong>${event.title}</strong> at the office on <strong>${formatDayLong(event.date)}</strong> (${when}). It takes the whole space, so the office isn't available for general desk booking that day and we've had to cancel your booking.</p>
+<p>We're sorry: we've decided to run ${event.isPrivate ? "a private event" : `<strong>${event.title}</strong>`} at the office on <strong>${formatDayLong(event.date)}</strong> (${when}). It takes the whole space, so the office isn't available for general desk booking that day and we've had to cancel your booking.</p>
 <p>We know that's annoying when you'd already planned around it — apologies. Every other day is unaffected: ${link(`${appUrl()}/book`, "pick another one from the calendar")}.</p>
-<p>If the day itself is up your street, you're very welcome to come to it — ${link(join.href, join.external ? "sign up on the event page" : "ask the organiser for a spot")}.</p>`,
+${event.isPrivate ? "" : `<p>If the day itself is up your street, you're very welcome to come to it — ${link(join.href, join.external ? "sign up on the event page" : "ask the organiser for a spot")}.</p>`}`,
     });
   }
 
   // Remember exactly who was moved off, so that calling the day off later can
-  // tell them the space is theirs again.
+  // tell them the space is theirs again. They're no longer coming, so they
+  // come off the guest list too — otherwise the organiser sees them as
+  // approved for a day they've just been told is closed to them.
   if (byUser.size > 0) {
     await db
       .update(events)
       .set({ displacedUserIds: [...byUser.keys()] })
       .where(eq(events.id, event.id));
+    await db
+      .delete(eventGuests)
+      .where(
+        and(
+          eq(eventGuests.eventId, event.id),
+          inArray(eventGuests.userId, [...byUser.keys()])
+        )
+      );
   }
 
   // Whoever's left holding a desk (the organiser) belongs on the guest list.
