@@ -447,7 +447,7 @@ export async function createEventAction(
   const startsAt = String(formData.get("startsAt") || "") || null;
   const endsAt = String(formData.get("endsAt") || "") || null;
   if (!title || !date) return { error: "Title and date are required." };
-  const hoursError = validateEventHours(type, startsAt, endsAt);
+  const hoursError = validateEventHours(type, date, startsAt, endsAt);
   if (hoursError) return { error: hoursError };
   const coworking = isCoworkingDay(type);
   if (coworking) {

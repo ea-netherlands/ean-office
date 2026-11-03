@@ -51,9 +51,20 @@ async function getAvailability(): Promise<Availability[]> {
   return Array.from(byDate.values());
 }
 
-export default async function ProposeEventPage() {
+export default async function ProposeEventPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string }>;
+}) {
+  const { date } = await searchParams;
+  // The booking page links here with the day you were looking at.
+  const initialDate =
+    date && /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= todayAms() ? date : "";
   const user = await getCurrentUser();
-  if (!user) redirect("/login?next=/events/propose");
+  if (!user)
+    redirect(
+      `/login?next=${encodeURIComponent(`/events/propose${initialDate ? `?date=${initialDate}` : ""}`)}`
+    );
   if (user.status === "imported") redirect("/welcome");
   if (!isActiveMember(user)) redirect("/");
 
@@ -69,7 +80,7 @@ export default async function ProposeEventPage() {
           — reading groups, discussions, workshops, talks, socials. Tell us
           what you have in mind and an admin will come back to you.
         </Sub>
-        <ProposeForm availability={availability} />
+        <ProposeForm availability={availability} initialDate={initialDate} />
       </Page>
     </>
   );

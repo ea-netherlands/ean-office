@@ -30,9 +30,12 @@ import { CoworkingDayInfo, DayPicker } from "./day-picker";
 export function CoworkingForm({
   away,
   days,
+  initialDate = "",
 }: {
   away: Away | null;
   days: CoworkingDayInfo[];
+  /** A date carried over from the booking page, so it arrives already picked. */
+  initialDate?: string;
 }) {
   const [state, action, pending] = useActionState<CoworkingProposalState, FormData>(
     proposeCoworkingDayAction,
@@ -41,7 +44,7 @@ export function CoworkingForm({
   const v = state.values;
   const attempt = state.attempt ?? 0;
   const { ref, clear } = useFormDraft("coworking-propose", attempt);
-  const [date, setDate] = useState(str(v, "date"));
+  const [date, setDate] = useState(str(v, "date") || initialDate);
   const picked = days.find((d) => d.date === date);
 
   useEffect(() => {

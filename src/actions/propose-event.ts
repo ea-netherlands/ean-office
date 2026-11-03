@@ -56,7 +56,7 @@ export async function proposeEventAction(
   if (!title) return fail("Give your event a name.", "title");
   if (!date) return fail("Pick a date.", "date");
   if (date < todayAms()) return fail("That date has already passed.", "date");
-  const hoursError = validateEventHours(type, startsAt, endsAt);
+  const hoursError = validateEventHours(type, date, startsAt, endsAt);
   if (hoursError) return fail(hoursError, "startsAt");
 
   await db.insert(events).values({

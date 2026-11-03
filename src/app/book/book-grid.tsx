@@ -816,6 +816,25 @@ function DayPanel({
             : `The lunch table is cleared over lunch (${flexWindow}), which is where a ${SLOT_LABEL[slot]} booking ${slot === "am" ? "ends" : "starts"} anyway.`}
         </p>
       )}
+
+      {/* People pick dates here, so this is where they need to learn the
+          office can be booked for more than a desk. */}
+      <div className="rule-dashed-y mt-4" />
+      <div className="mt-3">
+        <p className="text-sm text-slate-600">
+          Need the whole office this day?
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Link href={`/events/propose?date=${day.date}`} className={btnSecondary}>
+            <Icon name="calendar-event" />
+            Host an evening event
+          </Link>
+          <Link href={`/coworking/propose?date=${day.date}`} className={btnSecondary}>
+            <Icon name="target-arrow" />
+            Run a co-working day
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

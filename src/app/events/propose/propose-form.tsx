@@ -7,7 +7,7 @@ import { str } from "@/lib/form-values";
 import { useFormDraft } from "@/components/form-draft";
 import { Card, btnPrimary, btnSecondary, inputCls, labelCls, Icon } from "@/components/ui";
 import { AvailabilityCalendar, Availability } from "./availability-calendar";
-import { EVENING_START_MIN, EVENING_END_MAX, needsEveningWindow } from "@/lib/event-hours";
+import { EVENING_END_MAX, eventHoursHint, eventStartMin, needsEveningWindow } from "@/lib/event-hours";
 
 const TYPES = [
   ["reading_group", "Reading group"],
@@ -19,7 +19,14 @@ const TYPES = [
   ["other", "Something else"],
 ] as const;
 
-export function ProposeForm({ availability }: { availability: Availability[] }) {
+export function ProposeForm({
+  availability,
+  initialDate = "",
+}: {
+  availability: Availability[];
+  /** A date carried over from the booking page, so it arrives already picked. */
+  initialDate?: string;
+}) {
   const [state, action, pending] = useActionState<ProposeState, FormData>(
     proposeEventAction,
     {}
@@ -27,9 +34,11 @@ export function ProposeForm({ availability }: { availability: Availability[] }) 
   const v = state.values;
   const attempt = state.attempt ?? 0;
   const { ref, clear } = useFormDraft("propose-event", attempt);
-  const [date, setDate] = useState(str(v, "date"));
+  const [date, setDate] = useState(str(v, "date") || initialDate);
   const [type, setType] = useState<string>(str(v, "type") || "reading_group");
   const evening = needsEveningWindow(type);
+  const startMin = eventStartMin(type, date) ?? undefined;
+  const hoursHint = eventHoursHint(type, date);
 
   useEffect(() => {
     if (state.ok) clear();
@@ -66,7 +75,7 @@ export function ProposeForm({ availability }: { availability: Availability[] }) 
           />
         </div>
         <div>
-          <label className={labelCls}>Which evenings are free?</label>
+          <label className={labelCls}>Which dates are free?</label>
           <AvailabilityCalendar availability={availability} selected={date} onSelect={setDate} />
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
@@ -102,7 +111,7 @@ export function ProposeForm({ availability }: { availability: Availability[] }) 
               name="startsAt"
               type="time"
               defaultValue={str(v, "startsAt")}
-              min={evening ? EVENING_START_MIN : undefined}
+              min={startMin}
               max={evening ? EVENING_END_MAX : undefined}
               className={inputCls}
             />
@@ -113,18 +122,13 @@ export function ProposeForm({ availability }: { availability: Availability[] }) 
               name="endsAt"
               type="time"
               defaultValue={str(v, "endsAt")}
-              min={evening ? EVENING_START_MIN : undefined}
+              min={startMin}
               max={evening ? EVENING_END_MAX : undefined}
               className={inputCls}
             />
           </div>
         </div>
-        {evening && (
-          <p className="text-xs text-slate-500">
-            Evening events run {EVENING_START_MIN}–{EVENING_END_MAX} — the office alarm activates at{" "}
-            {EVENING_END_MAX}, so everything needs to wrap up before then.
-          </p>
-        )}
+        {hoursHint && <p className="text-xs text-slate-500">{hoursHint}</p>}
         <div>
           <label className={labelCls}>Roughly how many people?</label>
           <input
@@ -147,9 +151,9 @@ export function ProposeForm({ availability }: { availability: Availability[] }) 
           />
         </div>
         <p className="text-xs text-slate-400">
-          Events run outside office hours, from 17:30. The connecting doors
-          close at 18:00 — an admin will walk you through the checklist once
-          it&apos;s confirmed.
+          Events run outside office hours: weekday evenings from 17:30, or
+          any time at weekends. The connecting doors close at 18:00 — an admin
+          will walk you through the checklist once it&apos;s confirmed.
         </p>
       </Card>
 
