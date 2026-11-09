@@ -15,6 +15,7 @@ import {
   OFFICE_CLOSE,
   OFFICE_OPEN,
 } from "@/lib/coworking";
+import { VisibilityChoice } from "@/components/visibility-choice";
 import {
   Card,
   Icon,
@@ -184,6 +185,11 @@ export function CoworkingForm({
             guest list, not two. You can add it later.
           </p>
         </div>
+
+        <VisibilityChoice
+          defaultValue={str(v, "visibility")}
+          privateHint="Members just see the office closed for a private event — no title, and no way to ask for a spot. You send the link to the people you want there."
+        />
 
         <div>
           <label className={labelCls}>Anything the team should know?</label>

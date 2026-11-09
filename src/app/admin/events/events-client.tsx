@@ -167,6 +167,16 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
                 className={inputCls}
               />
             </div>
+            {/* The way to take the office for the team: no proposal to
+                approve, and nothing listed for members. */}
+            <label className="sm:col-span-2 flex items-start gap-2 text-xs text-slate-600">
+              <input type="checkbox" name="isPrivate" className="mt-0.5" />
+              <span>
+                {newEvening
+                  ? "Private: kept off the office site. Only people with the link can sign up. Still counts in reports."
+                  : "Private: members see the office as closed for a private event, with no title and no way to ask for a spot. It stays off What's on but still counts in reports."}
+              </span>
+            </label>
             {newEvening ? (
               <p className="text-xs text-slate-400 sm:col-span-2">
                 {eventHoursHint(newType, newDate)} Co-working days run during
@@ -174,16 +184,6 @@ export function EventsClient({ rows }: { rows: EventRow[] }) {
               </p>
             ) : (
               <>
-                {/* The way to take the office for the team: no proposal to
-                    approve, and nothing for members to ask to join. */}
-                <label className="sm:col-span-2 flex items-start gap-2 text-xs text-slate-600">
-                  <input type="checkbox" name="isPrivate" className="mt-0.5" />
-                  <span>
-                    Private: members see the office as closed for a private
-                    event, with no title and no way to ask for a spot. It
-                    stays off What&apos;s on but still counts in reports.
-                  </span>
-                </label>
                 <label className="sm:col-span-2 flex items-start gap-2 text-xs text-slate-600">
                   <input type="checkbox" name="clearBookings" className="mt-0.5" />
                   <span>
@@ -433,6 +433,8 @@ function ProposalItem({
   const [asking, setAsking] = useState(false);
   const [question, setQuestion] = useState("");
   const [note, setNote] = useState<string | null>(null);
+  // Starts as the proposer asked; the admin can overrule it before confirming.
+  const [isPrivate, setIsPrivate] = useState(e.isPrivate);
   const coworking = !needsEveningWindow(e.type);
 
   function decide(
@@ -440,7 +442,7 @@ function ProposalItem({
     existingBookings: "keep" | "clear" = "keep"
   ) {
     startTransition(async () => {
-      const res = await decideEventAction(e.id, decision, existingBookings);
+      const res = await decideEventAction(e.id, decision, existingBookings, isPrivate);
       onNotice(res.note ?? res.error ?? null);
       router.refresh();
     });
@@ -485,6 +487,24 @@ function ProposalItem({
           {e.proposalNote}
         </p>
       )}
+      <label className="mt-2 flex items-start gap-2 text-xs text-slate-600">
+        <input
+          type="checkbox"
+          checked={isPrivate}
+          onChange={(ev) => setIsPrivate(ev.target.checked)}
+          className="mt-0.5"
+        />
+        <span>
+          Private{" "}
+          <span className="text-slate-400">
+            ({e.isPrivate ? "they asked for private" : "they asked for public"})
+          </span>
+          {" — "}
+          {coworking
+            ? "members see the office closed for a private event, with no title"
+            : "kept off the office site; only people with the link can sign up"}
+        </span>
+      </label>
 
       {asking ? (
         <div className="mt-3 space-y-2">
@@ -629,7 +649,7 @@ function EventItem({
             {cancelled && <Badge tone="red">cancelled</Badge>}
             {e.source === "luma" && <Badge tone="teal">luma</Badge>}
             {e.organiser === "hosted" && <Badge>hosted</Badge>}
-            {coworking && e.isPrivate && <Badge>private</Badge>}
+            {e.isPrivate && <Badge>private</Badge>}
           </p>
           {e.decidedByName && (
             <p className="text-xs text-slate-500 mt-0.5">
@@ -697,7 +717,13 @@ function EventItem({
               nobody can sign themselves up — open it from the event page
             </>
           )}
+          {e.isPrivate && " · private — not listed on the office site"}
         </p>
+      )}
+      {!coworking && !e.past && !cancelled && (
+        <div className="mt-1.5">
+          <PrivacyToggle e={e} onNotice={onNotice} />
+        </div>
       )}
       {coworking && !e.past && !cancelled && (
         <>
@@ -713,20 +739,8 @@ function EventItem({
                 ? " · sign-ups are on Luma"
                 : " · sign-ups are here, on the office site"}
           </p>
-          <div className="mt-1.5 flex gap-2 items-center flex-wrap">
-            <button
-              className={btnSecondary}
-              disabled={pending}
-              onClick={() =>
-                startTransition(async () => {
-                  const res = await setEventPrivateAction(e.id, !e.isPrivate);
-                  onNotice(res.error ?? null);
-                  router.refresh();
-                })
-              }
-            >
-              {e.isPrivate ? "Make it public" : "Make it private"}
-            </button>
+          <div className="mt-1.5">
+            <PrivacyToggle e={e} onNotice={onNotice} />
           </div>
           {!e.isPrivate && <LumaLinkField e={e} />}
         </>
@@ -782,5 +796,32 @@ function EventItem({
         </div>
       )}
     </li>
+  );
+}
+
+/** Public or private for an event already on the calendar. */
+function PrivacyToggle({
+  e,
+  onNotice,
+}: {
+  e: EventRow;
+  onNotice: (note: string | null) => void;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  return (
+    <button
+      className={btnSecondary}
+      disabled={pending}
+      onClick={() =>
+        startTransition(async () => {
+          const res = await setEventPrivateAction(e.id, !e.isPrivate);
+          onNotice(res.error ?? null);
+          router.refresh();
+        })
+      }
+    >
+      {e.isPrivate ? "Make it public" : "Make it private"}
+    </button>
   );
 }
