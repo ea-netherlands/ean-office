@@ -5,6 +5,7 @@ import Link from "next/link";
 import { proposeEventAction, ProposeState } from "@/actions/propose-event";
 import { str } from "@/lib/form-values";
 import { useFormDraft } from "@/components/form-draft";
+import { VisibilityChoice } from "@/components/visibility-choice";
 import { Card, btnPrimary, btnSecondary, inputCls, labelCls, Icon } from "@/components/ui";
 import { AvailabilityCalendar, Availability } from "./availability-calendar";
 import { EVENING_END_MAX, eventHoursHint, eventStartMin, needsEveningWindow } from "@/lib/event-hours";
@@ -51,8 +52,8 @@ export function ProposeForm({
         <h2 className="text-xl">Sent to the team</h2>
         <p className="text-slate-500 mt-2 max-w-sm mx-auto">
           An admin will confirm or come back to you with questions. Once
-          it&apos;s confirmed you&apos;ll get an email and it&apos;ll show on the office
-          calendar.
+          it&apos;s confirmed you&apos;ll get an email, and unless you asked
+          for it to be private it&apos;ll show on the office calendar.
         </p>
         <Link href="/" className={`${btnSecondary} mt-5`}>
           Back to today
@@ -150,6 +151,10 @@ export function ProposeForm({
             placeholder="What it's for, whether you need the TV or the lounge, anything you'd like help with."
           />
         </div>
+        <VisibilityChoice
+          defaultValue={str(v, "visibility")}
+          privateHint="Kept off the office site. Only people you send the link to can sign up — right for a team day, a recording or anything invite-only."
+        />
         <p className="text-xs text-slate-400">
           Events run outside office hours: weekday evenings from 17:30, or
           any time at weekends. The connecting doors close at 18:00 — an admin

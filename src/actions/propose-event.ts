@@ -20,6 +20,7 @@ const FIELDS = [
   "type",
   "expectedAttendance",
   "proposalNote",
+  "visibility",
 ] as const;
 
 /**
@@ -52,6 +53,7 @@ export async function proposeEventAction(
   const type = String(formData.get("type") || "other");
   const expected = Number(formData.get("expectedAttendance"));
   const note = String(formData.get("proposalNote") || "").trim().slice(0, 1000);
+  const isPrivate = formData.get("visibility") === "private";
 
   if (!title) return fail("Give your event a name.", "title");
   if (!date) return fail("Pick a date.", "date");
@@ -71,6 +73,7 @@ export async function proposeEventAction(
     status: "proposed",
     expectedAttendance: Number.isFinite(expected) && expected > 0 ? expected : null,
     proposalNote: note || null,
+    isPrivate,
     createdBy: user!.id,
   });
 
@@ -83,7 +86,8 @@ export async function proposeEventAction(
       html: `<p><strong>${user!.name}</strong> would like to host an event at the office.</p>
 <p><strong>${title}</strong><br>
 ${formatDayLong(date)}${startsAt ? ` · ${startsAt}${endsAt ? `–${endsAt}` : ""}` : ""}<br>
-${expected ? `Expecting around ${expected} people` : "No attendance estimate given"}</p>
+${expected ? `Expecting around ${expected} people` : "No attendance estimate given"}<br>
+${isPrivate ? "They'd like it <strong>private</strong> — kept off the office site" : "They'd like it public — listed on the office site"}</p>
 ${note ? `<p>${note.replace(/</g, "&lt;")}</p>` : ""}
 <p>${link(`${appUrl()}/admin/events`, "Confirm or decline it")}</p>`,
     });

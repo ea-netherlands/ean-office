@@ -25,6 +25,7 @@ const FIELDS = [
   "expectedAttendance",
   "proposalNote",
   "url",
+  "visibility",
 ] as const;
 
 /**
@@ -57,6 +58,7 @@ export async function proposeCoworkingDayAction(
   const expected = Number(formData.get("expectedAttendance"));
   const note = String(formData.get("proposalNote") || "").trim().slice(0, 1000);
   const url = String(formData.get("url") || "").trim();
+  const isPrivate = formData.get("visibility") === "private";
 
   if (!title) return fail("Give the day a name.", "title");
   if (url && !/^https:\/\/(www\.)?(lu\.ma|luma\.com)\//.test(url)) {
@@ -109,6 +111,7 @@ export async function proposeCoworkingDayAction(
       url: url || null,
       expectedAttendance: Number.isFinite(expected) && expected > 0 ? expected : null,
       proposalNote: note || null,
+      isPrivate,
       createdBy: user!.id,
     })
     .returning();
@@ -123,7 +126,8 @@ export async function proposeCoworkingDayAction(
       html: `<p><strong>${user!.name}</strong> would like to run a co-working day at the office.</p>
 <p><strong>${title}</strong><br>
 ${formatDayLong(date)}${startsAt ? ` · ${startsAt}${endsAt ? `–${endsAt}` : ""}` : ""}<br>
-${expected ? `Expecting around ${expected} people` : "No attendance estimate given"}</p>
+${expected ? `Expecting around ${expected} people` : "No attendance estimate given"}<br>
+${isPrivate ? "They'd like it <strong>private</strong> — members just see the office closed for a private event" : "They'd like it public — listed on the office site"}</p>
 ${note ? `<p>${note.replace(/</g, "&lt;")}</p>` : ""}
 <p>Confirming closes that day to general desk booking. <strong>${alreadyBooked.length === 0 ? "Nobody has booked that day yet." : `${alreadyBooked.length} ${alreadyBooked.length === 1 ? "person has" : "people have"} already booked that day`}</strong>${alreadyBooked.length > 0 ? ` — they keep their desks and we'll tell them what's happening: ${alreadyBooked.map((b) => b.user.name).join(", ")}.` : ""}</p>
 <p>${link(`${appUrl()}/admin/events`, "Confirm or decline it")}</p>`,

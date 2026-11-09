@@ -467,7 +467,7 @@ export async function createEventAction(
       causeArea: String(formData.get("causeArea") || "") || null,
       organiser: (String(formData.get("organiser") || "ean") as "ean" | "hosted"),
       expectedAttendance: Number(formData.get("expectedAttendance")) || null,
-      isPrivate: coworking && formData.get("isPrivate") === "on",
+      isPrivate: formData.get("isPrivate") === "on",
       createdBy: admin.id,
     })
     .returning();
@@ -526,7 +526,12 @@ export async function decideEventAction(
    * `keep` leaves their desks alone and brings them along, `clear` cancels
    * their bookings and sends an apology. Never chosen for them.
    */
-  existingBookings: "keep" | "clear" = "keep"
+  existingBookings: "keep" | "clear" = "keep",
+  /**
+   * Whether it's listed publicly. The proposer asked for one or the other;
+   * the admin confirming it has the last word. Omitted = leave as proposed.
+   */
+  isPrivate?: boolean
 ): Promise<AdminActionState> {
   const admin = await requireAdmin();
   // Only a proposal can be decided, and only once. The status check is part
@@ -536,7 +541,12 @@ export async function decideEventAction(
   // desks and then that they'd been cancelled.
   const [event] = await db
     .update(events)
-    .set({ status: decision, decidedBy: admin.id, decidedAt: new Date() })
+    .set({
+      status: decision,
+      decidedBy: admin.id,
+      decidedAt: new Date(),
+      ...(decision === "confirmed" && isPrivate !== undefined ? { isPrivate } : {}),
+    })
     .where(and(eq(events.id, eventId), eq(events.status, "proposed")))
     .returning();
   if (!event) {
@@ -600,7 +610,11 @@ ${absorbed > 0 ? `<p>${absorbed === 1 ? "One person had" : `${absorbed} people h
 ${cleared > 0 ? `<p>${cleared === 1 ? "One booking that day was" : `${cleared} bookings that day were`} cancelled to free the space, and we've apologised to the people affected and pointed them at your link in case they'd like to come.</p>` : ""}
 <p>Thanks for organising it!</p>`
               : `<p>Hi ${proposer.name},</p>
-<p>Your event <strong>${event.title}</strong> on ${formatDayLong(event.date)} is confirmed — it's on the office calendar now.</p>
+${
+  event.isPrivate
+    ? `<p>Your event <strong>${event.title}</strong> on ${formatDayLong(event.date)} is confirmed. It's private, so it isn't listed anywhere on the office site — only people you tell will know about it.</p>`
+    : `<p>Your event <strong>${event.title}</strong> on ${formatDayLong(event.date)} is confirmed — it's on the office calendar now.</p>`
+}
 ${
   join.external
     ? `<p>Sign-ups stay on ${link(join.href, "your Luma page")} — we won't run a second list here.</p>`
@@ -714,9 +728,10 @@ export async function setEventSignupsAction(
 }
 
 /**
- * Make a co-working day private, or public again. The office stays closed
- * either way, and it counts in reports either way; this only decides what
- * members are told.
+ * Make an event private, or public again. It counts in reports either way,
+ * and a co-working day closes the office either way; this only decides what
+ * members are told. Private evening events drop off Today's "Coming up";
+ * private co-working days show as "closed for a private event".
  */
 export async function setEventPrivateAction(
   eventId: string,
@@ -725,9 +740,6 @@ export async function setEventPrivateAction(
   await requireAdmin();
   const [event] = await db.select().from(events).where(eq(events.id, eventId));
   if (!event) return { error: "Event not found." };
-  if (!isCoworkingDay(event.type)) {
-    return { error: "Only co-working days can be private." };
-  }
   await db.update(events).set({ isPrivate }).where(eq(events.id, eventId));
   revalidatePath("/admin/events");
   revalidatePath("/book");
@@ -742,11 +754,7 @@ export async function setEventTypeAction(
   await requireAdmin();
   await db
     .update(events)
-    // Privacy only means something on a co-working day.
-    .set({
-      type: type as typeof events.$inferInsert.type,
-      ...(isCoworkingDay(type) ? {} : { isPrivate: false }),
-    })
+    .set({ type: type as typeof events.$inferInsert.type })
     .where(eq(events.id, eventId));
   revalidatePath("/admin/events");
   return { ok: true };
