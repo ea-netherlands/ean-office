@@ -38,15 +38,54 @@ export function EmailList({
                 <span className="text-xs text-slate-400">{r.sentAt}</span>
               </span>
             </button>
-            {open === r.id && (
-              <div
-                className="mt-3 border border-slate-200 rounded-xl p-4 text-sm bg-slate-50 [&_a]:text-teal-700 [&_a]:underline"
-                dangerouslySetInnerHTML={{ __html: r.body }}
-              />
-            )}
+            {open === r.id && <EmailBody html={r.body} />}
           </li>
         ))}
       </ul>
     </Card>
+  );
+}
+
+// The web addresses an email links to, so they can be offered as ordinary
+// links outside the locked frame (in demo mode this is how you follow a
+// login link).
+function linksIn(html: string): string[] {
+  const found = new Set<string>();
+  for (const m of html.matchAll(/href="(https?:\/\/[^"<>\s]+)"/g)) {
+    found.add(m[1].replace(/&amp;/g, "&"));
+  }
+  return [...found];
+}
+
+// Logged emails quote text typed into public forms (a name on /join, an RSVP
+// note), so their HTML is never trusted. The empty `sandbox` means nothing in
+// the frame can run a script, submit a form, open a window or navigate.
+function EmailBody({ html }: { html: string }) {
+  const links = linksIn(html);
+  return (
+    <div className="mt-3">
+      <iframe
+        title="Email body"
+        sandbox=""
+        srcDoc={`<!doctype html><meta charset="utf-8"><body style="font-family:-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:1.55;color:#1a1a1a;margin:16px;">${html}</body>`}
+        className="w-full h-72 border border-slate-200 rounded-xl bg-slate-50"
+      />
+      {links.length > 0 && (
+        <ul className="mt-2 space-y-1 text-xs">
+          {links.map((href) => (
+            <li key={href}>
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-teal-700 underline break-all"
+              >
+                {href}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

@@ -5,6 +5,7 @@ import { db, users } from "@/db";
 import { eq } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { cleanLine } from "@/lib/text";
 
 export type WelcomeState = { error?: string };
 
@@ -16,7 +17,7 @@ export async function claimAccountAction(
   if (!user) redirect("/login?next=/welcome");
   if (user.status !== "imported") redirect("/book");
 
-  const name = String(formData.get("name") || "").trim();
+  const name = cleanLine(formData.get("name"));
   const expectedFrequency = String(formData.get("expectedFrequency") || "");
   const accessibilityNotes = String(formData.get("accessibilityNotes") || "").trim();
   const guidelines = formData.get("guidelines") === "on";

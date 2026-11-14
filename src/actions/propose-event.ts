@@ -9,6 +9,7 @@ import { sendEmail, link } from "@/lib/email";
 import { formatDayLong, todayAms } from "@/lib/dates";
 import { validateEventHours } from "@/lib/event-hours";
 import { EchoState, formValues } from "@/lib/form-values";
+import { cleanLine } from "@/lib/text";
 
 export type ProposeState = EchoState & { ok?: boolean };
 
@@ -46,7 +47,7 @@ export async function proposeEventAction(
     return fail("You need to be logged in as a member to propose an event.");
   }
 
-  const title = String(formData.get("title") || "").trim();
+  const title = cleanLine(formData.get("title"), 200);
   const date = String(formData.get("date") || "");
   const startsAt = String(formData.get("startsAt") || "") || null;
   const endsAt = String(formData.get("endsAt") || "") || null;
