@@ -5,10 +5,12 @@ import { flaggedUsers } from "@/lib/noshow";
 import { aliasesByUser, findLikelyDuplicates } from "@/lib/users";
 import { todayAms } from "@/lib/dates";
 import { MembersClient, MemberRow } from "./members-client";
+import { requireAdminPage } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function MembersPage() {
+  await requireAdminPage();
   const all = await db
     .select()
     .from(users)

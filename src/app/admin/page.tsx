@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
+import { requireAdminPage } from "@/lib/auth";
 
-export default function AdminIndex() {
+export default async function AdminIndex() {
+  await requireAdminPage();
   redirect("/admin/requests");
 }

@@ -8,6 +8,7 @@ import { checkInUser } from "@/lib/booking";
 import { newId } from "@/lib/ids";
 import { todayAms } from "@/lib/dates";
 import { answerMissedDays } from "@/lib/noshow";
+import { inTheRoom, onEventList } from "@/lib/access";
 
 export type CheckinState = {
   ok?: boolean;
@@ -20,6 +21,11 @@ export type CheckinState = {
 export async function checkinAction(): Promise<CheckinState> {
   const user = await getCurrentUser();
   if (!user) return { error: "Not logged in." };
+  // Without this, anyone who had only filled in the join form could walk
+  // themselves in: take a desk and count in the reports.
+  if (!(await inTheRoom(user, todayAms()))) {
+    return { error: "Checking in is for members and booked guests. Ask the team if that should be you." };
+  }
   const res = await checkInUser(user.id, todayAms());
   revalidatePath("/");
   revalidatePath("/checkin");
@@ -34,6 +40,9 @@ export async function eventCheckinAction(eventId: string): Promise<CheckinState>
   if (!user) return { error: "Not logged in." };
   const [event] = await db.select().from(events).where(eq(events.id, eventId));
   if (!event || event.date !== todayAms()) return { error: "No such event today." };
+  if (!(await onEventList(user, eventId))) {
+    return { error: "You're not on the list for this one. Ask the organiser to add you." };
+  }
 
   const existing = await db
     .select()

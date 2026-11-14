@@ -1,6 +1,7 @@
 import { getReport, methodologyNote } from "@/lib/reports";
 import { addDays, formatDayLong, todayAms } from "@/lib/dates";
 import { PrintButton } from "./print-button";
+import { requireAdminPage } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function PrintReportPage({
 }: {
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
+  await requireAdminPage();
   const sp = await searchParams;
   const today = todayAms();
   const from = /^\d{4}-\d{2}-\d{2}$/.test(sp.from || "") ? sp.from! : addDays(today, -182);
