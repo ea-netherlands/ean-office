@@ -5,10 +5,12 @@ import { todayAms, formatDayLong, formatInstant } from "@/lib/dates";
 import { asSlot, halves, SLOT_LABEL } from "@/lib/slots";
 import { getSettings } from "@/lib/settings";
 import { avatarUrl } from "@/lib/avatars";
+import { requireAdminPage } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminTodayPage() {
+  await requireAdminPage();
   const today = todayAms();
   const cfg = await getSettings();
 

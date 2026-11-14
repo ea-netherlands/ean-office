@@ -4,6 +4,7 @@ import { Page, H1, Sub, Card, Badge, btnSecondary, Icon } from "@/components/ui"
 import { addDays, todayAms } from "@/lib/dates";
 import { RangePicker } from "./range-picker";
 import { WeekdayChart } from "./weekday-chart";
+import { requireAdminPage } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
+  await requireAdminPage();
   const sp = await searchParams;
   const today = todayAms();
   const from = /^\d{4}-\d{2}-\d{2}$/.test(sp.from || "") ? sp.from! : addDays(today, -182);

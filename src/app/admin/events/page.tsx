@@ -4,10 +4,12 @@ import { Page, H1, Sub } from "@/components/ui";
 import { EventsClient, EventRow } from "./events-client";
 import { todayAms, amsDate } from "@/lib/dates";
 import { isCoworkingDay } from "@/lib/coworking";
+import { requireAdminPage } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function EventsPage() {
+  await requireAdminPage();
   const all = await db.select().from(events).orderBy(desc(events.date));
   const attendance =
     all.length > 0

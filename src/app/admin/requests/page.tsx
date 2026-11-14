@@ -9,10 +9,12 @@ import { adminsAway } from "@/lib/away";
 import { findPriorVisits, PriorVisit } from "@/lib/visit-history";
 import { RequestCard, RequestInfo } from "./request-card";
 import { GuestRequestCard, GuestRequestInfo } from "./guest-request-card";
+import { requireAdminPage } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function RequestsPage() {
+  await requireAdminPage();
   const rows = await db
     .select({ req: visitRequests, u: users })
     .from(visitRequests)

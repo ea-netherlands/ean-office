@@ -1,9 +1,11 @@
 import { Page, H1, Sub } from "@/components/ui";
 import { TransferClient } from "./transfer-client";
+import { requireAdminPage } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export default function TransferPage() {
+export default async function TransferPage() {
+  await requireAdminPage();
   return (
     <Page wide>
       <H1>Move bookings across</H1>
