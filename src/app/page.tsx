@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isActiveMember } from "@/lib/auth";
 import { Nav } from "@/components/nav";
 import { Page, H1, Sub, Card, Badge, Icon, btnPrimary, btnSecondary } from "@/components/ui";
 import { PeopleList } from "@/components/people";
@@ -87,6 +87,11 @@ export default async function HomePage() {
     myGuestStatus.set(g.eventId, g.status);
   }
 
+  // An account exists from the moment someone fills in the join form or signs
+  // up for an event, so being logged in is not the same as being a member.
+  // Who's in today, and checking in, are for members and for guests who hold
+  // a seat today.
+  const inRoom = isActiveMember(user) || !!myBooking;
   const others = cap.people.filter((p) => p.id !== user.id);
   // A co-working day owns the whole office, so today's card has to lead with
   // it rather than offering a desk that isn't going to exist.
@@ -149,6 +154,12 @@ export default async function HomePage() {
                 </>
               )}
             </>
+          ) : !inRoom ? (
+            <p className="text-slate-600 text-sm">
+              Booking a desk and seeing who&apos;s in are for members. If
+              you&apos;ve asked for a first visit, you&apos;ll get an email as
+              soon as the team has looked at it.
+            </p>
           ) : (
             <TodayActions
               booked={!!myBooking}
@@ -163,7 +174,7 @@ export default async function HomePage() {
 
         <SurveyCard className="mb-4" />
 
-        {!cap.closed && (
+        {!cap.closed && inRoom && (
           <Card className="mb-4">
             <div className="flex items-center justify-between mb-3">
               <h2>Who&apos;s coming today</h2>

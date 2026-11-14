@@ -1,10 +1,12 @@
 import { getSettings } from "@/lib/settings";
 import { Page, H1, Sub } from "@/components/ui";
 import { InfoEditor } from "./info-editor";
+import { requireAdminPage } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminInfoPage() {
+  await requireAdminPage();
   const cfg = await getSettings();
   return (
     <Page wide>

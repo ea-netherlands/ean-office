@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isActiveMember } from "@/lib/auth";
 import { db, checkins, events, eventAttendance, ensureMigrated } from "@/db";
 import { and, eq } from "drizzle-orm";
 import { todayAms, formatDayLong } from "@/lib/dates";
@@ -88,11 +88,20 @@ export default async function CheckinPage() {
       ) : (
         <>
           <h1 className="text-2xl">Hi {user.name.split(" ")[0]}</h1>
-          <p className="text-slate-600 mt-2 mb-5">
-            You&apos;re not booked today — check in anyway?
-            {cap.full && " The day is technically full, but you're here, so come on in."}
-          </p>
-          <CheckinButtons full={cap.full} />
+          {isActiveMember(user) ? (
+            <>
+              <p className="text-slate-600 mt-2 mb-5">
+                You&apos;re not booked today — check in anyway?
+                {cap.full && " The day is technically full, but you're here, so come on in."}
+              </p>
+              <CheckinButtons full={cap.full} />
+            </>
+          ) : (
+            <p className="text-slate-600 mt-2 mb-5">
+              You don&apos;t have a desk booked today, and checking in without
+              one is for members. Here for an event? Tap it below.
+            </p>
+          )}
         </>
       )}
 

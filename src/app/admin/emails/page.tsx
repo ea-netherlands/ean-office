@@ -3,12 +3,14 @@ import { desc } from "drizzle-orm";
 import { Page, H1, Sub, Badge } from "@/components/ui";
 import { formatInstant } from "@/lib/dates";
 import { EmailList } from "./email-list";
+import { requireAdminPage } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 // Outbox viewer. In production this is an audit trail; without an email
 // provider configured (local/demo) it's where every "sent" email lands.
 export default async function EmailsPage() {
+  await requireAdminPage();
   const rows = await db.select().from(emailLog).orderBy(desc(emailLog.sentAt)).limit(200);
   const provider = !!process.env.RESEND_API_KEY;
 

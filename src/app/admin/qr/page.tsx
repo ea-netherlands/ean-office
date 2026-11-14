@@ -1,5 +1,5 @@
 import QRCode from "qrcode";
-import { appUrl } from "@/lib/auth";
+import { appUrl, requireAdminPage } from "@/lib/auth";
 import { Page, H1, Sub } from "@/components/ui";
 import { getSettings } from "@/lib/settings";
 import { PrintQrButton } from "./print-button";
@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 // desk plus the lunch table. The number labels the desk to match the floor
 // plan on /book; the code checks you in. One static URL, never expires.
 export default async function QrPage() {
+  await requireAdminPage();
   const cfg = await getSettings();
   const url = `${appUrl()}/checkin`;
   const svg = await QRCode.toString(url, {
