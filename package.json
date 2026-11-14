@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
-    "@tabler/icons-webfont": "^3.46.0",
+    "@tabler/icons-webfont": "^3.52.0",
     "date-fns": "^4.4.0",
     "drizzle-orm": "^0.45.2",
     "marked": "^18.0.7",
