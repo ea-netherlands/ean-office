@@ -33,6 +33,27 @@ export type WeekdayRow = {
   flexPerDay: number; // lunch-table spots used per day, overflow
 };
 
+// One row per week (or per month on long ranges). Visits are per person per
+// day, the same counting as the headline "Visits" rows, and are compared per
+// working day so a short week or a week with a holiday isn't read as a dip.
+export type PeriodRow = {
+  start: string; // first day of the bucket that falls inside the range
+  end: string; // last day, likewise
+  days: number; // working days in the bucket, past days only
+  complete: boolean; // false when the range or today cuts the bucket short
+  visitsBooked: number;
+  visitsAttended: number;
+};
+
+export type TrendDirection = "up" | "down" | "steady" | "unknown";
+
+export type Trend = {
+  direction: TrendDirection;
+  from: number; // fitted visits per working day at the start of the range
+  to: number; // and at the end
+  average: number;
+};
+
 export type Report = {
   from: string;
   to: string;
@@ -48,6 +69,12 @@ export type Report = {
   occupancyAttended: number;
   flexDaysUsed: number; // overflow, reported separately
   byWeekday: WeekdayRow[];
+  overTime: {
+    unit: "week" | "month";
+    rows: PeriodRow[];
+    booked: Trend;
+    attended: Trend;
+  };
   walkIns: number;
   waitlistedDays: number;
   halfDayBookings: number; // count of morning/afternoon bookings
@@ -85,6 +112,125 @@ export type Report = {
 
 function pct(n: number, d: number): number {
   return d === 0 ? 0 : n / d;
+}
+
+// Weekly up to about nine months, monthly beyond that: more than ~40 bars
+// stops being readable, and a month smooths out the holiday weeks.
+const WEEKLY_MAX_DAYS = 280;
+
+function mondayOf(day: string): string {
+  return addDays(day, 1 - isoWeekday(day));
+}
+
+export function bucketVisits(
+  from: string,
+  pastTo: string,
+  bookedUserDays: Iterable<string>, // "userId:date"
+  attendedDates: Iterable<string>
+): { unit: "week" | "month"; rows: PeriodRow[] } {
+  if (pastTo < from) return { unit: "week", rows: [] };
+  const span = (Date.parse(pastTo) - Date.parse(from)) / 86_400_000;
+  const unit = span <= WEEKLY_MAX_DAYS ? "week" : "month";
+  const keyOf = (d: string) => (unit === "week" ? mondayOf(d) : d.slice(0, 7));
+
+  const rows = new Map<string, PeriodRow>();
+  for (let d = from; d <= pastTo; d = addDays(d, 1)) {
+    const k = keyOf(d);
+    const row = rows.get(k);
+    if (row) {
+      row.end = d;
+      if (isWorkingDay(d)) row.days++;
+    } else {
+      rows.set(k, {
+        start: d,
+        end: d,
+        days: isWorkingDay(d) ? 1 : 0,
+        // Complete unless the range starts after the bucket's first working
+        // day; whether it also runs to its last one is checked below.
+        complete: !hasWorkingDayBefore(d, k, keyOf),
+        visitsBooked: 0,
+        visitsAttended: 0,
+      });
+    }
+  }
+  for (const [k, row] of rows) {
+    if (hasWorkingDayAfter(row.end, k, keyOf)) row.complete = false;
+  }
+  for (const ud of bookedUserDays) {
+    const row = rows.get(keyOf(ud.slice(ud.indexOf(":") + 1)));
+    if (row) row.visitsBooked++;
+  }
+  for (const d of attendedDates) {
+    const row = rows.get(keyOf(d));
+    if (row) row.visitsAttended++;
+  }
+  // Weeks before the first recorded visit are before the app was in use, not
+  // empty weeks at the office: counting them as zeros would read as growth.
+  const all = [...rows.values()].filter((r) => r.days > 0);
+  const firstUsed = all.findIndex((r) => r.visitsBooked + r.visitsAttended > 0);
+  return { unit, rows: firstUsed === -1 ? [] : all.slice(firstUsed) };
+}
+
+function hasWorkingDayBefore(
+  day: string,
+  key: string,
+  keyOf: (d: string) => string
+): boolean {
+  for (let d = addDays(day, -1); keyOf(d) === key; d = addDays(d, -1)) {
+    if (isWorkingDay(d)) return true;
+  }
+  return false;
+}
+
+function hasWorkingDayAfter(
+  day: string,
+  key: string,
+  keyOf: (d: string) => string
+): boolean {
+  for (let d = addDays(day, 1); keyOf(d) === key; d = addDays(d, 1)) {
+    if (isWorkingDay(d)) return true;
+  }
+  return false;
+}
+
+// Is the series going up, down, or holding? A straight line through the
+// complete buckets, and it only counts as a trend when the line moves by
+// more than a tenth of the average across the range AND the slope stands
+// clear of the week-to-week noise (|t| > 2). Office weeks swing a lot, so
+// comparing two months by eye calls a trend most times there isn't one.
+const MIN_BUCKETS = { week: 8, month: 4 };
+
+export function trendOf(
+  rows: PeriodRow[],
+  unit: "week" | "month",
+  value: (r: PeriodRow) => number
+): Trend {
+  const ys = rows.filter((r) => r.complete).map((r) => value(r) / r.days);
+  const n = ys.length;
+  const average = n === 0 ? 0 : ys.reduce((s, y) => s + y, 0) / n;
+  if (n < MIN_BUCKETS[unit] || average === 0) {
+    return { direction: "unknown", from: average, to: average, average };
+  }
+  const xMean = (n - 1) / 2;
+  let sxx = 0;
+  let sxy = 0;
+  ys.forEach((y, x) => {
+    sxx += (x - xMean) ** 2;
+    sxy += (x - xMean) * (y - average);
+  });
+  const slope = sxy / sxx;
+  const intercept = average - slope * xMean;
+  const sse = ys.reduce((s, y, x) => s + (y - (intercept + slope * x)) ** 2, 0);
+  const se = Math.sqrt(sse / (n - 2) / sxx);
+  const t = se === 0 ? Infinity : Math.abs(slope) / se;
+  const change = slope * (n - 1);
+  const real = Math.abs(change) > 0.1 * average && t > 2;
+  return {
+    direction: !real ? "steady" : slope > 0 ? "up" : "down",
+    from: intercept,
+    to: intercept + change,
+    average,
+  };
 }
 
 export async function getReport(from: string, to: string): Promise<Report> {
@@ -161,6 +307,18 @@ export async function getReport(from: string, to: string): Promise<Report> {
     };
   });
   const uniqueVisitorIds = new Set(checkinRows.map((c) => c.userId));
+
+  const buckets = bucketVisits(
+    from,
+    pastTo,
+    bookedUserDays,
+    checkinRows.map((c) => c.date)
+  );
+  const overTime = {
+    ...buckets,
+    booked: trendOf(buckets.rows, buckets.unit, (r) => r.visitsBooked),
+    attended: trendOf(buckets.rows, buckets.unit, (r) => r.visitsAttended),
+  };
 
   // unique visitors per calendar month, averaged
   const byMonth = new Map<string, Set<string>>();
@@ -333,6 +491,7 @@ export async function getReport(from: string, to: string): Promise<Report> {
     occupancyAttended: pct(deskDays(deskAttended), denom),
     flexDaysUsed: deskDays(booked.filter((b) => b.seatType === "flex")),
     byWeekday,
+    overTime,
     walkIns: booked.filter((b) => b.source === "walkin").length,
     waitlistedDays: new Set(
       bookingRows.filter((b) => b.status === "waitlisted").map((b) => b.date)

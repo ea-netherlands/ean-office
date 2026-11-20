@@ -13,6 +13,7 @@ import { coworkingDayOn } from "@/lib/booking";
 import { normaliseUrl } from "@/lib/url";
 import { resolveGender } from "@/lib/profile-options";
 import { EchoState, formValues } from "@/lib/form-values";
+import { cleanLine, escapeHtml } from "@/lib/text";
 
 export type JoinState = EchoState & { ok?: boolean };
 
@@ -55,7 +56,7 @@ export async function submitJoinRequest(
     attempt,
   });
 
-  const name = String(formData.get("name") || "").trim();
+  const name = cleanLine(formData.get("name"));
   const email = String(formData.get("email") || "").toLowerCase().trim();
   const descriptor = String(formData.get("descriptor") || "");
   const profileUrl = String(formData.get("profileUrl") || "").trim();
@@ -222,7 +223,7 @@ export async function submitJoinRequest(
       ? `We got your request — we're back on ${away.back}`
       : "We got your request — you'll hear from us within one working day",
     kind: "request_ack",
-    html: `<p>Hi ${name},</p>
+    html: `<p>Hi ${escapeHtml(name)},</p>
 <p>Thanks for your interest in the EA Netherlands office! We've received your request to visit on <strong>${formatDayLong(requestedDate)}</strong> at ${requestedArrival}.</p>
 <p>Just so it's clear up front: that first visit works as a trial day. Come see if the space is a good fit, and afterwards the team will confirm whether to welcome you as a full member — you won't be able to book further days until then.</p>
 ${
@@ -243,7 +244,7 @@ ${
   const list = pending
     .map(
       (p) =>
-        `<li><strong>${p.u.name}</strong> — ${formatDayLong(p.req.requestedDate)} ${p.req.requestedArrival} (${p.req.status})</li>`
+        `<li><strong>${escapeHtml(p.u.name)}</strong> — ${formatDayLong(p.req.requestedDate)} ${p.req.requestedArrival} (${p.req.status})</li>`
     )
     .join("");
   for (const admin of admins) {
@@ -251,7 +252,7 @@ ${
       to: admin.email,
       subject: `New visit request from ${name} (${pending.length} open)`,
       kind: "admin_new_request",
-      html: `<p>${name} has requested a first visit on ${formatDayLong(requestedDate)} at ${requestedArrival}.</p>
+      html: `<p>${escapeHtml(name)} has requested a first visit on ${formatDayLong(requestedDate)} at ${requestedArrival}.</p>
 <p>All open requests:</p><ul>${list}</ul>
 <p>${link(`${appUrl()}/admin/requests`, "Open the approval queue")}</p>`,
     });

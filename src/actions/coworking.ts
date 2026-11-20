@@ -11,6 +11,7 @@ import { COWORKING_TYPE, validateCoworkingDay } from "@/lib/coworking";
 import { getSettings } from "@/lib/settings";
 import { bookedThatDay } from "@/lib/coworking-guests";
 import { EchoState, formValues } from "@/lib/form-values";
+import { cleanLine } from "@/lib/text";
 
 export type CoworkingProposalState = EchoState & {
   ok?: boolean;
@@ -51,7 +52,7 @@ export async function proposeCoworkingDayAction(
     return fail("You need to be logged in as a member to organise a co-working day.");
   }
 
-  const title = String(formData.get("title") || "").trim();
+  const title = cleanLine(formData.get("title"), 200);
   const date = String(formData.get("date") || "");
   const startsAt = String(formData.get("startsAt") || "") || null;
   const endsAt = String(formData.get("endsAt") || "") || null;

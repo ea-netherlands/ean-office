@@ -4,6 +4,8 @@ import { Page, H1, Sub, Card, Badge, btnSecondary, Icon } from "@/components/ui"
 import { addDays, todayAms } from "@/lib/dates";
 import { RangePicker } from "./range-picker";
 import { WeekdayChart } from "./weekday-chart";
+import { VisitsOverTime } from "./visits-over-time";
+import { requireAdminPage } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +18,7 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
+  await requireAdminPage();
   const sp = await searchParams;
   const today = todayAms();
   const from = /^\d{4}-\d{2}-\d{2}$/.test(sp.from || "") ? sp.from! : addDays(today, -182);
@@ -178,6 +181,17 @@ export default async function ReportsPage({
           expect the attended number to be lower, and say why. A defensible
           60% beats an unreproducible 75%.
         </p>
+      </Card>
+
+      {/* Usage over time */}
+      <Card className="mb-4">
+        <h2 className="mb-1">Visits over time</h2>
+        <p className="text-sm text-slate-600 mb-4">
+          Visits per working day, {r.overTime.unit === "week" ? "week by week" : "month by month"},
+          over the dates picked above. Counted per working day so a short week
+          or a holiday doesn&apos;t look like a dip. Hover over a bar for more.
+        </p>
+        <VisitsOverTime data={r.overTime} />
       </Card>
 
       {/* Usage by weekday */}

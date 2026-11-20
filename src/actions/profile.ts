@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { normaliseUrl } from "@/lib/url";
 import { resolveGender, PROFILE_PROMPT_COOKIE } from "@/lib/profile-options";
+import { cleanLine } from "@/lib/text";
 
 export type ProfileState = { ok?: boolean; error?: string };
 
@@ -131,7 +132,7 @@ export async function updatePrefsAction(
   await db
     .update(users)
     .set({
-      name: String(formData.get("name") || user.name),
+      name: cleanLine(formData.get("name")) || user.name,
       noshowEmailOptOut: formData.get("noshowEmailOptOut") === "on",
     })
     .where(eq(users.id, user.id));

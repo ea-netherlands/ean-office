@@ -2,12 +2,14 @@ import { Page, H1, Sub, Card, Badge } from "@/components/ui";
 import { SURVEY, surveyOpen, surveyRecipients } from "@/lib/survey";
 import { todayAms } from "@/lib/dates";
 import { SurveySendForm, SurveyReminderForm } from "./send-form";
+import { requireAdminPage } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 // One-off send for the 2026 office survey. Safe to press more than once:
 // anyone already in the email log for this survey is skipped.
 export default async function SurveyAdminPage() {
+  await requireAdminPage();
   const everyone = await surveyRecipients(true);
   const core = everyone.filter((r) => r.status !== "imported");
   const imported = everyone.filter((r) => r.status === "imported");

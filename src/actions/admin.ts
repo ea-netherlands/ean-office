@@ -31,6 +31,7 @@ import {
   coworkingSpots,
 } from "@/lib/coworking-guests";
 import { DeclineEmailTemplate } from "@/lib/profile-options";
+import { cleanLine } from "@/lib/text";
 
 async function requireAdmin() {
   const user = await getCurrentUser();
@@ -341,7 +342,7 @@ export async function addMemberAction(
   formData: FormData
 ): Promise<AdminActionState> {
   await requireAdmin();
-  const name = String(formData.get("name") || "").trim();
+  const name = cleanLine(formData.get("name"));
   const email = String(formData.get("email") || "").toLowerCase().trim();
   if (!name || !email.includes("@")) return { error: "Name and a valid email are required." };
   await db.insert(users).values({
@@ -441,7 +442,7 @@ export async function createEventAction(
   formData: FormData
 ): Promise<AdminActionState> {
   const admin = await requireAdmin();
-  const title = String(formData.get("title") || "").trim();
+  const title = cleanLine(formData.get("title"), 200);
   const date = String(formData.get("date") || "");
   const type = String(formData.get("type") || "other");
   const startsAt = String(formData.get("startsAt") || "") || null;

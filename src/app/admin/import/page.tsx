@@ -1,9 +1,11 @@
 import { Page, H1, Sub } from "@/components/ui";
 import { ImportClient } from "./import-client";
+import { requireAdminPage } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export default function ImportPage() {
+export default async function ImportPage() {
+  await requireAdminPage();
   return (
     <Page wide>
       <H1>Import members</H1>

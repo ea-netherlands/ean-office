@@ -5,6 +5,7 @@ import { db, ensureMigrated, loginTokens, sessions, users } from "@/db";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { newId } from "./ids";
 import { findUserByEmail } from "./users";
+import { redirect } from "next/navigation";
 
 const SESSION_COOKIE = "ean_session";
 const SESSION_DAYS = 90;
@@ -122,6 +123,19 @@ export async function logout(): Promise<void> {
     await db.delete(sessions).where(eq(sessions.tokenHash, hash(raw)));
   }
   jar.delete(SESSION_COOKIE);
+}
+
+/**
+ * For admin pages: send anyone who is not an admin away. Call it first in
+ * every page under /admin. The admin layout checks too, but a layout is not a
+ * boundary — Next.js can render a page without re-running the layout above
+ * it — so each page has to ask for itself.
+ */
+export async function requireAdminPage(): Promise<SessionUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login?next=/admin");
+  if (user.role !== "admin") redirect("/");
+  return user;
 }
 
 export function isAdmin(user: SessionUser | null): boolean {

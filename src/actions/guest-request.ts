@@ -9,6 +9,7 @@ import {
   declineGuestRequest,
 } from "@/lib/guest-requests";
 import { EchoState, formValues } from "@/lib/form-values";
+import { cleanLine } from "@/lib/text";
 
 export type GuestBookingState = EchoState & { ok?: boolean };
 
@@ -57,7 +58,7 @@ export async function requestGuestBookingAction(
   const res = await createGuestRequest(
     { id: user!.id, name: user!.name, email: user!.email },
     {
-      guestName: String(formData.get("guestName") ?? ""),
+      guestName: cleanLine(formData.get("guestName")),
       guestEmail: String(formData.get("guestEmail") ?? ""),
       date: String(formData.get("date") ?? ""),
       endDate: String(formData.get("endDate") ?? "") || undefined,

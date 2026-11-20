@@ -20,6 +20,7 @@ import {
   seatGuest,
 } from "@/lib/coworking-guests";
 import { EchoState, formValues } from "@/lib/form-values";
+import { cleanLine, escapeHtml } from "@/lib/text";
 
 export type GuestRequestState = EchoState & { ok?: boolean };
 
@@ -62,7 +63,7 @@ export async function requestEventGuestAction(
   if (!acceptsSignups(event)) return fail("This one isn't open for sign-ups.");
   const coworking = isCoworkingDay(event.type);
 
-  const name = String(formData.get("name") || "").trim();
+  const name = cleanLine(formData.get("name"));
   const email = String(formData.get("email") || "").toLowerCase().trim();
   const accessibilityNotes = String(formData.get("accessibilityNotes") || "").trim();
   const guidelines = formData.get("guidelines") === "on";
@@ -151,8 +152,8 @@ export async function requestEventGuestAction(
       to: email,
       subject: `Request received: ${event.title}`,
       kind: "event_guest_request",
-      html: `<p>Hi ${name},</p>
-<p>Thanks for asking to join <strong>${event.title}</strong> on ${formatDayLong(event.date)}. The organiser curates this one directly, so you'll get an email either way once they've had a look.</p>
+      html: `<p>Hi ${escapeHtml(name)},</p>
+<p>Thanks for asking to join <strong>${escapeHtml(event.title)}</strong> on ${formatDayLong(event.date)}. The organiser curates this one directly, so you'll get an email either way once they've had a look.</p>
 <p>Changed your mind? ${link(leaveEventUrl(guestId, event.date), "Withdraw your request")} — no login needed.</p>`,
     });
   } else {
@@ -163,8 +164,8 @@ export async function requestEventGuestAction(
       to: email,
       subject: `You're on the list: ${event.title}`,
       kind: "event_signup_confirmed",
-      html: `<p>Hi ${name},</p>
-<p>You're signed up for <strong>${event.title}</strong> — ${when}. No desk booking needed, just come along.</p>
+      html: `<p>Hi ${escapeHtml(name)},</p>
+<p>You're signed up for <strong>${escapeHtml(event.title)}</strong> — ${when}. No desk booking needed, just come along.</p>
 <p><strong>Where:</strong> ${cfg.office_address}</p>
 <p>The connecting doors to the main area close at 18:00, so if you arrive after that and the office door is shut, knock or message the organiser.</p>
 <p>${link(`${appUrl()}/info`, "Practical info about the office")} — getting here, wifi, the house guidelines.</p>
@@ -199,12 +200,12 @@ export async function requestEventGuestAction(
         ? "event_guest_request_organiser"
         : "event_signup_organiser",
       html: coworking
-        ? `<p><strong>${name}</strong> (${email}) asked to join <strong>${event.title}</strong> on ${formatDayLong(event.date)}.</p>
-${accessibilityNotes ? `<p>${accessibilityNotes.replace(/</g, "&lt;")}</p>` : ""}
+        ? `<p><strong>${escapeHtml(name)}</strong> (${escapeHtml(email)}) asked to join <strong>${escapeHtml(event.title)}</strong> on ${formatDayLong(event.date)}.</p>
+${accessibilityNotes ? `<p>${escapeHtml(accessibilityNotes)}</p>` : ""}
 <p>${spots!.left > 0 ? `${spots!.left} of ${spots!.total} spots still free.` : `The room is full — all ${spots!.total} spots are taken.`}</p>
 <p>${link(`${appUrl()}/events/${eventId}/guests`, "Review guest requests")}</p>`
-        : `<p><strong>${name}</strong> (${email}) signed up for <strong>${event.title}</strong> on ${formatDayLong(event.date)}. That's ${signedUp} ${signedUp === 1 ? "person" : "people"} so far.</p>
-${accessibilityNotes ? `<p>${accessibilityNotes.replace(/</g, "&lt;")}</p>` : ""}
+        : `<p><strong>${escapeHtml(name)}</strong> (${escapeHtml(email)}) signed up for <strong>${escapeHtml(event.title)}</strong> on ${formatDayLong(event.date)}. That's ${signedUp} ${signedUp === 1 ? "person" : "people"} so far.</p>
+${accessibilityNotes ? `<p>${escapeHtml(accessibilityNotes)}</p>` : ""}
 <p>${link(`${appUrl()}/events/${eventId}/guests`, "See who's coming")}</p>`,
     });
   }
