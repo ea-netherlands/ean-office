@@ -109,10 +109,16 @@ export async function publishCommunityProfileAction(
     .set({ profileVisible: true, bio, publicLink })
     .where(eq(users.id, user.id));
 
-  revalidatePath("/me");
-  revalidatePath("/book");
-  revalidatePath("/");
-  revalidatePath("/checkin");
+  // From the check-in prompt, skip revalidation: any revalidatePath in an
+  // action re-renders the page it was called from, and the check-in page
+  // only shows the prompt to people who aren't visible yet — so the card,
+  // and the "you're visible" confirmation in it, would vanish mid-tap. Every
+  // other page is force-dynamic and reads fresh on the next visit anyway.
+  if (formData.get("from") !== "checkin") {
+    revalidatePath("/me");
+    revalidatePath("/book");
+    revalidatePath("/");
+  }
   return { ok: true };
 }
 
