@@ -58,11 +58,12 @@ export default async function WelcomePage() {
             avatarUrl={avatarUrl(user.id, user.avatarUpdatedAt)}
             community={{
               profileVisible: user.profileVisible,
-              bio: user.bio ?? user.about,
+              bio: user.bio,
               expertise: user.expertise,
               publicCauseAreas: user.publicCauseAreas,
-              publicLink: user.publicLink ?? user.profileUrl,
+              publicLink: user.publicLink,
             }}
+            draft={{ bio: user.about, link: user.profileUrl }}
           />
         </div>
       </Page>

@@ -1,12 +1,19 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
 import { db, checkins, events, eventAttendance, ensureMigrated } from "@/db";
 import { and, eq } from "drizzle-orm";
 import { todayAms, formatDayLong } from "@/lib/dates";
 import { capacityForDay, checkInUser } from "@/lib/booking";
 import { CheckinButtons, EventCheckinButtons } from "./checkin-buttons";
-import { btnPrimary, btnSecondary, Icon } from "@/components/ui";
+import { btnPrimary, btnSecondary, Card, Icon } from "@/components/ui";
 import { SurveyCard } from "@/components/survey-card";
+import { PeopleList } from "@/components/people";
+import { QuickPublishForm } from "@/components/community-profile-card";
+import { AvatarUpload } from "@/components/avatar-upload";
+import { avatarUrl } from "@/lib/avatars";
+import { PROFILE_PROMPT_COOKIE } from "@/lib/profile-options";
+import { snoozeProfilePromptAction } from "@/actions/profile";
 
 export const dynamic = "force-dynamic";
 
@@ -73,6 +80,17 @@ export default async function CheckinPage() {
 
   const checkedIn = !!existing || justCheckedIn;
 
+  // Who else is here. The door is where a bio pays off the same day: you're
+  // about to sit next to these people, and seeing that they've said what
+  // they do is the best argument for saying what you do.
+  const seen = new Set<string>([user.id]);
+  const others = cap.people.filter((p) => !seen.has(p.id) && !!seen.add(p.id));
+  const described = others.filter((p) => !!p.profile?.bio).length;
+  const myAvatar = avatarUrl(user.id, user.avatarUpdatedAt);
+  const myProfileLive = user.profileVisible && !!user.bio?.trim();
+  const snoozed = !!(await cookies()).get(PROFILE_PROMPT_COOKIE);
+  const showPrompt = checkedIn && !myProfileLive && !snoozed;
+
   return (
     <Shell>
       {checkedIn ? (
@@ -94,6 +112,51 @@ export default async function CheckinPage() {
           </p>
           <CheckinButtons full={cap.full} />
         </>
+      )}
+
+      {checkedIn && others.length > 0 && (
+        <Card className="mt-8 w-full text-left">
+          <h2>In today</h2>
+          <p className="text-sm text-slate-600 mt-1 mb-3">
+            {others.length === 1
+              ? "1 other person is booked today."
+              : `${others.length} other people are booked today.`}
+            {described > 0 &&
+              ` ${described === others.length ? (others.length === 1 ? "They've" : "All of them have") : `${described} of them have`} said what they're working on — tap a name to read it.`}
+          </p>
+          <PeopleList
+            people={others.map((p) => ({
+              id: p.id,
+              name: p.name,
+              seatType: p.seatType,
+              deskNumber: p.deskNumber,
+              slot: p.slot,
+              avatarUrl: p.avatarUrl,
+              profile: p.profile,
+            }))}
+          />
+        </Card>
+      )}
+
+      {showPrompt && (
+        <Card className="mt-4 w-full text-left">
+          <h2>{others.length > 0 ? "Let them find you too" : "Let people find you"}</h2>
+          <p className="text-sm text-slate-600 mt-1">
+            One sentence about what you&apos;re working on, and other members
+            can tap your name to see it.
+          </p>
+          {!myAvatar && (
+            <div className="mt-3">
+              <AvatarUpload name={user.name} src={null} />
+            </div>
+          )}
+          <QuickPublishForm
+            bio={user.bio || user.about}
+            link={user.publicLink || user.profileUrl}
+            fromApplication={!user.bio && !!user.about}
+            snoozeAction={snoozeProfilePromptAction}
+          />
+        </Card>
       )}
 
       {todaysEvents.length > 0 && (
