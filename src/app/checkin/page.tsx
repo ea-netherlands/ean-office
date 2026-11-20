@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { getCurrentUser, isActiveMember } from "@/lib/auth";
-import { db, checkins, events, eventAttendance, ensureMigrated } from "@/db";
-import { and, eq } from "drizzle-orm";
+import { db, bookings, checkins, events, eventAttendance, ensureMigrated } from "@/db";
+import { and, eq, inArray, lt } from "drizzle-orm";
 import { todayAms, formatDayLong } from "@/lib/dates";
 import { capacityForDay, checkInUser } from "@/lib/booking";
 import { CheckinButtons, EventCheckinButtons } from "./checkin-buttons";
@@ -91,6 +91,14 @@ export default async function CheckinPage() {
   const snoozed = !!(await cookies()).get(PROFILE_PROMPT_COOKIE);
   const showPrompt = checkedIn && !myProfileLive && !snoozed;
 
+  // How many of today's people they've never been in with. A count, not a
+  // name: pointing at one person ("go talk to Sanne") volunteers someone who
+  // never agreed to be volunteered.
+  const metBefore = checkedIn
+    ? await sharedDaysWith(user.id, others.map((p) => p.id), today)
+    : new Set<string>();
+  const newFaces = others.filter((p) => !metBefore.has(p.id)).length;
+
   return (
     <Shell>
       {checkedIn ? (
@@ -144,6 +152,23 @@ export default async function CheckinPage() {
               profile: p.profile,
             }))}
           />
+          {newFaces > 0 && (
+            <div className="mt-4 pt-3 border-t border-dashed border-slate-200 flex items-start gap-2 text-sm text-slate-700">
+              <Icon name="users-plus" className="text-lg text-teal-700 mt-0.5 shrink-0" />
+              <p>
+                {newFaces === others.length
+                  ? others.length === 1
+                    ? "You haven't shared a day with them before."
+                    : `You haven't shared a day with any of them before.`
+                  : newFaces === 1
+                    ? "1 of them you haven't shared a day with before."
+                    : `${newFaces} of them you haven't shared a day with before.`}{" "}
+                New connections are one of the best things about the office: a
+                lot of jobs, collaborations and good ideas start with a chat
+                over coffee. Say hi at lunch?
+              </p>
+            </div>
+          )}
         </Card>
       )}
 
@@ -192,6 +217,40 @@ export default async function CheckinPage() {
       </Link>
     </Shell>
   );
+}
+
+/**
+ * Which of `others` have been booked into the office on a day `userId` was
+ * too, before today. Booked rows only: a cancellation or a waitlist place
+ * means they were never actually in the room together.
+ */
+async function sharedDaysWith(
+  userId: string,
+  others: string[],
+  today: string
+): Promise<Set<string>> {
+  if (others.length === 0) return new Set();
+  const myDays = db
+    .select({ date: bookings.date })
+    .from(bookings)
+    .where(
+      and(
+        eq(bookings.userId, userId),
+        eq(bookings.status, "booked"),
+        lt(bookings.date, today)
+      )
+    );
+  const rows = await db
+    .selectDistinct({ userId: bookings.userId })
+    .from(bookings)
+    .where(
+      and(
+        inArray(bookings.userId, others),
+        eq(bookings.status, "booked"),
+        inArray(bookings.date, myDays)
+      )
+    );
+  return new Set(rows.map((r) => r.userId));
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
