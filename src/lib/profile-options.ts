@@ -112,3 +112,6 @@ export const DECLINE_EMAIL_TEMPLATES = [
 ] as const;
 
 export type DeclineEmailTemplate = (typeof DECLINE_EMAIL_TEMPLATES)[number]["value"];
+
+/** Cookie that quiets the check-in profile prompt for a fortnight. */
+export const PROFILE_PROMPT_COOKIE = "profile_prompt_snoozed";

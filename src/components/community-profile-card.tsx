@@ -1,10 +1,14 @@
 "use client";
 
 import { useState, useActionState } from "react";
-import { saveCommunityProfileAction, ProfileState } from "@/actions/profile";
+import {
+  saveCommunityProfileAction,
+  publishCommunityProfileAction,
+  ProfileState,
+} from "@/actions/profile";
 import { CAUSE_AREAS } from "@/lib/profile-options";
 import { AvatarUpload } from "@/components/avatar-upload";
-import { Card, Badge, Icon, btnPrimary, inputCls, labelCls } from "@/components/ui";
+import { Card, Badge, Icon, Notice, btnPrimary, inputCls, labelCls } from "@/components/ui";
 
 export type CommunityProfile = {
   profileVisible: boolean;
@@ -13,6 +17,19 @@ export type CommunityProfile = {
   publicCauseAreas: string[] | null;
   publicLink: string | null;
 };
+
+/**
+ * What they told us when they applied — the "about" answer and the link the
+ * join form requires. Offered as an editable starting point, never published
+ * without them pressing the button: it was written for the people approving
+ * applications, not for other members.
+ */
+export type ProfileDraft = { bio: string | null; link: string | null };
+
+/** Live to other members, with something to read. */
+export function isProfileLive(c: CommunityProfile): boolean {
+  return c.profileVisible && !!c.bio?.trim();
+}
 
 /**
  * What's still missing, in the order it's worth filling in. Used for the
@@ -37,6 +54,114 @@ export function listGaps(gaps: string[]): string {
 }
 
 /**
+ * One sentence, one link, one button. The full form asks six things behind
+ * "Edit" and a checkbox people miss; this asks two, starts them filled in
+ * from the application, and the button itself is the opt-in.
+ */
+export function QuickPublishForm({
+  bio,
+  link,
+  fromApplication,
+  onMore,
+  snoozeAction,
+}: {
+  bio: string | null;
+  link: string | null;
+  /** The bio text came from their application rather than their profile. */
+  fromApplication: boolean;
+  /** Opens the full form, for "ask me about" and cause areas. */
+  onMore?: () => void;
+  /** Adds a "Not now" that runs this (the check-in prompt). */
+  snoozeAction?: () => Promise<void>;
+}) {
+  const [state, action, pending] = useActionState<ProfileState, FormData>(
+    publishCommunityProfileAction,
+    {}
+  );
+
+  if (state.ok) {
+    return (
+      <Notice tone="ok" className="mt-3">
+        You&apos;re visible to members. Anyone booked on the same day can tap
+        your name to read this.{" "}
+        <a href="/me" className="font-medium underline">
+          Add what to ask you about
+        </a>
+      </Notice>
+    );
+  }
+
+  return (
+    <form action={action} className="mt-3 space-y-3 text-left">
+      {snoozeAction && <input type="hidden" name="from" value="checkin" />}
+      <div>
+        <label className={labelCls} htmlFor="quick-bio">
+          What you&apos;re working on
+        </label>
+        <textarea
+          id="quick-bio"
+          name="bio"
+          rows={3}
+          maxLength={500}
+          defaultValue={bio ?? ""}
+          className={inputCls}
+          placeholder="e.g. Researching pandemic preparedness policy at Utrecht University."
+        />
+        {fromApplication && (
+          <p className="text-xs text-slate-500 mt-1">
+            We started this from your application. Have a read and make it
+            sound like you before you share it.
+          </p>
+        )}
+      </div>
+      <div>
+        <label className={labelCls} htmlFor="quick-link">
+          LinkedIn or another link
+        </label>
+        <input
+          id="quick-link"
+          name="publicLink"
+          type="text"
+          inputMode="url"
+          maxLength={300}
+          defaultValue={link ?? ""}
+          className={inputCls}
+          placeholder="linkedin.com/in/yourname"
+        />
+      </div>
+      {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+      <div className="flex items-center gap-3 flex-wrap">
+        <button type="submit" disabled={pending} className={btnPrimary}>
+          {pending ? "Sharing…" : "Show to members"}
+        </button>
+        {onMore && (
+          <button
+            type="button"
+            onClick={onMore}
+            className="text-sm text-teal-700 font-medium cursor-pointer"
+          >
+            More options
+          </button>
+        )}
+        {snoozeAction && (
+          <button
+            type="submit"
+            formAction={snoozeAction}
+            className="text-sm text-slate-500 hover:text-slate-700 cursor-pointer"
+          >
+            Not now
+          </button>
+        )}
+      </div>
+      <p className="text-xs text-slate-500">
+        Only logged-in members see it, and you can hide it again from your
+        profile page.
+      </p>
+    </form>
+  );
+}
+
+/**
  * Opt-in "who's-in" networking profile — deliberately separate from the
  * M&E reporting questions, which are never shown to anyone. Reused on
  * /me (where it starts collapsed) and /welcome (started expanded, since
@@ -44,22 +169,28 @@ export function listGaps(gaps: string[]): string {
  */
 export function CommunityProfileCard({
   community,
+  draft,
   defaultOpen,
   name,
   avatarUrl,
 }: {
+  /** What's saved. Gaps and "live" are judged on this, never the draft. */
   community: CommunityProfile;
+  draft?: ProfileDraft;
   defaultOpen?: boolean;
   name: string;
   avatarUrl: string | null;
 }) {
-  const [open, setOpen] = useState(defaultOpen ?? community.profileVisible);
+  const live = isProfileLive(community);
+  const [open, setOpen] = useState(defaultOpen ?? live);
   const [visible, setVisible] = useState(community.profileVisible);
   const [state, action, pending] = useActionState<ProfileState, FormData>(
     saveCommunityProfileAction,
     {}
   );
   const gaps = communityProfileGaps(community, !!avatarUrl);
+  const startBio = community.bio || draft?.bio || null;
+  const startLink = community.publicLink || draft?.link || null;
 
   return (
     <Card>
@@ -90,12 +221,27 @@ export function CommunityProfileCard({
           it never leaves the app.
         </p>
       </div>
-      {!open && (
+      {!open && !live && (
+        <>
+          <p className="text-sm text-slate-600 mt-4">
+            Most conversations in the office start with &ldquo;what are you
+            working on?&rdquo; Add a sentence so people already know, and
+            can tap your name on the booking calendar to find you.
+          </p>
+          <QuickPublishForm
+            bio={startBio}
+            link={startLink}
+            fromApplication={!community.bio && !!draft?.bio}
+            onMore={() => setOpen(true)}
+          />
+        </>
+      )}
+      {!open && live && (
         <>
           <p className="text-sm text-slate-500 mt-3">
-            Optional: let other members tap your name on the booking calendar to
-            see what you work on. Completely separate from the reporting
-            questions below, which are never shown to anyone.
+            Members can tap your name on the booking calendar to see what you
+            work on. Completely separate from the reporting questions below,
+            which are never shown to anyone.
           </p>
           {gaps.length > 0 && (
             <p className="text-sm text-teal-800 mt-2 flex items-start gap-1.5">
@@ -131,7 +277,7 @@ export function CommunityProfileCard({
               name="bio"
               rows={2}
               maxLength={500}
-              defaultValue={community.bio ?? ""}
+              defaultValue={startBio ?? ""}
               className={inputCls}
               placeholder="e.g. Researching pandemic preparedness policy at Utrecht University."
             />
@@ -171,7 +317,7 @@ export function CommunityProfileCard({
               type="text"
               inputMode="url"
               maxLength={300}
-              defaultValue={community.publicLink ?? ""}
+              defaultValue={startLink ?? ""}
               className={inputCls}
             />
           </div>

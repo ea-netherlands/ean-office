@@ -194,11 +194,13 @@ export default async function MePage() {
             noshowEmailOptOut: user.noshowEmailOptOut,
             community: {
               profileVisible: user.profileVisible,
-              bio: user.bio ?? user.about, // prefill from intake, editable before publishing
+              bio: user.bio,
               expertise: user.expertise,
               publicCauseAreas: user.publicCauseAreas,
-              publicLink: user.publicLink ?? user.profileUrl,
+              publicLink: user.publicLink,
             },
+            // From the application: a starting point, shown only to them.
+            draft: { bio: user.about, link: user.profileUrl },
             profile: {
               causeArea: user.causeArea,
               roleCategory: user.roleCategory,

@@ -49,6 +49,7 @@ export function MeClient({
       publicCauseAreas: string[] | null;
       publicLink: string | null;
     };
+    draft: { bio: string | null; link: string | null };
     profile: {
       causeArea: string | null;
       roleCategory: string | null;
@@ -201,6 +202,7 @@ export function MeClient({
 
       <CommunityProfileCard
         community={user.community}
+        draft={user.draft}
         name={user.name}
         avatarUrl={user.avatarUrl}
       />
