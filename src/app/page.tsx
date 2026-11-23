@@ -12,7 +12,7 @@ import { and, eq, gte, lte, asc } from "drizzle-orm";
 import { addDays, formatDayLong, todayAms, formatDay } from "@/lib/dates";
 import { TodayActions } from "./today-actions";
 import { SurveyCard } from "@/components/survey-card";
-import { countNewFaces, NewFacesNote, ProfilePrompt } from "@/components/meet-people";
+import { newFaceIds, NewFacesNote, ProfilePrompt } from "@/components/meet-people";
 
 export const dynamic = "force-dynamic";
 
@@ -107,8 +107,8 @@ export default async function HomePage() {
   // page rather than the door QR code, so they have to live here too.
   const hereToday = !cap.closed && (!!myBooking || !!myCheckin);
   const newFaces = hereToday
-    ? await countNewFaces(user.id, others.map((p) => p.id), today)
-    : 0;
+    ? await newFaceIds(user.id, others.map((p) => p.id), today)
+    : new Set<string>();
 
   return (
     <>
@@ -210,12 +210,16 @@ export default async function HomePage() {
                   deskNumber: p.deskNumber,
                   slot: p.slot,
                   isYou: p.id === user.id,
+                  isNew: newFaces.has(p.id),
                   avatarUrl: p.avatarUrl,
                   profile: p.profile,
                 }))}
               />
             )}
-            <NewFacesNote newFaces={newFaces} total={others.length} />
+            <NewFacesNote
+              names={others.filter((p) => newFaces.has(p.id)).map((p) => p.name)}
+              total={others.length}
+            />
           </Card>
         )}
 

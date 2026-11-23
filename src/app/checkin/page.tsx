@@ -8,7 +8,7 @@ import { CheckinButtons, EventCheckinButtons } from "./checkin-buttons";
 import { btnPrimary, btnSecondary, Card, Icon } from "@/components/ui";
 import { SurveyCard } from "@/components/survey-card";
 import { PeopleList } from "@/components/people";
-import { countNewFaces, NewFacesNote, ProfilePrompt } from "@/components/meet-people";
+import { newFaceIds, NewFacesNote, ProfilePrompt } from "@/components/meet-people";
 
 export const dynamic = "force-dynamic";
 
@@ -82,8 +82,8 @@ export default async function CheckinPage() {
   const others = cap.people.filter((p) => !seen.has(p.id) && !!seen.add(p.id));
   const described = others.filter((p) => !!p.profile?.bio).length;
   const newFaces = checkedIn
-    ? await countNewFaces(user.id, others.map((p) => p.id), today)
-    : 0;
+    ? await newFaceIds(user.id, others.map((p) => p.id), today)
+    : new Set<string>();
 
   return (
     <Shell>
@@ -136,9 +136,13 @@ export default async function CheckinPage() {
               slot: p.slot,
               avatarUrl: p.avatarUrl,
               profile: p.profile,
+              isNew: newFaces.has(p.id),
             }))}
           />
-          <NewFacesNote newFaces={newFaces} total={others.length} />
+          <NewFacesNote
+            names={others.filter((p) => newFaces.has(p.id)).map((p) => p.name)}
+            total={others.length}
+          />
         </Card>
       )}
 

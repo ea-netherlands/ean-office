@@ -16,16 +16,16 @@ import { AvatarUpload } from "@/components/avatar-upload";
  */
 
 /**
- * How many of `others` the person has never been booked in with, before
- * today. Booked rows only: a cancellation or a waitlist place means they
- * were never actually in the room together.
+ * Which of `others` the person has never been booked in with, before today.
+ * Booked rows only: a cancellation or a waitlist place means they were never
+ * actually in the room together.
  */
-export async function countNewFaces(
+export async function newFaceIds(
   userId: string,
   others: string[],
   today: string
-): Promise<number> {
-  if (others.length === 0) return 0;
+): Promise<Set<string>> {
+  if (others.length === 0) return new Set();
   const myDays = db
     .select({ date: bookings.date })
     .from(bookings)
@@ -47,23 +47,36 @@ export async function countNewFaces(
       )
     );
   const metIds = new Set(met.map((r) => r.userId));
-  return others.filter((id) => !metIds.has(id)).length;
+  return new Set(others.filter((id) => !metIds.has(id)));
+}
+
+const SHOW_NAMES = 3;
+
+/**
+ * "Raymond Koopmanschap and Soem Zeijlmans", "A, B and 2 others". Full
+ * names: first names collide in a room this size (two Sannes, two Jameses).
+ */
+function nameList(names: string[]): string {
+  const first = names;
+  if (first.length === 1) return first[0];
+  if (first.length <= SHOW_NAMES) {
+    return `${first.slice(0, -1).join(", ")} and ${first[first.length - 1]}`;
+  }
+  const rest = first.length - (SHOW_NAMES - 1);
+  return `${first.slice(0, SHOW_NAMES - 1).join(", ")} and ${rest} others`;
 }
 
 /**
- * A count, not a name: pointing at one person ("go talk to Sanne")
- * volunteers someone who never agreed to be volunteered.
+ * Names the people they haven't shared a day with (James, 23 Nov 2026: a
+ * count alone left him scanning the list to work out who it meant). Their
+ * chips carry a "new" tag too, so the name in the sentence has a face.
  */
-export function NewFacesNote({ newFaces, total }: { newFaces: number; total: number }) {
-  if (newFaces === 0) return null;
+export function NewFacesNote({ names, total }: { names: string[]; total: number }) {
+  if (names.length === 0) return null;
   const lead =
-    newFaces === total
-      ? total === 1
-        ? "You haven't shared a day with them before."
-        : "You haven't shared a day with any of them before."
-      : newFaces === 1
-        ? "1 of them you haven't shared a day with before."
-        : `${newFaces} of them you haven't shared a day with before.`;
+    names.length === total && total > SHOW_NAMES
+      ? "You haven't shared a day with any of them before."
+      : `You haven't shared a day with ${nameList(names)} before.`;
   return (
     <div className="mt-4 pt-3 border-t border-dashed border-slate-200 flex items-start gap-2 text-sm text-slate-700">
       <Icon name="users-plus" className="text-lg text-teal-700 mt-0.5 shrink-0" />

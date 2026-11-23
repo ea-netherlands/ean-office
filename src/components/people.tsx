@@ -11,6 +11,8 @@ export type PersonChipData = {
   deskNumber?: number | null;
   slot?: Slot;
   isYou?: boolean;
+  /** Never been booked in on the same day as the viewer. */
+  isNew?: boolean;
   avatarUrl?: string | null;
   profile: {
     bio: string | null;
@@ -59,6 +61,9 @@ export function PeopleList({ people }: { people: PersonChipData[] }) {
               ) : null}
               {p.slot && p.slot !== "day" && (
                 <span className="text-slate-400">{SLOT_BADGE[p.slot]}</span>
+              )}
+              {p.isNew && (
+                <span className="text-teal-700 font-medium">new to you</span>
               )}
               {clickable && <span className="text-teal-600">›</span>}
             </button>
