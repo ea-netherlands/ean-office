@@ -12,6 +12,7 @@ import { and, eq, gte, lte, asc } from "drizzle-orm";
 import { addDays, formatDayLong, todayAms, formatDay } from "@/lib/dates";
 import { TodayActions } from "./today-actions";
 import { SurveyCard } from "@/components/survey-card";
+import { countNewFaces, NewFacesNote, ProfilePrompt } from "@/components/meet-people";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +102,13 @@ export default async function HomePage() {
   // A private day still closes the office, so it leads today's card — but it
   // isn't something anyone else could come to, so it stays off What's on.
   const listedEvents = upcomingEvents.filter((e) => !e.isPrivate);
+  // The meet-people nudges are for whoever's actually in the room today:
+  // booked or checked in. Most members check in with the button on this
+  // page rather than the door QR code, so they have to live here too.
+  const hereToday = !cap.closed && (!!myBooking || !!myCheckin);
+  const newFaces = hereToday
+    ? await countNewFaces(user.id, others.map((p) => p.id), today)
+    : 0;
 
   return (
     <>
@@ -207,7 +215,12 @@ export default async function HomePage() {
                 }))}
               />
             )}
+            <NewFacesNote newFaces={newFaces} total={others.length} />
           </Card>
+        )}
+
+        {hereToday && (
+          <ProfilePrompt user={user} othersCount={others.length} className="mb-4" />
         )}
 
         <Card>

@@ -1,19 +1,14 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { getCurrentUser, isActiveMember } from "@/lib/auth";
-import { db, bookings, checkins, events, eventAttendance, ensureMigrated } from "@/db";
-import { and, eq, inArray, lt } from "drizzle-orm";
+import { db, checkins, events, eventAttendance, ensureMigrated } from "@/db";
+import { and, eq } from "drizzle-orm";
 import { todayAms, formatDayLong } from "@/lib/dates";
 import { capacityForDay, checkInUser } from "@/lib/booking";
 import { CheckinButtons, EventCheckinButtons } from "./checkin-buttons";
 import { btnPrimary, btnSecondary, Card, Icon } from "@/components/ui";
 import { SurveyCard } from "@/components/survey-card";
 import { PeopleList } from "@/components/people";
-import { QuickPublishForm } from "@/components/community-profile-card";
-import { AvatarUpload } from "@/components/avatar-upload";
-import { avatarUrl } from "@/lib/avatars";
-import { PROFILE_PROMPT_COOKIE } from "@/lib/profile-options";
-import { snoozeProfilePromptAction } from "@/actions/profile";
+import { countNewFaces, NewFacesNote, ProfilePrompt } from "@/components/meet-people";
 
 export const dynamic = "force-dynamic";
 
@@ -86,18 +81,9 @@ export default async function CheckinPage() {
   const seen = new Set<string>([user.id]);
   const others = cap.people.filter((p) => !seen.has(p.id) && !!seen.add(p.id));
   const described = others.filter((p) => !!p.profile?.bio).length;
-  const myAvatar = avatarUrl(user.id, user.avatarUpdatedAt);
-  const myProfileLive = user.profileVisible && !!user.bio?.trim();
-  const snoozed = !!(await cookies()).get(PROFILE_PROMPT_COOKIE);
-  const showPrompt = checkedIn && !myProfileLive && !snoozed;
-
-  // How many of today's people they've never been in with. A count, not a
-  // name: pointing at one person ("go talk to Sanne") volunteers someone who
-  // never agreed to be volunteered.
-  const metBefore = checkedIn
-    ? await sharedDaysWith(user.id, others.map((p) => p.id), today)
-    : new Set<string>();
-  const newFaces = others.filter((p) => !metBefore.has(p.id)).length;
+  const newFaces = checkedIn
+    ? await countNewFaces(user.id, others.map((p) => p.id), today)
+    : 0;
 
   return (
     <Shell>
@@ -152,45 +138,12 @@ export default async function CheckinPage() {
               profile: p.profile,
             }))}
           />
-          {newFaces > 0 && (
-            <div className="mt-4 pt-3 border-t border-dashed border-slate-200 flex items-start gap-2 text-sm text-slate-700">
-              <Icon name="users-plus" className="text-lg text-teal-700 mt-0.5 shrink-0" />
-              <p>
-                {newFaces === others.length
-                  ? others.length === 1
-                    ? "You haven't shared a day with them before."
-                    : `You haven't shared a day with any of them before.`
-                  : newFaces === 1
-                    ? "1 of them you haven't shared a day with before."
-                    : `${newFaces} of them you haven't shared a day with before.`}{" "}
-                New connections are one of the best things about the office: a
-                lot of jobs, collaborations and good ideas start with a chat
-                over coffee. Say hi at lunch?
-              </p>
-            </div>
-          )}
+          <NewFacesNote newFaces={newFaces} total={others.length} />
         </Card>
       )}
 
-      {showPrompt && (
-        <Card className="mt-4 w-full text-left">
-          <h2>{others.length > 0 ? "Let them find you too" : "Let people find you"}</h2>
-          <p className="text-sm text-slate-600 mt-1">
-            One sentence about what you&apos;re working on, and other members
-            can tap your name to see it.
-          </p>
-          {!myAvatar && (
-            <div className="mt-3">
-              <AvatarUpload name={user.name} src={null} />
-            </div>
-          )}
-          <QuickPublishForm
-            bio={user.bio || user.about}
-            link={user.publicLink || user.profileUrl}
-            fromApplication={!user.bio && !!user.about}
-            snoozeAction={snoozeProfilePromptAction}
-          />
-        </Card>
+      {checkedIn && (
+        <ProfilePrompt user={user} othersCount={others.length} className="mt-4 w-full" />
       )}
 
       {todaysEvents.length > 0 && (
@@ -217,40 +170,6 @@ export default async function CheckinPage() {
       </Link>
     </Shell>
   );
-}
-
-/**
- * Which of `others` have been booked into the office on a day `userId` was
- * too, before today. Booked rows only: a cancellation or a waitlist place
- * means they were never actually in the room together.
- */
-async function sharedDaysWith(
-  userId: string,
-  others: string[],
-  today: string
-): Promise<Set<string>> {
-  if (others.length === 0) return new Set();
-  const myDays = db
-    .select({ date: bookings.date })
-    .from(bookings)
-    .where(
-      and(
-        eq(bookings.userId, userId),
-        eq(bookings.status, "booked"),
-        lt(bookings.date, today)
-      )
-    );
-  const rows = await db
-    .selectDistinct({ userId: bookings.userId })
-    .from(bookings)
-    .where(
-      and(
-        inArray(bookings.userId, others),
-        eq(bookings.status, "booked"),
-        inArray(bookings.date, myDays)
-      )
-    );
-  return new Set(rows.map((r) => r.userId));
 }
 
 function Shell({ children }: { children: React.ReactNode }) {

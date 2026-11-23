@@ -93,7 +93,7 @@ export function QuickPublishForm({
 
   return (
     <form action={action} className="mt-3 space-y-3 text-left">
-      {snoozeAction && <input type="hidden" name="from" value="checkin" />}
+      {snoozeAction && <input type="hidden" name="from" value="prompt" />}
       <div>
         <label className={labelCls} htmlFor="quick-bio">
           What you&apos;re working on
